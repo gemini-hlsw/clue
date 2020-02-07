@@ -1,5 +1,6 @@
-package clue
+package clue.js
 
+import clue._
 import cats.effect._
 import org.scalajs.dom.ext.Ajax
 import io.circe._

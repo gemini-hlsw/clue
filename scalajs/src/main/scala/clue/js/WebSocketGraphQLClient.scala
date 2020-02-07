@@ -1,5 +1,6 @@
-package clue
+package clue.js
 
+import clue._
 import cats.effect._
 import org.scalajs.dom.raw.WebSocket
 import io.circe.syntax._
@@ -24,7 +25,7 @@ case class WebSocketGraphQLClient(uri: String)(
     def send(msg: StreamingMessage): IO[Unit] =
       IO(ws.send(msg.asJson.toString))
 
-    protected[client] def close(): IO[Unit] =
+    protected[clue] def close(): IO[Unit] =
       IO(ws.close())
   }
 

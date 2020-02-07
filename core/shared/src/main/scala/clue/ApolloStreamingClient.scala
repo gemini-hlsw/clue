@@ -100,7 +100,7 @@ trait ApolloStreamingClient extends GraphQLStreamingClient[ConcurrentEffect] {
 
   protected trait Sender {
     def send(msg: StreamingMessage): IO[Unit]
-    protected[client] def close(): IO[Unit]
+    protected[clue] def close(): IO[Unit]
   }
 
   final protected def processMessage(str: String): IO[Unit] = 

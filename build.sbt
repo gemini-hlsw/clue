@@ -10,7 +10,8 @@ inThisBuild(List(
       "-deprecation",
       "-feature",
       "-Xfatal-warnings",
-      "-encoding", "UTF-8"
+      "-encoding", "UTF-8",
+      "-Ymacro-annotations"
     ),  
   organization := "com.rpiaggio",
   homepage := Some(url("https://github.com/rpiaggio/clue")),
@@ -26,12 +27,13 @@ inThisBuild(List(
   scmInfo := Some(ScmInfo(
     url("https://https://github.com/rpiaggio/clue"),
     "scm:git:git@github.com:rpiaggio/clue.git",
-    Some("scm:git:git@github.com:rpiaggio/clue.git")))
+    Some("scm:git:git@github.com:rpiaggio/clue.git"))),
+  pomIncludeRepository := { _ => false }
 ))
 
-lazy val root = project.in(file(".")).
-  aggregate(coreJVM, coreJS, scalaJS).
-  settings(
+lazy val root = project.in(file("."))
+  .aggregate(coreJVM, coreJS, scalaJS)
+  .settings(
     publish := {},
     publishLocal := {}
   )
@@ -44,8 +46,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform).in(file("core"))
         Settings.Libraries.CatsEffectJS.value ++
         Settings.Libraries.Fs2JS.value ++
         Settings.Libraries.Circe.value ++
-        Settings.Libraries.Log4Cats.value,
-    pomIncludeRepository := { _ => false }
+        Settings.Libraries.Log4Cats.value    
   )
   .jsSettings(
     scalacOptions ++= Seq(
@@ -60,6 +61,13 @@ lazy val coreJVM = core.jvm
 lazy val scalaJS = project.in(file("scalajs"))
   .settings(
     moduleName := "clue-scalajs",
+    libraryDependencies ++=
+      Settings.Libraries.ScalaJSDom.value,
+/*      // Settings.Libraries.CatsJS.value ++
+        Settings.Libraries.CatsEffectJS.value ++
+        // Settings.Libraries.Fs2JS.value ++
+        Settings.Libraries.Circe.value ++
+        Settings.Libraries.Log4Cats.value,*/
     scalacOptions ++= Seq(
       "-P:scalajs:suppressMissingJSGlobalDeprecations"
     )

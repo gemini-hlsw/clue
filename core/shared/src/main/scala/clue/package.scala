@@ -1,9 +1,7 @@
-package explore.graphql
-
 import io.circe.generic.extras._
 
-package object client {
-  protected[client] type MessageType = String
+package object clue {
+  protected[clue] type MessageType = String
 
   private val messageTypes: Map[String, String] = Map(
     "ConnectionInit" -> "connection_init",
@@ -18,7 +16,7 @@ package object client {
     "Complete" -> "complete"
   )
 
-  implicit protected[client] val genDevConfig: Configuration =
+  implicit protected[clue] val genDevConfig: Configuration =
     Configuration.default
       .withDiscriminator("type")
       .copy(transformConstructorNames = messageTypes)

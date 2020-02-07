@@ -11,7 +11,7 @@ import io.circe.generic.JsonCodec
 // }
 
 @JsonCodec
-protected[client] final case class GraphQLRequest(
+protected[clue] final case class GraphQLRequest(
   query:         String,
   operationName: Option[String] = None,
   variables:     Option[Json] = None

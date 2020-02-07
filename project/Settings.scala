@@ -9,22 +9,24 @@ object Settings {
     val catsEffect                  = "2.1.0"
     val fs2                         = "2.2.2"
     val circe                       = "0.12.3"
+    val circeGenericExtras          = "0.12.2"
     val log4Cats                    = "1.0.1"
     val log4CatsLog4s               = "0.4.0-M1"
+    val scalaJSDom                  = "0.9.8"
   }
 
   object Libraries {
     import LibraryVersions._
 
-    val CatsJS = Def.setting(Seq[ModuleID](
+    val CatsJS = Def.setting(Seq(
       "org.typelevel" %%% "cats-core" % cats
     ))
 
-    val CatsEffectJS = Def.setting(Seq[ModuleID](
+    val CatsEffectJS = Def.setting(Seq(
       "org.typelevel" %%% "cats-effect" % catsEffect
     ))
 
-    val Fs2JS = Def.setting(Seq[ModuleID](
+    val Fs2JS = Def.setting(Seq(
       "co.fs2" %%% "fs2-core" % fs2
     ))
 
@@ -32,14 +34,19 @@ object Settings {
           "io.circe" %%% "circe-core",
           "io.circe" %%% "circe-generic",
           "io.circe" %%% "circe-parser"
-      ).map(_ % circe)
+      ).map(_ % circe) ++ Seq(
+        "io.circe" %%% "circe-generic-extras" % circeGenericExtras
+      )
     )
 
-    val Log4Cats = Def.setting(Seq[ModuleID](
+    val Log4Cats = Def.setting(Seq(
       "io.chrisdavenport" %%% "log4cats-core" % log4Cats,
       "io.chrisdavenport" %%% "log4cats-log4s" % log4CatsLog4s
     ))
 
+    val ScalaJSDom = Def.setting(Seq(
+      "org.scala-js" %%% "scalajs-dom" % scalaJSDom
+    ))
   }
 
 }
