@@ -132,7 +132,7 @@ trait ApolloStreamingClient extends GraphQLStreamingClient[ConcurrentEffect] {
   final protected def terminateAllSubscriptions(): IO[Unit] = 
     for {
       subs <- subscriptions.get
-      _ <- subs.parUnorderedTraverse(_.terminate())
+      _ <- subs.toList.parUnorderedTraverse(_._2.terminate()) // In 2.13 we can just subs.parUnorderedTraverse(_.terminate())
       _ <- subscriptions.set(Map.empty)
     } yield ()
 
