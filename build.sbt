@@ -18,7 +18,7 @@ lazy val paradisePlugin = Def.setting{
 
 lazy val scalaOptions = Def.setting {
     PartialFunction.condOpt(CrossVersion.partialVersion(scalaVersion.value)) {
-      case Some((2, n)) if n <= 12 => Seq(/*"-Xfuture",*/ "-Yno-adapted-args")
+      case Some((2, n)) if n <= 12 => Seq("-Xfuture", "-Yno-adapted-args")
       case Some((2, n)) if n >= 13 => Seq("-Ymacro-annotations")
     }.toList.flatten
   }
@@ -32,7 +32,7 @@ inThisBuild(List(
       "-feature",
       "-Xfatal-warnings",
       "-encoding", "UTF-8",
-      "-language:higherKinds"
+      "-language:higherKinds"      
     ) ++ scalaOptions.value,
   organization := "com.rpiaggio",
   homepage := Some(url("https://github.com/rpiaggio/clue")),
