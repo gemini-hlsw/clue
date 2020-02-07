@@ -1,0 +1,75 @@
+*.class
+*.log
+*.swp
+.#*
+*.iml
+.metals/
+.DS_Store
+*.pem
+*.der
+*.p12
+*.pkcs12
+*.jks
+yarn.lock
+.tags*
+.java-version
+package.json
+package-lock.json
+calibrations/
+.metals/
+.bloop/
+project/project/.bloop/
+
+# hydra
+.hydra/
+project/hydra.sbt
+
+# sbt specific
+.cache
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+sbt-ctags-dep-srcs/
+buildinfo.properties
+
+# Scala-IDE specific
+.scala_dependencies
+.cache
+.classpath
+.project
+.worksheet/
+bin/
+.settings/
+.idea
+*.ipr
+*.iws
+
+# OS X
+.DS_Store
+
+# Tags
+.tags
+GPATH
+GRTAGS
+GTAGS
+
+# ENSIME
+.ensime
+.ensime_cache/
+.#*
+ensime.sbt
+
+archive
+smartgcal
+.jvmopts
+# Node modules
+node_modules/
+package-lock.json
+
+# Project specific
+modules/edu.gemini.seqexec.web/edu.gemini.seqexec.web.server/log/
