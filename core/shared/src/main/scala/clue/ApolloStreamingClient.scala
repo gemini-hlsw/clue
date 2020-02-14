@@ -126,7 +126,6 @@ trait ApolloStreamingClient extends GraphQLStreamingClient[ConcurrentEffect] {
     (for {
       emitter <- EitherT(subscriptions.get.map(_.get(id).toRight[Throwable](new InvalidSubscriptionIdException(id))))
       _ <- EitherT.right[Throwable](emitter.terminate())
-      _ <- EitherT.right[Throwable](subscriptions.update(_ - id))      
     } yield ()).value.rethrow
 
   final protected def terminateAllSubscriptions(): IO[Unit] = 
@@ -207,7 +206,6 @@ trait ApolloStreamingClient extends GraphQLStreamingClient[ConcurrentEffect] {
       queue <- Queue.unbounded[IO, Either[Throwable, Option[D]]]
       id      = UUID.randomUUID().toString
       emitter = QueueEmitter(queue, request)
-      _ <- subscriptions.update(_ + (id -> emitter))
     } yield (id, emitter)
 
   protected def subscribeInternal[F[_]: ConcurrentEffect, D: Decoder](
@@ -224,7 +222,12 @@ trait ApolloStreamingClient extends GraphQLStreamingClient[ConcurrentEffect] {
         (id, emitter) = idEmitter
         _ <- EitherT.right[Throwable](sender.send(StreamingMessage.Start(id, request)))
       } yield {
-        ApolloSubscription(emitter.queue.dequeue.rethrow.unNoneTerminate.translate(toF), id)
+        val bracket = Stream.bracket(subscriptions.update(_ + (id -> emitter)))(
+            _ => subscriptions.update(_ - id))
+        ApolloSubscription(
+          bracket.flatMap(_ => emitter.queue.dequeue.rethrow.unNoneTerminate).translate(toF), 
+          id
+        )
       }).value.rethrow
     )
   }
@@ -234,12 +237,11 @@ trait ApolloStreamingClient extends GraphQLStreamingClient[ConcurrentEffect] {
     operationName: Option[String] = None,
     variables:     Option[Json] = None
   ): F[D] =
-    // Cleanup should happen automatically, as long as the server sends the "Complete" message.
-    // We could add an option to force cleanup, in which case we would wrap the IO.asyncF in a Bracket.
+    // Cleanup happens automatically (as long as the server sends the "Complete" message).
     LiftIO[F].liftIO {
       IO.asyncF[D] { cb =>
         subscribeInternal[IO, D](document, operationName, variables).flatMap { subscription =>
-          subscription.stream.attempt.head
+          subscription.stream.attempt
             .evalMap(result => IO(cb(result)))
             .compile
             .drain
