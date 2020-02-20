@@ -2,8 +2,9 @@ package clue
 
 import fs2.Stream
 import cats._
-import cats.effect._
 import cats.implicits._
+import cats.effect._
+import cats.effect.implicits._
 import io.circe._
 import io.circe.parser._
 import fs2.concurrent.Queue
@@ -16,135 +17,124 @@ import fs2.concurrent.SignallingRef
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.log4s.Log4sLogger
 
-trait ApolloStreamingClient extends GraphQLStreamingClient[ConcurrentEffect] {
-  protected implicit val timerIO: Timer[IO]
-  protected implicit val csIO: ContextShift[IO]
+trait ApolloStreamingClient[F[_]] extends GraphQLStreamingClient[F] {
+  protected implicit val ceF: ConcurrentEffect[F]
+  protected implicit val tF: Timer[F]  
 
-  protected implicit val logger = Log4sLogger.createLocal[IO]
+  protected implicit val logger = Log4sLogger.createLocal[F]
 
-  private val connectionStatus: SignallingRef[IO, StreamingClientStatus] =
+  private val connectionStatus: SignallingRef[F, StreamingClientStatus] =
     SignallingRef
-      .in[SyncIO, IO, StreamingClientStatus](StreamingClientStatus.Closed)
+      .in[SyncIO, F, StreamingClientStatus](StreamingClientStatus.Closed)
       .unsafeRunSync()
 
-  private def toF[F[_]: LiftIO]: ~>[IO, F] = new ~>[IO, F] {
-        def apply[A](fa: IO[A]): F[A] = LiftIO[F].liftIO(fa)
-      }
+  def status: F[StreamingClientStatus] =
+    connectionStatus.get
 
-  def status[F[_]: LiftIO]: F[StreamingClientStatus] =
-    LiftIO[F].liftIO(connectionStatus.get)
+  def statusStream: fs2.Stream[F, StreamingClientStatus] =
+    connectionStatus.discrete
 
-  def statusStream[F[_]: LiftIO]: fs2.Stream[F, StreamingClientStatus] =
-    connectionStatus.discrete.translate(toF)
 
-  def close[F[_]: ConcurrentEffect](): F[Unit] =
-    LiftIO[F].liftIO(
-      for {
-        isEmpty <- client.isEmpty
-        sender  <- if (!isEmpty) client.read.map(_.toOption) else IO(None)
-        _ <- sender.foldMap(s =>
-          connectionStatus.set(StreamingClientStatus.Closing) *> 
-            s.close()
-        )
-      } yield ()
+  def close(): F[Unit] =
+    client.read.rethrow.flatMap( s =>
+      connectionStatus.set(StreamingClientStatus.Closing) *> s.close()
     )
 
-  type Subscription[F[_], D] = ApolloSubscription[F, D]
+  type Subscription[D] = ApolloSubscription[D]
 
-  case class ApolloSubscription[F[_]: LiftIO, D](stream: Stream[F, D], private val id: String)
-      extends StoppableSubscription[F, D] {
+  case class ApolloSubscription[D](stream: Stream[F, D], private val id: String)
+      extends StoppableSubscription[D] {
 
     def stop(): F[Unit] =
-      LiftIO[F].liftIO(
         (for {
           sender <- EitherT(client.read)
           _ <- EitherT(terminateSubscription(id).attempt)
           _ <- EitherT.right[Throwable](sender.send(StreamingMessage.Stop(id)))
         } yield ()).value.rethrow
-      )
   }
 
   private trait Emitter {
     val request: GraphQLRequest
 
-    def emitData(json:  Json): IO[Unit]
-    def emitError(json: Json): IO[Unit]
-    def terminate(): IO[Unit]
+    def emitData(json:  Json): F[Unit]
+    def emitError(json: Json): F[Unit]
+    def terminate(): F[Unit]
   }
 
-  type DataQueue[D] = Queue[IO, Either[Throwable, Option[D]]]
+  type DataQueue[D] = Queue[F, Either[Throwable, Option[D]]]
 
   private case class QueueEmitter[D: Decoder](
     val queue:   DataQueue[D],
     val request: GraphQLRequest
   ) extends Emitter {
 
-    def emitData(json: Json): IO[Unit] = {
+    def emitData(json: Json): F[Unit] = {
       val data = json.as[D]
       queue.enqueue1(data.map(_.some))
     }
 
-    def emitError(json: Json): IO[Unit] = {
+    def emitError(json: Json): F[Unit] = {
       val error = new GraphQLException(List(json))
        queue.enqueue1(Left(error))
     }
 
-    def terminate(): IO[Unit] =
+    def terminate(): F[Unit] =
        queue.enqueue1(Right(None))
   }
 
-  private val subscriptions: Ref[IO, Map[String, Emitter]] = 
-    Ref.in[SyncIO, IO, Map[String, Emitter]](Map.empty).unsafeRunSync()
+  private val subscriptions: Ref[F, Map[String, Emitter]] = 
+    Ref.in[SyncIO, F, Map[String, Emitter]](Map.empty).unsafeRunSync()
 
   protected type WebSocketClient
 
   protected trait Sender {
-    def send(msg: StreamingMessage): IO[Unit]
-    protected[clue] def close(): IO[Unit]
+    def send(msg: StreamingMessage): F[Unit]
+    protected[clue] def close(): F[Unit]
   }
 
-  final protected def processMessage(str: String): IO[Unit] = 
+  final protected def processMessage(str: String): F[Unit] = 
     decode[StreamingMessage](str) match {
       case Left(e) =>
-        e.printStackTrace()
-        Logger[IO].error(e)(s"Exception decoding WebSocket message for [$uri]")
+        Logger[F].error(e)(s"Exception decoding WebSocket message for [$url]")
       case Right(StreamingMessage.ConnectionError(json)) =>
-        Logger[IO].error(s"Connection error on WebSocket for [$uri]: $json")
+        Logger[F].error(s"Connection error on WebSocket for [$url]: $json")
       case Right(StreamingMessage.DataJson(id, json)) =>
-        for {
-          emitter <- subscriptions.get.map(_.get(id))
-          _ <- emitter.foldMap(_.emitData(json))
-        } yield ()
+        subscriptions.get.map(_.get(id)).flatMap(
+          _.fold(
+            Logger[F].error(s"Received data for non existant subscription id [$id] on WebSocket for [$url]: $json")
+          )(_.emitData(json))
+        )
       case Right(StreamingMessage.Error(id, json)) =>
-        Logger[IO].error(s"Error message received on WebSocket for [$uri] and subscription id [$id]:\n$json")
+        Logger[F].error(s"Error message received on WebSocket for [$url] and subscription id [$id]:\n$json")
       case Right(StreamingMessage.Complete(id)) =>
         terminateSubscription(id)
-      case _ => IO.unit
+      case _ => Applicative[F].pure(())
     }
 
-  final protected def terminateSubscription(id: String): IO[Unit] =
+  final protected def terminateSubscription(id: String): F[Unit] =
     (for {
       emitter <- EitherT(subscriptions.get.map(_.get(id).toRight[Throwable](new InvalidSubscriptionIdException(id))))
       _ <- EitherT.right[Throwable](emitter.terminate())
     } yield ()).value.rethrow
 
-  final protected def terminateAllSubscriptions(): IO[Unit] = 
+  final protected def terminateAllSubscriptions(): F[Unit] = 
     for {
       subs <- subscriptions.get
-      _ <- subs.toList.parUnorderedTraverse(_._2.terminate()) // In 2.13 we can just subs.parUnorderedTraverse(_.terminate())
+      _ <- subs.toList.traverse(_._2.terminate())
+      // _ <- subs.toList.parUnorderedTraverse(_._2.terminate()) // In 2.13 we can just subs.parUnorderedTraverse(_.terminate())
       _ <- subscriptions.set(Map.empty)
     } yield ()
 
   protected def createClientInternal(
-    onOpen:    Sender => IO[Unit],
-    onMessage: String => IO[Unit],
-    onError:   Throwable => IO[Unit],
-    onClose:   Boolean => IO[Unit] // Boolean = wasClean
-  ): IO[Unit]
+    onOpen:    Sender => F[Unit],
+    onMessage: String => F[Unit],
+    onError:   Throwable => F[Unit],
+    onClose:   Boolean => F[Unit] // Boolean = wasClean
+  ): F[Unit]
 
   private def createClient(
-    mvar: MVar[IO, Either[Throwable, Sender]],
-    onOpen: Sender => IO[Unit] = _ => IO.unit): IO[Unit] =
+    mvar: MVar[F, Either[Throwable, Sender]],
+    onOpen: Sender => F[Unit] = _ => Applicative[F].pure(())): F[Unit] =
       connectionStatus.set(StreamingClientStatus.Connecting) *> {
         try {
           createClientInternal(
@@ -170,14 +160,15 @@ trait ApolloStreamingClient extends GraphQLStreamingClient[ConcurrentEffect] {
               for {
                 _ <- mvar.take
                 _ <- connectionStatus.set(StreamingClientStatus.Closed)
-                _ <- IO.sleep(10 seconds) // TODO: Backoff.
+                _ <- Timer[F].sleep(10 seconds) // TODO: Backoff.
                 // math.min(60000, math.max(200, value.nextAttempt * 2)))
                 _      <- createClient(mvar, {sender =>
                   // Restart subscriptions on new client.
                   // TODO Filter out queries/mutations?
                     for {
                       subs <- subscriptions.get
-                      _ <- subs.toList.parUnorderedTraverse{ case(id, emitter) => 
+                      _ <- subs.toList.traverse{ case(id, emitter) => 
+                      // _ <- subs.toList.parUnorderedTraverse{ case(id, emitter) => 
                         sender.send(StreamingMessage.Start(id, emitter.request))
                       }
                     } yield()
@@ -191,61 +182,57 @@ trait ApolloStreamingClient extends GraphQLStreamingClient[ConcurrentEffect] {
         }
       }
 
-  lazy private val client: MVar[IO, Either[Throwable, Sender]] = {
-    val mvar = MVar.emptyIn[SyncIO, IO, Either[Throwable, Sender]].unsafeRunSync()
+  lazy private val client: MVar[F, Either[Throwable, Sender]] = {
+    val mvar = MVar.emptyIn[SyncIO, F, Either[Throwable, Sender]].unsafeRunSync()
 
-    createClient(mvar).unsafeRunAsyncAndForget()
+    Effect[F].toIO(createClient(mvar)).unsafeRunAsyncAndForget()
 
     mvar
   }
 
   private def buildQueue[D: Decoder](
     request: GraphQLRequest
-  ): IO[(String, QueueEmitter[D])] =
+  ): F[(String, QueueEmitter[D])] =
     for {
-      queue <- Queue.unbounded[IO, Either[Throwable, Option[D]]]
+      queue <- Queue.unbounded[F, Either[Throwable, Option[D]]]
       id      = UUID.randomUUID().toString
       emitter = QueueEmitter(queue, request)
     } yield (id, emitter)
 
-  protected def subscribeInternal[F[_]: ConcurrentEffect, D: Decoder](
+  protected def subscribeInternal[D: Decoder](
     subscription:  String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
-  ): F[Subscription[F, D]] = {
+  ): F[Subscription[D]] = {
     val request = GraphQLRequest(subscription, operationName, variables)
 
-    LiftIO[F].liftIO(
-      (for {
-        sender    <- EitherT(client.read)
-        idEmitter <- EitherT.right[Throwable](buildQueue[D](request))
-        (id, emitter) = idEmitter
-        _ <- EitherT.right[Throwable](sender.send(StreamingMessage.Start(id, request)))
-      } yield {
-        val bracket = Stream.bracket(subscriptions.update(_ + (id -> emitter)))(
-            _ => subscriptions.update(_ - id))
-        ApolloSubscription(
-          bracket.flatMap(_ => emitter.queue.dequeue.rethrow.unNoneTerminate).translate(toF), 
-          id
-        )
-      }).value.rethrow
-    )
+    (for {
+      sender    <- EitherT(client.read)
+      idEmitter <- EitherT.right[Throwable](buildQueue[D](request))
+      (id, emitter) = idEmitter
+      _ <- EitherT.right[Throwable](sender.send(StreamingMessage.Start(id, request)))
+    } yield {
+      val bracket = Stream.bracket(subscriptions.update(_ + (id -> emitter)))(
+          _ => subscriptions.update(_ - id))
+      ApolloSubscription(
+        bracket.flatMap(_ => emitter.queue.dequeue.rethrow.unNoneTerminate),
+        id
+      )
+    }).value.rethrow
   }
 
-  protected def queryInternal[F[_]: ConcurrentEffect, D: Decoder](
+  protected def queryInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
   ): F[D] =
     // Cleanup happens automatically (as long as the server sends the "Complete" message).
-    LiftIO[F].liftIO {
-      IO.asyncF[D] { cb =>
-        subscribeInternal[IO, D](document, operationName, variables).flatMap { subscription =>
-          subscription.stream.attempt
-            .evalMap(result => IO(cb(result)))
-            .compile
-            .drain
-        }
+    Async[F].asyncF[D] { cb =>
+      subscribeInternal[D](document, operationName, variables).flatMap { subscription =>
+        subscription.stream.attempt
+          .evalMap(result => Sync[F].delay(cb(result)))
+          .compile
+          .drain
       }
     }
 }

@@ -6,19 +6,20 @@ import org.scalajs.dom.ext.Ajax
 import io.circe._
 import io.circe.syntax._
 import io.circe.parser._
+import io.lemonlabs.uri.Url
 
 import scala.concurrent.ExecutionContext.Implicits._
 import scala.util.Success
 import scala.util.Failure
 
-case class AjaxGraphQLClient(uri: String) extends GraphQLClient[Async] {
+case class AjaxGraphQLClient[F[_]: Async](url: Url) extends GraphQLClient[F] {
   // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
   // {
   //   "data": { ... }, // Typed
   //   "errors": [ ... ]
   // }
 
-  override protected def queryInternal[F[_]: Async, D: Decoder](
+  override protected def queryInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
@@ -26,7 +27,7 @@ case class AjaxGraphQLClient(uri: String) extends GraphQLClient[Async] {
     Async[F].async { cb =>
       Ajax
         .post(
-          url     = uri,
+          url     = url.toString,
           data    = GraphQLRequest(document, operationName, variables).asJson.toString,
           headers = Map("Content-Type" -> "application/json")
         )

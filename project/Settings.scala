@@ -13,6 +13,7 @@ object Settings {
     val log4Cats                    = "1.0.1"
     val log4CatsLog4s               = "0.4.0-M1"
     val scalaJSDom                  = "0.9.8"
+    val scalaUri                    = "2.1.0"
   }
 
   object Libraries {
@@ -46,6 +47,10 @@ object Settings {
 
     val ScalaJSDom = Def.setting(Seq(
       "org.scala-js" %%% "scalajs-dom" % scalaJSDom
+    ))
+
+    val ScalaUri = Def.setting(Seq(
+      "io.lemonlabs" %%% "scala-uri" % scalaUri
     ))
   }
 

@@ -27,13 +27,13 @@ inThisBuild(List(
   name := "clue",
   scalaVersion := "2.13.1",
   crossScalaVersions := Seq("2.12.10", "2.13.1"),
-    scalacOptions ++= Seq(
-      "-deprecation",
-      "-feature",
-      "-Xfatal-warnings",
-      "-encoding", "UTF-8",
-      "-language:higherKinds"      
-    ) ++ scalaOptions.value,
+  scalacOptions ++= Seq(
+    "-deprecation",
+    "-feature",
+    "-Xfatal-warnings",
+    "-encoding", "UTF-8",
+    "-language:higherKinds"      
+  ) ++ scalaOptions.value,
   organization := "com.rpiaggio",
   homepage := Some(url("https://github.com/rpiaggio/clue")),
   licenses += ("BSD 3-Clause", url("http://opensource.org/licenses/BSD-3-Clause")),
@@ -68,6 +68,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform).in(file("core"))
         Settings.Libraries.Fs2JS.value ++
         Settings.Libraries.Circe.value ++
         Settings.Libraries.Log4Cats.value ++
+        Settings.Libraries.ScalaUri.value ++
         paradisePlugin.value
   )
   .jsSettings(
