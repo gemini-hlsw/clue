@@ -210,14 +210,18 @@ trait ApolloStreamingClient[F[_]] extends GraphQLStreamingClient[F] {
       sender    <- EitherT(client.read)
       idEmitter <- EitherT.right[Throwable](buildQueue[D](request))
       (id, emitter) = idEmitter
-      _ <- EitherT.right[Throwable](sender.send(StreamingMessage.Start(id, request)))
     } yield {
       val bracket = Stream.bracket(subscriptions.update(_ + (id -> emitter)))(
           _ => subscriptions.update(_ - id))
       ApolloSubscription(
-        bracket.flatMap(_ => emitter.queue.dequeue.rethrow.unNoneTerminate),
+        bracket.flatMap(_ => 
+          Stream.eval(sender.send(StreamingMessage.Start(id, request))) >>
+            emitter.queue.dequeue.rethrow.unNoneTerminate
+        ),
         id
       )
+
+
     }).value.rethrow
   }
 
