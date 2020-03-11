@@ -6,8 +6,6 @@ import io.circe.syntax._
 import io.lemonlabs.uri.Url
 
 trait GraphQLClient[F[_]] {
-  val url: Url
-
   // Query with GraphQLQuery
   def query(
     graphQLQuery:  GraphQLQuery,

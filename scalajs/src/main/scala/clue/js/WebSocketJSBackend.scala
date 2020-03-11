@@ -15,32 +15,27 @@ import io.lemonlabs.uri.Url
 // This implementation follows the Apollo protocol, specified in:
 // https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
 // Also see: https://medium.com/@rob.blackbourn/writing-a-graphql-websocket-subscriber-in-javascript-4451abb9cd60
-case class WebSocketGraphQLClient[F[_]](url: Url)(implicit
-  protected val ceF: ConcurrentEffect[F],
-  protected val tF: Timer[F]
-) extends ApolloStreamingClient[F] {
+final class WebSocketJSConnection[F[_] : Sync](private val ws: WebSocket) extends BackendConnection[F] {
+  override def send(msg: StreamingMessage): F[Unit] =
+    Sync[F].delay(ws.send(msg.asJson.toString))
 
+  override def close(): F[Unit] =
+    Sync[F].delay(ws.close())
+}
+
+final class WebSocketJSBackend[F[_] : ConcurrentEffect : Logger] extends StreamingBackend[F] {
   private val Protocol = "graphql-ws"
 
-  type WebSocketClient = WebSocket
-
-  private case class WebSocketSender(private val ws: WebSocketClient) extends Sender {
-    def send(msg: StreamingMessage): F[Unit] =
-      Sync[F].delay(ws.send(msg.asJson.toString))
-
-    protected[clue] def close(): F[Unit] =
-      Sync[F].delay(ws.close())
-  }
-
-  protected def createClientInternal(
+  override def connect(
+    url:       Url,
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit]
-  ): F[Sender] = Async[F].async { cb =>
+  ): F[BackendConnection[F]] =  Async[F].async { cb =>
     val ws = new WebSocket(url.toString, Protocol)
 
     ws.onopen = { _: Event =>
-      cb(Right(WebSocketSender(ws)))
+      cb(Right(new WebSocketJSConnection(ws)))
     }
 
     ws.onmessage = { e: MessageEvent =>
@@ -62,4 +57,8 @@ case class WebSocketGraphQLClient[F[_]](url: Url)(implicit
       onClose(e.wasClean).toIO.unsafeRunAsyncAndForget()
     }
   }
+}
+
+object WebSocketJSBackend {
+  def apply[F[_] : ConcurrentEffect : Logger]: WebSocketJSBackend[F] = new WebSocketJSBackend[F]
 }

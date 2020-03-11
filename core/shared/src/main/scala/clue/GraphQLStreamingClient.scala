@@ -6,8 +6,6 @@ import io.circe.syntax._
 import io.lemonlabs.uri.Url
 
 trait GraphQLStreamingClient[F[_]] extends GraphQLClient[F] {
-  val url: Url
-
   def status: F[StreamingClientStatus]
 
   def statusStream: fs2.Stream[F, StreamingClientStatus]
