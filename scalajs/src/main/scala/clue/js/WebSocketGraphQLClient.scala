@@ -33,15 +33,14 @@ case class WebSocketGraphQLClient[F[_]](url: Url)(implicit
   }
 
   protected def createClientInternal(
-    onOpen:    Sender => F[Unit],
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit]
-  ): F[Unit] = Sync[F].delay {
+  ): F[Sender] = Async[F].async { cb =>
     val ws = new WebSocket(url.toString, Protocol)
 
     ws.onopen = { _: Event =>
-      onOpen(WebSocketSender(ws)).toIO.unsafeRunAsyncAndForget()
+      cb(Right(WebSocketSender(ws)))
     }
 
     ws.onmessage = { e: MessageEvent =>

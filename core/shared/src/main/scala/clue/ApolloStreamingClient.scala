@@ -19,7 +19,7 @@ import io.chrisdavenport.log4cats.log4s.Log4sLogger
 
 trait ApolloStreamingClient[F[_]] extends GraphQLStreamingClient[F] {
   protected implicit val ceF: ConcurrentEffect[F]
-  protected implicit val tF: Timer[F]  
+  protected implicit val tF: Timer[F]
 
   protected implicit val logger = Log4sLogger.createLocal[F]
 
@@ -92,25 +92,6 @@ trait ApolloStreamingClient[F[_]] extends GraphQLStreamingClient[F] {
     protected[clue] def close(): F[Unit]
   }
 
-  final protected def processMessage(str: String): F[Unit] = 
-    decode[StreamingMessage](str) match {
-      case Left(e) =>
-        Logger[F].error(e)(s"Exception decoding WebSocket message for [$url]")
-      case Right(StreamingMessage.ConnectionError(json)) =>
-        Logger[F].error(s"Connection error on WebSocket for [$url]: $json")
-      case Right(StreamingMessage.DataJson(id, json)) =>
-        subscriptions.get.map(_.get(id)).flatMap(
-          _.fold(
-            Logger[F].error(s"Received data for non existant subscription id [$id] on WebSocket for [$url]: $json")
-          )(_.emitData(json))
-        )
-      case Right(StreamingMessage.Error(id, json)) =>
-        Logger[F].error(s"Error message received on WebSocket for [$url] and subscription id [$id]:\n$json")
-      case Right(StreamingMessage.Complete(id)) =>
-        terminateSubscription(id)
-      case _ => Applicative[F].pure(())
-    }
-
   final protected def terminateSubscription(id: String): F[Unit] =
     (for {
       emitter <- EitherT(subscriptions.get.map(_.get(id).toRight[Throwable](new InvalidSubscriptionIdException(id))))
@@ -126,61 +107,69 @@ trait ApolloStreamingClient[F[_]] extends GraphQLStreamingClient[F] {
     } yield ()
 
   protected def createClientInternal(
-    onOpen:    Sender => F[Unit],
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit] // Boolean = wasClean
-  ): F[Unit]
+  ): F[Sender]
 
-  private def createClient(
-    mvar: MVar[F, Either[Throwable, Sender]],
-    onOpen: Sender => F[Unit] = _ => Applicative[F].pure(())): F[Unit] =
-      connectionStatus.set(StreamingClientStatus.Connecting) *> {
-        try {
-          createClientInternal(
-            onOpen = { sender =>
-              for {
-                _ <- connectionStatus.set(StreamingClientStatus.Open)
-                _ <- sender.send(StreamingMessage.ConnectionInit())
-                _ <- mvar.put(Right(sender))
-                _ <- onOpen(sender)
-              } yield ()
-            },
-            onMessage = processMessage _,
-            onError = { t =>
-              mvar
-                .tryPut(Left(t))
-                .flatMap {
-                  // Connection was established. We must cancel all subscriptions. (or not?)
-                  case false => terminateAllSubscriptions()
-                  case true  => connectionStatus.set(StreamingClientStatus.Closed) // Retry?
-                }
-            },
-            onClose = { _ =>
-              for {
-                _ <- mvar.take
-                _ <- connectionStatus.set(StreamingClientStatus.Closed)
-                _ <- Timer[F].sleep(10 seconds) // TODO: Backoff.
-                // math.min(60000, math.max(200, value.nextAttempt * 2)))
-                _      <- createClient(mvar, {sender =>
-                  // Restart subscriptions on new client.
-                  // TODO Filter out queries/mutations?
-                    for {
-                      subs <- subscriptions.get
-                      _ <- subs.toList.traverse{ case(id, emitter) => 
-                      // _ <- subs.toList.parUnorderedTraverse{ case(id, emitter) => 
-                        sender.send(StreamingMessage.Start(id, emitter.request))
-                      }
-                    } yield()
-                })
-              } yield ()
-            }
+  private def createClient(mvar: MVar[F, Either[Throwable, Sender]]): F[Unit] = {
+
+    def processMessage(str: String): F[Unit] = 
+      decode[StreamingMessage](str) match {
+        case Left(e) =>
+          Logger[F].error(e)(s"Exception decoding WebSocket message for [$url]")
+        case Right(StreamingMessage.ConnectionError(json)) =>
+          Logger[F].error(s"Connection error on WebSocket for [$url]: $json")
+        case Right(StreamingMessage.DataJson(id, json)) =>
+          subscriptions.get.map(_.get(id)).flatMap(
+            _.fold(
+              Logger[F].error(s"Received data for non existant subscription id [$id] on WebSocket for [$url]: $json")
+            )(_.emitData(json))
           )
-        } catch {
-          case e: Throwable =>
-            mvar.put(Left(e)) // TODO: Use tryPut and handle error
-        }
+        case Right(StreamingMessage.Error(id, json)) =>
+          Logger[F].error(s"Error message received on WebSocket for [$url] and subscription id [$id]:\n$json")
+        case Right(StreamingMessage.Complete(id)) =>
+          terminateSubscription(id)
+        case _ => Applicative[F].pure(())
       }
+
+    def processError(t: Throwable): F[Unit] =
+      mvar
+        .tryPut(Left(t))
+        .flatMap {
+          // Connection was established. We must cancel all subscriptions. (or not?)
+          case false => terminateAllSubscriptions()
+          case true  => connectionStatus.set(StreamingClientStatus.Closed) // Retry?
+        }
+
+    val processClose: F[Unit] =
+      for {
+        _ <- mvar.take
+        _ <- connectionStatus.set(StreamingClientStatus.Closed)
+        _ <- Timer[F].sleep(10 seconds) // TODO: Backoff.
+        // math.min(60000, math.max(200, value.nextAttempt * 2)))
+        _ <- createClient(mvar)
+      } yield ()
+
+    def restartSubscriptions(sender: Sender): F[Unit] =
+      for {
+        subs <- subscriptions.get
+        _    <- subs.toList.traverse{ case(id, emitter) =>  // _ <- subs.toList.parUnorderedTraverse{ case(id, emitter) => 
+                  sender.send(StreamingMessage.Start(id, emitter.request))
+                }
+      } yield()            
+
+    val initializedSender =
+      for {
+        _      <- connectionStatus.set(StreamingClientStatus.Connecting)
+        sender <- createClientInternal(processMessage _, processError _, _ => processClose)
+        _      <- connectionStatus.set(StreamingClientStatus.Open)              
+        _      <- sender.send(StreamingMessage.ConnectionInit())
+        _      <- restartSubscriptions(sender)
+      } yield sender
+
+    initializedSender.attempt.flatMap(mvar.put)
+  }
 
   lazy private val client: MVar[F, Either[Throwable, Sender]] = {
     val mvar = MVar.emptyIn[SyncIO, F, Either[Throwable, Sender]].unsafeRunSync()
