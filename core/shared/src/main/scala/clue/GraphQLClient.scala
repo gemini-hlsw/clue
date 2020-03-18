@@ -3,7 +3,6 @@ package clue
 import cats.implicits._
 import io.circe._
 import io.circe.syntax._
-import io.lemonlabs.uri.Url
 
 trait GraphQLClient[F[_]] {
   // Query with GraphQLQuery

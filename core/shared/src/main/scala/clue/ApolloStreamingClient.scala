@@ -28,7 +28,7 @@ trait StreamingBackend[F[_]] {
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit] // Boolean = wasClean
-  ): F[BackendConnection[F]] 
+  ): F[BackendConnection[F]]
 }
 
 object StreamingBackend {
