@@ -15,7 +15,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import fs2.concurrent.SignallingRef
 import io.chrisdavenport.log4cats.Logger
-import io.lemonlabs.uri.Url
+import sttp.model.Uri
 
  trait BackendConnection[F[_]] {
   def send(msg: StreamingMessage): F[Unit]
@@ -24,7 +24,7 @@ import io.lemonlabs.uri.Url
 
 trait StreamingBackend[F[_]] {
   def connect(
-    url:       Url,
+    uri:       Uri,
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit] // Boolean = wasClean
@@ -44,7 +44,7 @@ protected[clue] trait Emitter[F[_]] {
 }
 
 class ApolloStreamingClient[F[_]: ConcurrentEffect : Timer : Logger : StreamingBackend](
-  url: Url
+  uri: Uri
 )(
   val connectionStatus:       SignallingRef[F, StreamingClientStatus],
   private val subscriptions:  Ref[F, Map[String, Emitter[F]]],
@@ -116,17 +116,17 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect : Timer : Logger : StreamingB
     def processMessage(str: String): F[Unit] = 
       decode[StreamingMessage](str) match {
         case Left(e) =>
-          Logger[F].error(e)(s"Exception decoding WebSocket message for [$url]")
+          Logger[F].error(e)(s"Exception decoding WebSocket message for [$uri]")
         case Right(StreamingMessage.ConnectionError(json)) =>
-          Logger[F].error(s"Connection error on WebSocket for [$url]: $json")
+          Logger[F].error(s"Connection error on WebSocket for [$uri]: $json")
         case Right(StreamingMessage.DataJson(id, json)) =>
           subscriptions.get.map(_.get(id)).flatMap(
             _.fold(
-              Logger[F].error(s"Received data for non existant subscription id [$id] on WebSocket for [$url]: $json")
+              Logger[F].error(s"Received data for non existant subscription id [$id] on WebSocket for [$uri]: $json")
             )(_.emitData(json))
           )
         case Right(StreamingMessage.Error(id, json)) =>
-          Logger[F].error(s"Error message received on WebSocket for [$url] and subscription id [$id]:\n$json")
+          Logger[F].error(s"Error message received on WebSocket for [$uri] and subscription id [$id]:\n$json")
         case Right(StreamingMessage.Complete(id)) =>
           terminateSubscription(id)
         case _ => Applicative[F].pure(())
@@ -161,7 +161,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect : Timer : Logger : StreamingB
     val initializedSender =
       for {
         _      <- connectionStatus.set(StreamingClientStatus.Connecting)
-        sender <- StreamingBackend[F].connect(url, processMessage _, processError _, _ => processClose)
+        sender <- StreamingBackend[F].connect(uri, processMessage _, processError _, _ => processClose)
         _      <- connectionStatus.set(StreamingClientStatus.Open)              
         _      <- sender.send(StreamingMessage.ConnectionInit())
         _      <- restartSubscriptions(sender)
@@ -220,12 +220,12 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect : Timer : Logger : StreamingB
 }
 
 object ApolloStreamingClient {
-  def of[F[_]: ConcurrentEffect : Timer : Logger : StreamingBackend](url: Url): F[ApolloStreamingClient[F]] =
+  def of[F[_]: ConcurrentEffect : Timer : Logger : StreamingBackend](uri: Uri): F[ApolloStreamingClient[F]] =
     for {
       connectionStatus <- SignallingRef[F, StreamingClientStatus](StreamingClientStatus.Closed)
       subscriptions    <- Ref.of[F, Map[String, Emitter[F]]](Map.empty)
       connectionMVar   <- MVar.empty[F, Either[Throwable, BackendConnection[F]]]
-      client           = new ApolloStreamingClient[F](url)(connectionStatus, subscriptions, connectionMVar)
+      client           = new ApolloStreamingClient[F](uri)(connectionStatus, subscriptions, connectionMVar)
       _                <- client.connect
     } yield {
       client

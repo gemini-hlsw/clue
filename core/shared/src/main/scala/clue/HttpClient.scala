@@ -1,6 +1,6 @@
 package clue
 
-import io.lemonlabs.uri.Url
+import sttp.model.Uri
 import io.circe._
 import io.circe.syntax._
 import io.circe.parser._
@@ -11,7 +11,7 @@ import cats.Applicative
 
 trait Backend[F[_]] {
   def request(
-    url:       Url,
+    uri:       Uri,
     request:   GraphQLRequest
   ): F[String]
 }
@@ -25,13 +25,13 @@ object Backend {
 //   "data": { ... }, // Typed
 //   "errors": [ ... ]
 // }
-class HttpClient[F[_] : Backend](url: Url)(implicit me: MonadError[F, Throwable]) extends GraphQLClient[F] {
+class HttpClient[F[_] : Backend](uri: Uri)(implicit me: MonadError[F, Throwable]) extends GraphQLClient[F] {
   override protected def queryInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
   ): F[D] = 
-    Backend[F].request(url, GraphQLRequest(document, operationName, variables)).map{ response =>
+    Backend[F].request(uri, GraphQLRequest(document, operationName, variables)).map{ response =>
       parse(response).flatMap { json =>
         val cursor = json.hcursor
         cursor
@@ -44,6 +44,6 @@ class HttpClient[F[_] : Backend](url: Url)(implicit me: MonadError[F, Throwable]
 }
 
 object HttpClient {
-  def of[F[_]: Backend](url: Url)(implicit me: MonadError[F, Throwable]): F[HttpClient[F]] =
-    Applicative[F].pure(new HttpClient[F](url))
+  def of[F[_]: Backend](uri: Uri)(implicit me: MonadError[F, Throwable]): F[HttpClient[F]] =
+    Applicative[F].pure(new HttpClient[F](uri))
 }

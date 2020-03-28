@@ -6,7 +6,7 @@ import org.scalajs.dom.ext.Ajax
 import io.circe._
 import io.circe.syntax._
 import io.circe.parser._
-import io.lemonlabs.uri.Url
+import sttp.model.Uri
 
 import scala.concurrent.ExecutionContext.Implicits._
 import scala.util.Success
@@ -14,13 +14,13 @@ import scala.util.Failure
 
 final class AjaxJSBackend[F[_]: Async] extends Backend[F] {
   def request(
-    url:       Url,
+    uri:       Uri,
     request:   GraphQLRequest
   ): F[String] =
     Async[F].async { cb =>
       Ajax
         .post(
-          url     = url.toString,
+          url     = uri.toString,
           data    = request.asJson.toString,
           headers = Map("Content-Type" -> "application/json")
         )

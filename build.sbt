@@ -68,7 +68,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform).in(file("core"))
         Settings.Libraries.Fs2JS.value ++
         Settings.Libraries.Circe.value ++
         Settings.Libraries.Log4Cats.value ++
-        Settings.Libraries.ScalaUri.value ++
+        Settings.Libraries.SttpModel.value ++
         paradisePlugin.value
   )
   .jsSettings(

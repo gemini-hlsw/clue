@@ -10,7 +10,7 @@ import io.circe.parser._
 import scala.scalajs.js
 import org.scalajs.dom.raw.{ CloseEvent, Event, MessageEvent }
 import io.chrisdavenport.log4cats.Logger
-import io.lemonlabs.uri.Url
+import sttp.model.Uri
 
 // This implementation follows the Apollo protocol, specified in:
 // https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
@@ -27,12 +27,12 @@ final class WebSocketJSBackend[F[_] : ConcurrentEffect : Logger] extends Streami
   private val Protocol = "graphql-ws"
 
   override def connect(
-    url:       Url,
+    uri:       Uri,
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit]
   ): F[BackendConnection[F]] =  Async[F].async { cb =>
-    val ws = new WebSocket(url.toString, Protocol)
+    val ws = new WebSocket(uri.toString, Protocol)
 
     ws.onopen = { _: Event =>
       cb(Right(new WebSocketJSConnection(ws)))
@@ -42,7 +42,7 @@ final class WebSocketJSBackend[F[_] : ConcurrentEffect : Logger] extends Streami
       (e.data match {
         case str: String => onMessage(str)
         case other       =>
-          Logger[F].error(s"Unexpected event from WebSocket for [$url]: [$other]")
+          Logger[F].error(s"Unexpected event from WebSocket for [$uri]: [$other]")
       }).toIO.unsafeRunAsyncAndForget()
     }
 
