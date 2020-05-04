@@ -14,14 +14,14 @@ import scala.util.Failure
 
 final class AjaxJSBackend[F[_]: Async] extends Backend[F] {
   def request(
-    uri:       Uri,
-    request:   GraphQLRequest
+    uri:     Uri,
+    request: GraphQLRequest
   ): F[String] =
     Async[F].async { cb =>
       Ajax
         .post(
-          url     = uri.toString,
-          data    = request.asJson.toString,
+          url = uri.toString,
+          data = request.asJson.toString,
           headers = Map("Content-Type" -> "application/json")
         )
         .onComplete {
@@ -32,5 +32,5 @@ final class AjaxJSBackend[F[_]: Async] extends Backend[F] {
 }
 
 object AjaxJSBackend {
-  def apply[F[_] : Async]: AjaxJSBackend[F] = new AjaxJSBackend[F]
+  def apply[F[_]: Async]: AjaxJSBackend[F] = new AjaxJSBackend[F]
 }
