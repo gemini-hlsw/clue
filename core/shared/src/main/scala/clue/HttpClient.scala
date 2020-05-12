@@ -10,14 +10,14 @@ import cats.MonadError
 import cats.Applicative
 import io.chrisdavenport.log4cats.Logger
 
-trait Backend[F[_]]          {
+trait Backend[F[_]] {
   def request(
     uri:     Uri,
     request: GraphQLRequest
   ): F[String]
 }
 
-object Backend               {
+object Backend {
   def apply[F[_]: Backend]: Backend[F] = implicitly
 }
 
@@ -51,7 +51,7 @@ class HttpClient[F[_]: Logger: Backend](uri: Uri)(implicit me: MonadError[F, Thr
       .onError { case t: Throwable => Logger[F].error(t)(s"$LogPrefix Error in query: ") }
 }
 
-object HttpClient            {
+object HttpClient {
   def of[F[_]: Logger: Backend](uri: Uri)(implicit me: MonadError[F, Throwable]): F[HttpClient[F]] =
     Applicative[F].pure(new HttpClient[F](uri))
 }
