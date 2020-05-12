@@ -9,7 +9,7 @@ object Settings {
     val catsEffect                  = "2.1.0"
     val fs2                         = "2.2.2"
     val circe                       = "0.12.3"
-    val circeGenericExtras          = "0.12.2"
+    val circeGenericExtras          = "0.13.0"
     val log4Cats                    = "1.0.1"
     val log4CatsLog4s               = "0.4.0-M1"
     val scalaJSDom                  = "0.9.8"
