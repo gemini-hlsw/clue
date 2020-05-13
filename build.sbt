@@ -29,8 +29,8 @@ lazy val scalaOptions = Def.setting {
 inThisBuild(
   List(
     name := "clue",
-    scalaVersion := "2.13.1",
-    crossScalaVersions := Seq("2.12.10", "2.13.1"),
+    scalaVersion := "2.13.2",
+    crossScalaVersions := Seq("2.12.11", scalaVersion.value),
     scalacOptions ++= Seq(
       "-deprecation",
       "-feature",
@@ -81,11 +81,6 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
         Settings.Libraries.SttpModel.value ++
         paradisePlugin.value
   )
-  .jsSettings(
-    scalacOptions ++= Seq(
-      "-P:scalajs:suppressMissingJSGlobalDeprecations"
-    )
-  )
 
 lazy val coreJS = core.js
 
@@ -96,10 +91,7 @@ lazy val scalaJS = project
   .settings(
     moduleName := "clue-scalajs",
     libraryDependencies ++=
-      Settings.Libraries.ScalaJSDom.value,
-    scalacOptions ++= Seq(
-      "-P:scalajs:suppressMissingJSGlobalDeprecations"
-    )
+      Settings.Libraries.ScalaJSDom.value
   )
   .dependsOn(coreJS)
   .enablePlugins(ScalaJSPlugin)

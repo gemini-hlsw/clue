@@ -22,7 +22,7 @@ trait BackendConnection[F[_]] {
   def close(): F[Unit]
 }
 
-trait StreamingBackend[F[_]]  {
+trait StreamingBackend[F[_]] {
   def connect(
     uri:       Uri,
     onMessage: String => F[Unit],
@@ -31,11 +31,11 @@ trait StreamingBackend[F[_]]  {
   ): F[BackendConnection[F]]
 }
 
-object StreamingBackend       {
+object StreamingBackend {
   def apply[F[_]: StreamingBackend]: StreamingBackend[F] = implicitly
 }
 
-protected[clue] trait Emitter[F[_]]   {
+protected[clue] trait Emitter[F[_]] {
   val request: GraphQLRequest
 
   def emitData(json:  Json): F[Unit]
@@ -243,7 +243,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
     }
 }
 
-object ApolloStreamingClient          {
+object ApolloStreamingClient {
   def of[F[_]: ConcurrentEffect: Timer: Logger: StreamingBackend](
     uri: Uri
   ): F[ApolloStreamingClient[F]] =
