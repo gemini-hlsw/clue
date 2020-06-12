@@ -26,3 +26,6 @@ project/metals.sbt
 ._.DS_Store
 **/.DS_Store
 **/._.DS_Store
+
+# Hydra
+.hydra/

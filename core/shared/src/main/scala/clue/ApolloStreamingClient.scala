@@ -101,7 +101,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
     for {
       _       <- Logger[F].debug(s"$LogPrefix Terminating subscription [$id]")
       subs    <- subscriptions.get
-      _       <- Logger[F].trace(s"$LogPrefix Current subscriptions: [${subs.keySet}]")
+      _       <- Logger[F].debug(s"$LogPrefix Current subscriptions: [${subs.keySet}]")
       emitter <- Sync[F].fromOption(subs.get(id), new InvalidSubscriptionIdException(id))
       _       <- emitter.terminate()
     } yield ()
@@ -215,7 +215,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
           (
             Stream.eval(sender.send(StreamingMessage.Start(id, request))) >>
               emitter.queue.dequeue
-                .evalTap(v => Logger[F].trace(s"$LogPrefix Dequeuing for subscription [$id]: [$v]"))
+                .evalTap(v => Logger[F].debug(s"$LogPrefix Dequeuing for subscription [$id]: [$v]"))
           ).rethrow.unNoneTerminate
             .onError {
               case t: Throwable =>
