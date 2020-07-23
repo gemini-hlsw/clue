@@ -12,7 +12,7 @@ object Settings {
     val circeGenericExtras = "0.13.0"
     val log4Cats           = "1.1.1"
     val scalaJSDom         = "1.0.0"
-    val sttpModel          = "1.1.3"
+    val sttpModel          = "1.1.4"
   }
 
   object Libraries {
