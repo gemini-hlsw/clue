@@ -1,5 +1,6 @@
 package clue
 
+import clue.model.GraphQLRequest
 import sttp.model.Uri
 import io.circe._
 import io.circe.syntax._

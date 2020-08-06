@@ -20,6 +20,7 @@ project/plugins/project/
 .bloop/
 .metals/
 project/metals.sbt
+/out/
 
 # Mac OS
 .DS_Store
@@ -29,3 +30,4 @@ project/metals.sbt
 
 # Hydra
 .hydra/
+

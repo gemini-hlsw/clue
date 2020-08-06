@@ -1,4 +1,4 @@
-package clue
+package clue.model
 
 import io.circe.Json
 import io.circe.generic.JsonCodec
@@ -11,7 +11,7 @@ import io.circe.generic.JsonCodec
 // }
 
 @JsonCodec
-protected[clue] final case class GraphQLRequest(
+final case class GraphQLRequest(
   query:         String,
   operationName: Option[String] = None,
   variables:     Option[Json] = None

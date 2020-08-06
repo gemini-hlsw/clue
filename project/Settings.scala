@@ -18,19 +18,19 @@ object Settings {
   object Libraries {
     import LibraryVersions._
 
-    val CatsJS = Def.setting(
+    val Cats = Def.setting(
       Seq(
         "org.typelevel" %%% "cats-core" % cats
       )
     )
 
-    val CatsEffectJS = Def.setting(
+    val CatsEffect = Def.setting(
       Seq(
         "org.typelevel" %%% "cats-effect" % catsEffect
       )
     )
 
-    val Fs2JS = Def.setting(
+    val Fs2 = Def.setting(
       Seq(
         "co.fs2" %%% "fs2-core" % fs2
       )
@@ -41,7 +41,11 @@ object Settings {
         "io.circe" %%% "circe-core",
         "io.circe" %%% "circe-generic",
         "io.circe" %%% "circe-parser"
-      ).map(_        % circe) ++ Seq(
+      ).map(_        % circe)
+    )
+
+    val CirceGenericExtras = Def.setting(
+      Seq(
         "io.circe" %%% "circe-generic-extras" % circeGenericExtras
       )
     )

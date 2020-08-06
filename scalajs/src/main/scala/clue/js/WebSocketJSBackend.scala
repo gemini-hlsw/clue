@@ -1,16 +1,18 @@
 package clue.js
 
 import clue._
+import clue.model.StreamingMessage
 import cats._
 import cats.effect._
 import cats.effect.implicits._
 import org.scalajs.dom.raw.WebSocket
 import io.circe.syntax._
 import io.circe.parser._
+import sttp.model.Uri
+
 import scala.scalajs.js
 import org.scalajs.dom.raw.{ CloseEvent, Event, MessageEvent }
 import io.chrisdavenport.log4cats.Logger
-import sttp.model.Uri
 
 // This implementation follows the Apollo protocol, specified in:
 // https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md

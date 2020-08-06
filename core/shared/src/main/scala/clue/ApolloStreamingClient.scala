@@ -1,5 +1,7 @@
 package clue
 
+import clue.model._
+
 import fs2.Stream
 import cats._
 import cats.implicits._
@@ -9,8 +11,10 @@ import io.circe._
 import io.circe.parser._
 import fs2.concurrent.Queue
 import java.util.UUID
+
 import cats.effect.concurrent.{ MVar, Ref }
 import cats.data.EitherT
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import fs2.concurrent.SignallingRef
@@ -163,9 +167,9 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       for {
         subs <- subscriptions.get
         _    <- subs.toList.traverse {
-               case (id, emitter) => // _ <- subs.toList.parUnorderedTraverse{ case(id, emitter) =>
-                 sender.send(StreamingMessage.Start(id, emitter.request))
-             }
+                  case (id, emitter) => // _ <- subs.toList.parUnorderedTraverse{ case(id, emitter) =>
+                    sender.send(StreamingMessage.Start(id, emitter.request))
+                }
       } yield ()
 
     val initializedSender =

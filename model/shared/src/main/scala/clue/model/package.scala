@@ -1,9 +1,11 @@
+package clue
+
 import io.circe.generic.extras._
 
-package object clue {
-  protected[clue] type MessageType = String
+package object model {
+  private type MessageType = String
 
-  private val messageTypes: Map[String, String] = Map(
+  private val messageTypes: Map[MessageType, String] = Map(
     "ConnectionInit"      -> "connection_init",
     "ConnectionAck"       -> "connection_ack",
     "ConnectionError"     -> "connection_error",
@@ -16,7 +18,7 @@ package object clue {
     "Complete"            -> "complete"
   )
 
-  implicit protected[clue] val genDevConfig: Configuration =
+  implicit protected[model] val genDevConfig: Configuration =
     Configuration.default
       .withDiscriminator("type")
       .copy(transformConstructorNames = messageTypes)

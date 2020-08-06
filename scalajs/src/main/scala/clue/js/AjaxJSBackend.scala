@@ -1,6 +1,7 @@
 package clue.js
 
 import clue._
+import clue.model.GraphQLRequest
 import cats.effect._
 import org.scalajs.dom.ext.Ajax
 import io.circe._
