@@ -9,8 +9,6 @@ import io.circe.Json
  * GraphQL web socket protocol streaming messages.  Messages are cleanly
  * divided in those coming `FromClient` and those coming `FromServer`.  See
  * also https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
- *
- * Copied and modified from https://github.com/rpiaggio/clue
  */
 object StreamingMessage {
 
@@ -149,6 +147,7 @@ object StreamingMessage {
      */
     final case class Data(id: String, payload: DataWrapper)
       extends FromServer
+         with Identifier
          with Payload[DataWrapper]
 
     object Data {
