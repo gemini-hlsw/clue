@@ -5,14 +5,15 @@ import sbt.librarymanagement._
 object Settings {
 
   object LibraryVersions {
-    val cats               = "2.1.1"
-    val catsEffect         = "2.1.4"
-    val fs2                = "2.4.2"
-    val circe              = "0.13.0"
-    val circeGenericExtras = "0.13.0"
-    val log4Cats           = "1.1.1"
-    val scalaJSDom         = "1.1.0"
-    val sttpModel          = "1.1.4"
+    val cats                 = "2.1.1"
+    val catsEffect           = "2.1.4"
+    val catsTestkitScalaTest = "1.0.1"
+    val fs2                  = "2.4.2"
+    val circe                = "0.13.0"
+    val circeGenericExtras   = "0.13.0"
+    val log4Cats             = "1.1.1"
+    val scalaJSDom           = "1.1.0"
+    val sttpModel            = "1.1.4"
   }
 
   object Libraries {
@@ -27,6 +28,13 @@ object Settings {
     val CatsEffect = Def.setting(
       Seq(
         "org.typelevel" %%% "cats-effect" % catsEffect
+      )
+    )
+
+    val CatsTestkit = Def.setting(
+      Seq(
+        "org.typelevel" %%% "cats-testkit"           % cats                 % "test",
+        "org.typelevel" %%% "cats-testkit-scalatest" % catsTestkitScalaTest % "test"
       )
     )
 
