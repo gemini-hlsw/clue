@@ -2,6 +2,7 @@ package clue.js
 
 import clue._
 import clue.model.StreamingMessage
+import clue.model.json._
 import cats._
 import cats.effect._
 import cats.effect.implicits._
@@ -19,7 +20,7 @@ import io.chrisdavenport.log4cats.Logger
 // Also see: https://medium.com/@rob.blackbourn/writing-a-graphql-websocket-subscriber-in-javascript-4451abb9cd60
 final class WebSocketJSConnection[F[_]: Sync](private val ws: WebSocket)
     extends BackendConnection[F] {
-  override def send(msg: StreamingMessage): F[Unit] =
+  override def send(msg: StreamingMessage.FromClient): F[Unit] =
     Sync[F].delay(ws.send(msg.asJson.toString))
 
   override def close(): F[Unit] =

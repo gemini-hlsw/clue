@@ -5,14 +5,15 @@ import sbt.librarymanagement._
 object Settings {
 
   object LibraryVersions {
-    val cats               = "2.1.1"
-    val catsEffect         = "2.1.4"
-    val fs2                = "2.4.4"
-    val circe              = "0.13.0"
-    val circeGenericExtras = "0.13.0"
-    val log4Cats           = "1.1.1"
-    val scalaJSDom         = "1.1.0"
-    val sttpModel          = "1.1.4"
+    val cats                 = "2.1.1"
+    val catsEffect           = "2.1.4"
+    val catsTestkitScalaTest = "1.0.1"
+    val fs2                  = "2.4.4"
+    val circe                = "0.13.0"
+    val circeGenericExtras   = "0.13.0"
+    val log4Cats             = "1.1.1"
+    val scalaJSDom           = "1.1.0"
+    val sttpModel            = "1.1.4"
   }
 
   object Libraries {
@@ -30,6 +31,13 @@ object Settings {
       )
     )
 
+    val CatsTestkit = Def.setting(
+      Seq(
+        "org.typelevel" %%% "cats-testkit"           % cats                 % "test",
+        "org.typelevel" %%% "cats-testkit-scalatest" % catsTestkitScalaTest % "test"
+      )
+    )
+
     val Fs2 = Def.setting(
       Seq(
         "co.fs2" %%% "fs2-core" % fs2
@@ -40,7 +48,8 @@ object Settings {
       Seq(
         "io.circe" %%% "circe-core",
         "io.circe" %%% "circe-generic",
-        "io.circe" %%% "circe-parser"
+        "io.circe" %%% "circe-parser",
+        "io.circe" %%% "circe-testing"
       ).map(_        % circe)
     )
 

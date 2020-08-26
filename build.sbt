@@ -49,7 +49,9 @@ lazy val model = crossProject(JVMPlatform, JSPlatform)
   .settings(
     moduleName := "clue-model",
     libraryDependencies ++=
-      Settings.Libraries.Circe.value ++
+      Settings.Libraries.Cats.value ++
+        Settings.Libraries.CatsTestkit.value ++
+        Settings.Libraries.Circe.value ++
         Settings.Libraries.CirceGenericExtras.value
   )
 

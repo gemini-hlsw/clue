@@ -1,6 +1,7 @@
 package clue
 
 import clue.model._
+import clue.model.json._
 
 import fs2.Stream
 import cats._
@@ -22,7 +23,7 @@ import io.chrisdavenport.log4cats.Logger
 import sttp.model.Uri
 
 trait BackendConnection[F[_]] {
-  def send(msg: StreamingMessage): F[Unit]
+  def send(msg: StreamingMessage.FromClient): F[Unit]
   def close(): F[Unit]
 }
 
@@ -76,7 +77,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       (for {
         sender <- EitherT(connectionMVar.read)
         _      <- EitherT(terminateSubscription(id).attempt)
-        _      <- EitherT.right[Throwable](sender.send(StreamingMessage.Stop(id)))
+        _      <- EitherT.right[Throwable](sender.send(StreamingMessage.FromClient.Stop(id)))
       } yield ()).value.rethrow
   }
 
@@ -121,12 +122,12 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
   private val connect: F[Unit] = {
 
     def processMessage(str: String): F[Unit] =
-      decode[StreamingMessage](str) match {
-        case Left(e)                                       =>
+      decode[StreamingMessage.FromServer](str) match {
+        case Left(e)                                                  =>
           Logger[F].error(e)(s"Exception decoding WebSocket message for [$uri]")
-        case Right(StreamingMessage.ConnectionError(json)) =>
+        case Right(StreamingMessage.FromServer.ConnectionError(json)) =>
           Logger[F].error(s"Connection error on WebSocket for [$uri]: $json")
-        case Right(StreamingMessage.DataJson(id, json))    =>
+        case Right(StreamingMessage.FromServer.DataJson(id, json))    =>
           subscriptions.get
             .map(_.get(id))
             .flatMap(
@@ -136,13 +137,14 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
                 )
               )(_.emitData(json))
             )
-        case Right(StreamingMessage.Error(id, json))       =>
+        case Right(StreamingMessage.FromServer.Error(id, json))       =>
           Logger[F].error(
             s"Error message received on WebSocket for [$uri] and subscription id [$id]:\n$json"
           )
-        case Right(StreamingMessage.Complete(id))          =>
+        case Right(StreamingMessage.FromServer.Complete(id))          =>
           terminateSubscription(id)
-        case _                                             => ().pure[F]
+        case _                                                        =>
+          ().pure[F]
       }
 
     def processError(t: Throwable): F[Unit] =
@@ -168,7 +170,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
         subs <- subscriptions.get
         _    <- subs.toList.traverse {
                   case (id, emitter) => // _ <- subs.toList.parUnorderedTraverse{ case(id, emitter) =>
-                    sender.send(StreamingMessage.Start(id, emitter.request))
+                    sender.send(StreamingMessage.FromClient.Start(id, emitter.request))
                 }
       } yield ()
 
@@ -178,7 +180,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
         sender <-
           StreamingBackend[F].connect(uri, processMessage _, processError _, _ => processClose)
         _      <- connectionStatus.set(StreamingClientStatus.Open)
-        _      <- sender.send(StreamingMessage.ConnectionInit())
+        _      <- sender.send(StreamingMessage.FromClient.ConnectionInit())
         _      <- restartSubscriptions(sender)
       } yield sender
 
@@ -217,7 +219,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       ApolloSubscription(
         bracket.flatMap(_ =>
           (
-            Stream.eval(sender.send(StreamingMessage.Start(id, request))) >>
+            Stream.eval(sender.send(StreamingMessage.FromClient.Start(id, request))) >>
               emitter.queue.dequeue
                 .evalTap(v => Logger[F].debug(s"$LogPrefix Dequeuing for subscription [$id]: [$v]"))
           ).rethrow.unNoneTerminate
