@@ -1,25 +1,26 @@
+// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package clue
 
-import clue.model._
-import clue.model.json._
-
-import fs2.Stream
-import cats._
-import cats.implicits._
-import cats.effect._
-import cats.effect.implicits._
-import io.circe._
-import io.circe.parser._
-import fs2.concurrent.Queue
 import java.util.UUID
-
-import cats.effect.concurrent.{ MVar, Ref }
-import cats.data.EitherT
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
+
+import cats.data.EitherT
+import cats.effect._
+import cats.effect.concurrent.MVar
+import cats.effect.concurrent.Ref
+import cats.implicits._
+import clue.model._
+import clue.model.json._
+import fs2.Stream
+import fs2.concurrent.Queue
 import fs2.concurrent.SignallingRef
 import io.chrisdavenport.log4cats.Logger
+import io.circe._
+import io.circe.parser._
 import sttp.model.Uri
 
 trait BackendConnection[F[_]] {
@@ -192,7 +193,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
   ): F[(String, QueueEmitter[D])] =
     for {
       queue  <- Queue.unbounded[F, Either[Throwable, Option[D]]]
-      id      = UUID.randomUUID().toString
+      id     <- Sync[F].delay(UUID.randomUUID().toString)
       emitter = QueueEmitter(queue, request)
     } yield (id, emitter)
 

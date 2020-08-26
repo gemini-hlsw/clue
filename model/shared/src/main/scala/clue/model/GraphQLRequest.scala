@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package clue.model
 
 import cats.Eq
@@ -12,17 +15,17 @@ import io.circe.Json
 // }
 
 /**
- * A raw (pre-parsed) GraphQL request.
- *
- * @param query         the query itself
- * @param operationName identifies a particular operation in the query to
- *                      execute
- * @param variables     values corresponding to variables in the query
- */
+  * A raw (pre-parsed) GraphQL request.
+  *
+  * @param query         the query itself
+  * @param operationName identifies a particular operation in the query to
+  *                      execute
+  * @param variables     values corresponding to variables in the query
+  */
 final case class GraphQLRequest(
   query:         String,
   operationName: Option[String] = None,
-  variables:     Option[Json]   = None
+  variables:     Option[Json] = None
 )
 
 object GraphQLRequest {

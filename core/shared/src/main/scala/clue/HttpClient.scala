@@ -1,15 +1,16 @@
+// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package clue
 
-import clue.model.GraphQLRequest
-import sttp.model.Uri
-import io.circe._
-import io.circe.syntax._
-import io.circe.parser._
-import cats.FlatMap
-import cats.implicits._
-import cats.MonadError
 import cats.Applicative
+import cats.MonadError
+import cats.implicits._
+import clue.model.GraphQLRequest
 import io.chrisdavenport.log4cats.Logger
+import io.circe._
+import io.circe.parser._
+import sttp.model.Uri
 
 trait Backend[F[_]] {
   def request(

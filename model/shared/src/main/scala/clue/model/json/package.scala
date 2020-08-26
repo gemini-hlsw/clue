@@ -1,22 +1,26 @@
+// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package clue.model
 
 import cats.implicits._
 import io.circe._
 import io.circe.syntax._
 
-
 /**
- * JSON codecs for `clue.model`.
- */
+  * JSON codecs for `clue.model`.
+  */
 package object json {
 
   implicit val EncoderGraphQLRequest: Encoder[GraphQLRequest] =
     (a: GraphQLRequest) =>
-      Json.obj(
-        "query"         -> Json.fromString(a.query),
-        "operationName" -> a.operationName.asJson,
-        "variables"     -> a.variables.asJson
-      ).dropNullValues
+      Json
+        .obj(
+          "query"         -> Json.fromString(a.query),
+          "operationName" -> a.operationName.asJson,
+          "variables"     -> a.variables.asJson
+        )
+        .dropNullValues
 
   implicit val DecoderGraphQLRequest: Decoder[GraphQLRequest] =
     (c: HCursor) =>
@@ -63,8 +67,8 @@ package object json {
   implicit val EncoderStop: Encoder[Stop] =
     (a: Stop) =>
       Json.obj(
-        "type"    -> Json.fromString("stop"),
-        "id"      -> Json.fromString(a.id)
+        "type" -> Json.fromString("stop"),
+        "id"   -> Json.fromString(a.id)
       )
 
   implicit val DecoderStop: Decoder[Stop] =
@@ -76,10 +80,10 @@ package object json {
 
   implicit val EncoderFromClient: Encoder[StreamingMessage.FromClient] =
     Encoder.instance {
-      case m @ ConnectionInit(_)   => m.asJson
-      case m @ Start(_, _)         => m.asJson
-      case m @ Stop(_)             => m.asJson
-      case _ @ ConnectionTerminate => encodeCaseObject("connection_terminate")
+      case m @ ConnectionInit(_)  => m.asJson
+      case m @ Start(_, _)        => m.asJson
+      case m @ Stop(_)            => m.asJson
+      case _ @ConnectionTerminate => encodeCaseObject("connection_terminate")
     }
 
   implicit val DecoderFromClient: Decoder[StreamingMessage.FromClient] =
@@ -89,7 +93,6 @@ package object json {
       Decoder[Stop].widen,
       decodeCaseObject("connection_terminate", ConnectionTerminate)
     ).reduceLeft(_ or _)
-
 
   // ---- FromServer
 
@@ -116,10 +119,9 @@ package object json {
       )
 
   implicit val DecoderDataWrapper: Decoder[DataWrapper] =
-    (c: HCursor) =>
-      c.downField("data").as[Json].map(DataWrapper(_))
+    (c: HCursor) => c.downField("data").as[Json].map(DataWrapper(_))
 
-  implicit val EncoderData: Encoder[Data] =
+  implicit val EncoderData: Encoder[Data]               =
     (a: Data) =>
       Json.obj(
         "type"    -> Json.fromString("data"),
@@ -154,8 +156,8 @@ package object json {
   implicit val EncoderComplete: Encoder[Complete] =
     (a: Complete) =>
       Json.obj(
-        "type"    -> Json.fromString("complete"),
-        "id"      -> Json.fromString(a.id)
+        "type" -> Json.fromString("complete"),
+        "id"   -> Json.fromString(a.id)
       )
 
   implicit val DecoderComplete: Decoder[Complete] =
@@ -165,15 +167,14 @@ package object json {
         i <- c.downField("id").as[String]
       } yield Complete(i)
 
-
   implicit val EncoderFromServer: Encoder[StreamingMessage.FromServer] =
     Encoder.instance {
-      case _ @ ConnectionAck       => encodeCaseObject("connection_ack")
-      case m @ ConnectionError(_)  => m.asJson
-      case _ @ ConnectionKeepAlive => encodeCaseObject("ka")
-      case m @ Data(_, _)          => m.asJson
-      case m @ Error(_, _)         => m.asJson
-      case m @ Complete(_)         => m.asJson
+      case _ @ConnectionAck       => encodeCaseObject("connection_ack")
+      case m @ ConnectionError(_) => m.asJson
+      case _ @ConnectionKeepAlive => encodeCaseObject("ka")
+      case m @ Data(_, _)         => m.asJson
+      case m @ Error(_, _)        => m.asJson
+      case m @ Complete(_)        => m.asJson
     }
 
   implicit val DecoderFromServer: Decoder[StreamingMessage.FromServer] =
@@ -186,14 +187,13 @@ package object json {
       Decoder[Complete].widen
     ).reduceLeft(_ or _)
 
-
   private def checkType(c: HCursor, expected: String): Decoder.Result[Unit] =
     c.downField("type")
-     .as[String]
-     .filterOrElse(_ === expected, DecodingFailure(s"expected '$expected''", c.history))
-     .void
+      .as[String]
+      .filterOrElse(_ === expected, DecodingFailure(s"expected '$expected''", c.history))
+      .void
 
-  private def encodeCaseObject(tpe: String): Json =
+  private def encodeCaseObject(tpe:            String): Json =
     Json.obj("type" -> Json.fromString(tpe))
 
   private def decodeCaseObject[A, W >: A](tpe: String, instance: A): Decoder[W] =

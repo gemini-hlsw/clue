@@ -10,7 +10,6 @@ object Settings {
     val catsTestkitScalaTest = "1.0.1"
     val fs2                  = "2.4.4"
     val circe                = "0.13.0"
-    val circeGenericExtras   = "0.13.0"
     val log4Cats             = "1.1.1"
     val scalaJSDom           = "1.1.0"
     val sttpModel            = "1.1.4"
@@ -50,13 +49,7 @@ object Settings {
         "io.circe" %%% "circe-generic",
         "io.circe" %%% "circe-parser",
         "io.circe" %%% "circe-testing"
-      ).map(_        % circe)
-    )
-
-    val CirceGenericExtras = Def.setting(
-      Seq(
-        "io.circe" %%% "circe-generic-extras" % circeGenericExtras
-      )
+      ).map(_ % circe)
     )
 
     val Log4Cats = Def.setting(

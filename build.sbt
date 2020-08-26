@@ -1,39 +1,10 @@
 import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
-Global / onChangedBuildSource := ReloadOnSourceChanges
-
 inThisBuild(
-  List(
-    name := "clue",
-    scalaVersion := "2.13.3",
-    scalacOptions ++= Seq(
-      "-deprecation",
-      "-feature",
-      "-Xfatal-warnings",
-      "-encoding",
-      "UTF-8",
-      "-language:higherKinds",
-      "-Ymacro-annotations"
-    ),
-    organization := "com.rpiaggio",
-    homepage := Some(url("https://github.com/rpiaggio/clue")),
-    licenses += ("BSD 3-Clause", url("http://opensource.org/licenses/BSD-3-Clause")),
-    developers := List(
-      Developer(
-        "rpiaggio",
-        "Raúl Piaggio",
-        "rpiaggio@gmail.com",
-        url("http://rpiaggio.com")
-      )
-    ),
-    scmInfo := Some(
-      ScmInfo(url("https://https://github.com/rpiaggio/clue"),
-              "scm:git:git@github.com:rpiaggio/clue.git",
-              Some("scm:git:git@github.com:rpiaggio/clue.git")
-      )
-    ),
-    pomIncludeRepository := { _ => false }
-  )
+  Seq(
+    homepage := Some(url("https://github.com/gemini-hlsw/clue")),
+    Global / onChangedBuildSource := ReloadOnSourceChanges
+  ) ++ gspPublishSettings
 )
 
 lazy val root = project
@@ -41,7 +12,8 @@ lazy val root = project
   .aggregate(modelJVM, modelJS, coreJVM, coreJS, scalaJS)
   .settings(
     publish := {},
-    publishLocal := {}
+    publishLocal := {},
+    packagedArtifacts := Map.empty
   )
 
 lazy val model = crossProject(JVMPlatform, JSPlatform)
@@ -51,8 +23,7 @@ lazy val model = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies ++=
       Settings.Libraries.Cats.value ++
         Settings.Libraries.CatsTestkit.value ++
-        Settings.Libraries.Circe.value ++
-        Settings.Libraries.CirceGenericExtras.value
+        Settings.Libraries.Circe.value
   )
 
 lazy val modelJS = model.js
@@ -88,7 +59,3 @@ lazy val scalaJS = project
   )
   .dependsOn(coreJS)
   .enablePlugins(ScalaJSPlugin)
-
-sonatypeProfileName := "com.rpiaggio"
-
-packagedArtifacts in root := Map.empty

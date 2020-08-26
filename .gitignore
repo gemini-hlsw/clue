@@ -19,7 +19,7 @@ project/plugins/project/
 .vscode/
 .bloop/
 .metals/
-project/metals.sbt
+metals.sbt
 /out/
 
 # Mac OS

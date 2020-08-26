@@ -1,9 +1,12 @@
+// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package clue.model.arb
 
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage.FromClient
 import clue.model.StreamingMessage.FromClient._
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.{ Arbitrary, Gen }
 import org.scalacheck.Arbitrary._
 
 trait ArbFromClient {

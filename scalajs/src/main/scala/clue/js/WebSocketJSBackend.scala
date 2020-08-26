@@ -1,19 +1,23 @@
+// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
 package clue.js
 
+import scala.scalajs.js
+
+import cats.effect._
+import cats.effect.implicits._
 import clue._
 import clue.model.StreamingMessage
 import clue.model.json._
-import cats._
-import cats.effect._
-import cats.effect.implicits._
-import org.scalajs.dom.raw.WebSocket
-import io.circe.syntax._
-import io.circe.parser._
-import sttp.model.Uri
-
-import scala.scalajs.js
-import org.scalajs.dom.raw.{ CloseEvent, Event, MessageEvent }
 import io.chrisdavenport.log4cats.Logger
+import io.circe.parser._
+import io.circe.syntax._
+import org.scalajs.dom.raw.CloseEvent
+import org.scalajs.dom.raw.Event
+import org.scalajs.dom.raw.MessageEvent
+import org.scalajs.dom.raw.WebSocket
+import sttp.model.Uri
 
 // This implementation follows the Apollo protocol, specified in:
 // https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
