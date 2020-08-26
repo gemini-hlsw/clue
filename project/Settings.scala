@@ -8,8 +8,9 @@ object Settings {
     val cats                 = "2.1.1"
     val catsEffect           = "2.1.4"
     val catsTestkitScalaTest = "1.0.1"
-    val fs2                  = "2.4.4"
     val circe                = "0.13.0"
+    val disciplineMUnit      = "0.2.3"
+    val fs2                  = "2.4.4"
     val log4Cats             = "1.1.1"
     val scalaJSDom           = "1.1.0"
     val sttpModel            = "1.1.4"
@@ -37,12 +38,6 @@ object Settings {
       )
     )
 
-    val Fs2 = Def.setting(
-      Seq(
-        "co.fs2" %%% "fs2-core" % fs2
-      )
-    )
-
     val Circe = Def.setting(
       Seq(
         "io.circe" %%% "circe-core",
@@ -50,6 +45,18 @@ object Settings {
         "io.circe" %%% "circe-parser",
         "io.circe" %%% "circe-testing"
       ).map(_ % circe)
+    )
+
+    val DisciplineMUnit = Def.setting(
+      Seq[ModuleID](
+        "org.typelevel" %%% "discipline-munit" % disciplineMUnit % "test"
+      )
+    )
+
+    val Fs2 = Def.setting(
+      Seq(
+        "co.fs2" %%% "fs2-core" % fs2
+      )
     )
 
     val Log4Cats = Def.setting(
