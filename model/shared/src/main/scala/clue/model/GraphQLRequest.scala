@@ -4,7 +4,6 @@
 package clue.model
 
 import cats.Eq
-import cats.implicits._
 import io.circe.Json
 
 // Request format from Spec: https://github.com/APIs-guru/graphql-over-http
