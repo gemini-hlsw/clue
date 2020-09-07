@@ -6,11 +6,16 @@ package clue
 import io.circe.Decoder
 import io.circe.Encoder
 
-trait GraphQLQuery {
+trait GraphQLOperation[S] {
   val document: String
   type Variables
   type Data
 
-  implicit val varEncoder: Encoder[Variables]
-  implicit val dataDecoder: Decoder[Data]
+  val varEncoder: Encoder[Variables]
+  val dataDecoder: Decoder[Data]
+
+  object implicits {
+    implicit val implicitVarEncoder: Encoder[Variables] = varEncoder
+    implicit val implicitDataDecoder: Decoder[Data]     = dataDecoder
+  }
 }

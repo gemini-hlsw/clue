@@ -3,8 +3,6 @@
 
 package clue
 
-import io.circe.Json
-
-class GraphQLException(val errors: List[Json]) extends Exception(errors.toString)
+class GraphQLException(msg: String) extends Exception(msg)
 
 class InvalidSubscriptionIdException(id: String) extends Exception(s"Invalid subscription id: $id")

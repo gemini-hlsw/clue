@@ -10,7 +10,10 @@ object Settings {
     val circe           = "0.13.0"
     val disciplineMUnit = "0.3.0"
     val fs2             = "2.4.4"
+    val grackle         = "0.0.19"
+    val jawn            = "1.0.0"
     val log4Cats        = "1.1.1"
+    val monocle         = "2.0.3"
     val scalaJSDom      = "1.1.0"
     val sttpModel       = "1.1.4"
   }
@@ -57,9 +60,28 @@ object Settings {
       )
     )
 
+    val Grackle = Def.setting(
+      Seq(
+        "edu.gemini" %%% "gsp-graphql-core" % grackle
+      )
+    )
+
+    val Jawn = Def.setting(
+      Seq(
+        "org.typelevel" %%% "jawn-ast" % jawn
+      )
+    )
+
     val Log4Cats = Def.setting(
       Seq(
         "io.chrisdavenport" %%% "log4cats-core" % log4Cats
+      )
+    )
+
+    val Monocle = Def.setting(
+      Seq(
+        "com.github.julien-truffaut" %%% "monocle-core"  % monocle % "test",
+        "com.github.julien-truffaut" %%% "monocle-macro" % monocle % "test"
       )
     )
 

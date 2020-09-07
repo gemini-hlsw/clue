@@ -48,13 +48,13 @@ protected[clue] trait Emitter[F[_]] {
   def terminate(): F[Unit]
 }
 
-class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBackend](
+class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBackend, S](
   uri:                        Uri
 )(
   val connectionStatus:       SignallingRef[F, StreamingClientStatus],
   private val subscriptions:  Ref[F, Map[String, Emitter[F]]],
   private val connectionMVar: MVar2[F, Either[Throwable, BackendConnection[F]]]
-) extends GraphQLStreamingClient[F] {
+) extends GraphQLStreamingClient[F, S] {
   private val LogPrefix = "[clue.ApolloStreamingClient]"
 
   def status: F[StreamingClientStatus] =
@@ -94,7 +94,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
     }
 
     def emitError(json: Json): F[Unit] = {
-      val error = new GraphQLException(List(json))
+      val error = new GraphQLException(json.toString)
       queue.enqueue1(Left(error))
     }
 
@@ -232,7 +232,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
     }).value.rethrow
   }
 
-  protected def queryInternal[D: Decoder](
+  protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
@@ -249,14 +249,14 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
 }
 
 object ApolloStreamingClient {
-  def of[F[_]: ConcurrentEffect: Timer: Logger: StreamingBackend](
+  def of[F[_]: ConcurrentEffect: Timer: Logger: StreamingBackend, S](
     uri: Uri
-  ): F[ApolloStreamingClient[F]] =
+  ): F[ApolloStreamingClient[F, S]] =
     for {
       connectionStatus <- SignallingRef[F, StreamingClientStatus](StreamingClientStatus.Closed)
       subscriptions    <- Ref.of[F, Map[String, Emitter[F]]](Map.empty)
       connectionMVar   <- MVar.empty[F, Either[Throwable, BackendConnection[F]]]
-      client            = new ApolloStreamingClient[F](uri)(connectionStatus, subscriptions, connectionMVar)
+      client            = new ApolloStreamingClient[F, S](uri)(connectionStatus, subscriptions, connectionMVar)
       _                <- client.connect
     } yield client
 }
