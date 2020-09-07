@@ -1,16 +1,24 @@
-package clue
+package clue.macros
 
 import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import scala.annotation.tailrec
+import scala.annotation.compileTimeOnly
 
-// class QueryData( /*schema: Class[_] = ???*/ ) extends StaticAnnotation {
-class QueryData extends StaticAnnotation {
+@compileTimeOnly("Macro annotations must be enabled")
+class QueryData(schemaModule: String) extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro QueryDataImpl.expand
 }
 
 private[clue] final class QueryDataImpl(val c: blackbox.Context) {
   import c.universe._
+
+  private[this] val macroName: Tree = {
+    c.prefix.tree match {
+      case Apply(Select(New(name), _), _) => name
+      case _                              => c.abort(c.enclosingPosition, "Unexpected macro application")
+    }
+  }
 
   @tailrec
   private[this] def documentDef(tree: List[c.Tree]): Option[String] =
@@ -33,9 +41,19 @@ private[clue] final class QueryDataImpl(val c: blackbox.Context) {
             )
 
           case Some(document) =>
+            val mappings =
+              c.prefix.tree match {
+                case q"new ${`macroName`}(${mappingsModule: String})" =>
+                  c.eval(c.Expr(Ident(c.mirror.staticModule(mappingsModule))))
+                    .asInstanceOf[Mapping]
+                    .mapping
+                case _                                                => c.abort(c.enclosingPosition, "Unexpected missing Mapping object.")
+              }
+
             val fields = List(
               document.split("\\n").toList.map(_.trim).filterNot(_.isEmpty).map { v =>
-                val t = TypeName("Int")
+                // val t = TypeName("Int")
+                val t = TypeName(mappings(v))
                 val n = TermName(v)
                 val d = EmptyTree
                 q"val $n: $t = $d"

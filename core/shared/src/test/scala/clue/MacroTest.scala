@@ -1,11 +1,13 @@
 package clue
 
+import clue.macros._
 import munit._
 import io.circe.parser.decode
+import scala.annotation.compileTimeOnly
 
 class MacroTest extends FunSuite {
 
-  @QueryData
+  @QueryData("clue.macros.Mappings")
   object HelloQuery extends GraphQLQuery {
     val document = """
         name
@@ -15,12 +17,11 @@ class MacroTest extends FunSuite {
   }
 
   test("macros!") {
-    // println(HelloQuery.Data(1, 2, 3))
     val json = """
       {
-        "name": 1,
+        "name": "John",
         "age": 2,
-        "height": 3
+        "height": 3.0
       }
     """
     println(decode[HelloQuery.Data](json))
