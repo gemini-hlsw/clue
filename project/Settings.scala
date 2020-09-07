@@ -8,7 +8,7 @@ object Settings {
     val cats            = "2.1.1"
     val catsEffect      = "2.1.4"
     val circe           = "0.13.0"
-    val disciplineMUnit = "0.2.3"
+    val disciplineMUnit = "0.2.4"
     val fs2             = "2.4.4"
     val log4Cats        = "1.1.1"
     val scalaJSDom      = "1.1.0"
