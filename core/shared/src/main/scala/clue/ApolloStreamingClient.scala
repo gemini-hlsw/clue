@@ -12,7 +12,7 @@ import cats.data.EitherT
 import cats.effect._
 import cats.effect.concurrent.MVar
 import cats.effect.concurrent.Ref
-import cats.implicits._
+import cats.syntax.all._
 import clue.model._
 import clue.model.json._
 import fs2.Stream

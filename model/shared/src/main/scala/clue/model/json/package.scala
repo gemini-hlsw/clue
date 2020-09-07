@@ -3,7 +3,7 @@
 
 package clue.model
 
-import cats.implicits._
+import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
 
