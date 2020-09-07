@@ -2,10 +2,28 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 inThisBuild(
   Seq(
+    scalacOptions += "-Ymacro-annotations",
+    scalacOptions += "-language:experimental.macros",
+    scalacOptions ~= (_.filterNot(
+      Set(
+        // Disabling these to explore macros.
+        "-Wdead-code",
+        "-Wunused:params",
+        "-Wunused:explicits",
+        "-Wunused:implicits",
+        "-Wunused:locals",
+        "-Wunused:imports",
+        "-Wunused:patvars",
+        "-Wunused:privates",
+        "-Yno-predef",
+        "-Ywarn-unused-import"
+      )
+    )),
+    scalaVersion := "2.13.3",
     homepage := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
     testFrameworks += new TestFramework("munit.Framework")
-  ) ++ gspPublishSettings
+  ) //++ gspPublishSettings
 )
 
 lazy val root = project
@@ -45,7 +63,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
         Settings.Libraries.CatsEffect.value ++
         Settings.Libraries.Fs2.value ++
         Settings.Libraries.Log4Cats.value ++
-        Settings.Libraries.SttpModel.value
+        Settings.Libraries.SttpModel.value ++
+        Settings.Libraries.DisciplineMUnit.value
   )
   .dependsOn(model)
 
