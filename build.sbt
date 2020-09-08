@@ -77,7 +77,8 @@ lazy val macros = project
   .settings(
     moduleName := "clue-macros",
     libraryDependencies ++=
-      Settings.Libraries.DisciplineMUnit.value
+      Settings.Libraries.DisciplineMUnit.value :+
+        "edu.gemini" %% "gsp-graphql-core" % "0.0.15"
     // scalacOptions ~= (_.filterNot(
     //   Set(
     //     // Disabling these to explore macros.

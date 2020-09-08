@@ -7,21 +7,36 @@ import scala.annotation.compileTimeOnly
 
 class MacroTest extends FunSuite {
 
-  @QueryData("clue.macros.Mappings")
+  @QueryTypes("starwars")
   object HelloQuery extends GraphQLQuery {
     val document = """
-        name
-        age
-        height
+        query {
+          character(id: $id) {
+            id
+            name
+            friends
+          }
+        }
       """
   }
 
   test("macros!") {
     val json = """
       {
-        "name": "John",
-        "age": 2,
-        "height": 3.0
+        "character": {
+          "id": "001",
+          "name": "Luke",
+          "friends": [
+            {
+              "id": "002",
+              "name": "R2D2"
+            },
+            {
+              "id": "003",
+              "name": "C3P0"
+            }          
+          ]
+        }
       }
     """
     println(decode[HelloQuery.Data](json))
