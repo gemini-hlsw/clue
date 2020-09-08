@@ -1,6 +1,6 @@
-package clue
+package clue.macros
 
-import clue.macros._
+import clue._
 import munit._
 import io.circe.parser.decode
 import scala.annotation.compileTimeOnly

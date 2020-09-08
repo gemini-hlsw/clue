@@ -2,24 +2,11 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 inThisBuild(
   Seq(
+    //
     scalacOptions += "-Ymacro-annotations",
-    scalacOptions += "-language:experimental.macros",
-    scalacOptions ~= (_.filterNot(
-      Set(
-        // Disabling these to explore macros.
-        "-Wdead-code",
-        "-Wunused:params",
-        "-Wunused:explicits",
-        "-Wunused:implicits",
-        "-Wunused:locals",
-        "-Wunused:imports",
-        "-Wunused:patvars",
-        "-Wunused:privates",
-        "-Yno-predef",
-        "-Ywarn-unused-import"
-      )
-    )),
     scalaVersion := "2.13.3",
+    scalacOptions += "-language:experimental.macros",
+    //
     homepage := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
     testFrameworks += new TestFramework("munit.Framework")
@@ -28,7 +15,7 @@ inThisBuild(
 
 lazy val root = project
   .in(file("."))
-  .aggregate(modelJVM, modelJS, coreJVM, coreJS, scalaJS)
+  .aggregate(modelJVM, modelJS, coreJVM, coreJS, scalaJS, macros)
   .settings(
     name := "clue",
     publish := {},
@@ -77,10 +64,34 @@ lazy val scalaJS = project
   .settings(
     moduleName := "clue-scalajs",
     libraryDependencies ++=
-      Settings.Libraries.CatsEffect.value ++
-        Settings.Libraries.ScalaJSDom.value ++
-        Settings.Libraries.Log4Cats.value ++
-        Settings.Libraries.SttpModel.value
+      // Settings.Libraries.CatsEffect.value ++
+      Settings.Libraries.ScalaJSDom.value
+    // Settings.Libraries.Log4Cats.value ++
+    // Settings.Libraries.SttpModel.value
   )
   .dependsOn(coreJS)
   .enablePlugins(ScalaJSPlugin)
+
+lazy val macros = project
+  .in(file("macros"))
+  .settings(
+    moduleName := "clue-macros",
+    libraryDependencies ++=
+      Settings.Libraries.DisciplineMUnit.value
+    // scalacOptions ~= (_.filterNot(
+    //   Set(
+    //     // Disabling these to explore macros.
+    //     "-Wdead-code",
+    //     "-Wunused:params",
+    //     "-Wunused:explicits",
+    //     "-Wunused:implicits",
+    //     "-Wunused:locals",
+    //     "-Wunused:imports",
+    //     "-Wunused:patvars",
+    //     "-Wunused:privates",
+    //     "-Yno-predef",
+    //     "-Ywarn-unused-import"
+    //   )
+    // ))
+  )
+  .dependsOn(coreJVM)
