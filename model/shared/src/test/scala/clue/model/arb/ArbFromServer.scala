@@ -17,17 +17,16 @@ trait ArbFromServer {
       arbitrary[List[(String, Int, Int)]].map { errorList =>
         Json.obj(
           "errors" -> Json.fromValues(
-            errorList.map {
-              case (msg, line, column) =>
-                Json.obj(
-                  "message"   -> Json.fromString(msg),
-                  "locations" -> Json.arr(
-                    Json.obj(
-                      "line"   -> Json.fromInt(line),
-                      "column" -> Json.fromInt(column)
-                    )
+            errorList.map { case (msg, line, column) =>
+              Json.obj(
+                "message"   -> Json.fromString(msg),
+                "locations" -> Json.arr(
+                  Json.obj(
+                    "line"   -> Json.fromInt(line),
+                    "column" -> Json.fromInt(column)
                   )
                 )
+              )
             }
           )
         )

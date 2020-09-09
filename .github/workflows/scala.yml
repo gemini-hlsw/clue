@@ -9,9 +9,19 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: coursier/cache-action@v3
-      - name: Set up JDK 1.8
+      - name: Set up JDK
         uses: olafurpg/setup-scala@v7
         with:
           java-version: adoptjdk@14
+      - name: Cache SBT ivy cache
+        uses: actions/cache@v1
+        with:
+          path: ~/.ivy2/cache
+          key: ${{ runner.os }}-sbt-ivy-cache-${{ hashFiles('**/project/**') }}-${{ hashFiles('**/build.sbt') }}
+      - name: Cache SBT
+        uses: actions/cache@v1
+        with:
+          path: ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/project/**') }}-${{ hashFiles('**/build.sbt') }}          
       - name: Run compile
-        run: csbt headerCheck +compile +test
+        run: csbt headerCheck scalafmtCheckAll +compile +test
