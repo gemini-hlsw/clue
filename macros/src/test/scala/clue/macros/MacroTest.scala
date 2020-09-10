@@ -7,11 +7,11 @@ import scala.annotation.compileTimeOnly
 
 class MacroTest extends FunSuite {
 
-  @QueryTypes("starwars")
+  @QueryTypes("starwars", true)
   object HelloQuery extends GraphQLQuery {
     val document = """
         query {
-          character(id: $id) {
+          character(id: $charId) {
             id
             name
             friends
