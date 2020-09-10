@@ -10,8 +10,7 @@ import scala.language.postfixOps
 
 import cats.data.EitherT
 import cats.effect._
-import cats.effect.concurrent.MVar
-import cats.effect.concurrent.Ref
+import cats.effect.concurrent._
 import cats.syntax.all._
 import clue.model._
 import clue.model.json._
@@ -54,7 +53,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
 )(
   val connectionStatus:       SignallingRef[F, StreamingClientStatus],
   private val subscriptions:  Ref[F, Map[String, Emitter[F]]],
-  private val connectionMVar: MVar[F, Either[Throwable, BackendConnection[F]]]
+  private val connectionMVar: MVar2[F, Either[Throwable, BackendConnection[F]]]
 ) extends GraphQLStreamingClient[F] {
   private val LogPrefix = "[clue.ApolloStreamingClient]"
 
@@ -224,9 +223,8 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
               emitter.queue.dequeue
                 .evalTap(v => Logger[F].debug(s"$LogPrefix Dequeuing for subscription [$id]: [$v]"))
           ).rethrow.unNoneTerminate
-            .onError {
-              case t: Throwable =>
-                Stream.eval(Logger[F].error(t)(s"$LogPrefix Error in subscription [$id]: "))
+            .onError { case t: Throwable =>
+              Stream.eval(Logger[F].error(t)(s"$LogPrefix Error in subscription [$id]: "))
             }
         ),
         id

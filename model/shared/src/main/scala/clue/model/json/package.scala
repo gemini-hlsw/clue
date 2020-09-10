@@ -8,8 +8,8 @@ import io.circe._
 import io.circe.syntax._
 
 /**
-  * JSON codecs for `clue.model`.
-  */
+ * JSON codecs for `clue.model`.
+ */
 package object json {
 
   implicit val EncoderGraphQLRequest: Encoder[GraphQLRequest] =
