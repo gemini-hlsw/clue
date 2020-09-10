@@ -1,0 +1,1270 @@
+scalar cloudcover
+
+# expression to compare columns of type cloudcover. All fields are combined with logical 'AND'.
+input cloudcover_comparison_exp {
+  _eq: cloudcover
+  _gt: cloudcover
+  _gte: cloudcover
+  _in: [cloudcover!]
+  _is_null: Boolean
+  _lt: cloudcover
+  _lte: cloudcover
+  _neq: cloudcover
+  _nin: [cloudcover!]
+}
+
+# columns and relationships of "constraints"
+type constraints {
+  cloud_cover: cloudcover!
+  id: uuid!
+  image_quality: imagequality!
+  name: String!
+
+  # An array relationship
+  observations(
+    # distinct select on columns
+    distinct_on: [observations_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [observations_order_by!]
+
+    # filter the rows returned
+    where: observations_bool_exp
+  ): [observations!]!
+
+  # An aggregated array relationship
+  observations_aggregate(
+    # distinct select on columns
+    distinct_on: [observations_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [observations_order_by!]
+
+    # filter the rows returned
+    where: observations_bool_exp
+  ): observations_aggregate!
+  sky_background: skybackground!
+  water_vapor: watervapor!
+}
+
+# aggregated selection of "constraints"
+type constraints_aggregate {
+  aggregate: constraints_aggregate_fields
+  nodes: [constraints!]!
+}
+
+# aggregate fields of "constraints"
+type constraints_aggregate_fields {
+  count(columns: [constraints_select_column!], distinct: Boolean): Int
+  max: constraints_max_fields
+  min: constraints_min_fields
+}
+
+# order by aggregate values of table "constraints"
+input constraints_aggregate_order_by {
+  count: order_by
+  max: constraints_max_order_by
+  min: constraints_min_order_by
+}
+
+# input type for inserting array relation for remote table "constraints"
+input constraints_arr_rel_insert_input {
+  data: [constraints_insert_input!]!
+  on_conflict: constraints_on_conflict
+}
+
+# Boolean expression to filter rows from the table "constraints". All fields are combined with a logical 'AND'.
+input constraints_bool_exp {
+  _and: [constraints_bool_exp]
+  _not: constraints_bool_exp
+  _or: [constraints_bool_exp]
+  cloud_cover: cloudcover_comparison_exp
+  id: uuid_comparison_exp
+  image_quality: imagequality_comparison_exp
+  name: String_comparison_exp
+  observations: observations_bool_exp
+  sky_background: skybackground_comparison_exp
+  water_vapor: watervapor_comparison_exp
+}
+
+# unique or primary key constraints on table "constraints"
+enum constraints_constraint {
+  # unique or primary key constraint
+  constraints_pkey
+}
+
+# input type for inserting data into table "constraints"
+input constraints_insert_input {
+  cloud_cover: cloudcover
+  id: uuid
+  image_quality: imagequality
+  name: String
+  observations: observations_arr_rel_insert_input
+  sky_background: skybackground
+  water_vapor: watervapor
+}
+
+# aggregate max on columns
+type constraints_max_fields {
+  id: uuid
+  name: String
+}
+
+# order by max() on columns of table "constraints"
+input constraints_max_order_by {
+  id: order_by
+  name: order_by
+}
+
+# aggregate min on columns
+type constraints_min_fields {
+  id: uuid
+  name: String
+}
+
+# order by min() on columns of table "constraints"
+input constraints_min_order_by {
+  id: order_by
+  name: order_by
+}
+
+# response of any mutation on the table "constraints"
+type constraints_mutation_response {
+  # number of affected rows by the mutation
+  affected_rows: Int!
+
+  # data of the affected rows by the mutation
+  returning: [constraints!]!
+}
+
+# input type for inserting object relation for remote table "constraints"
+input constraints_obj_rel_insert_input {
+  data: constraints_insert_input!
+  on_conflict: constraints_on_conflict
+}
+
+# on conflict condition type for table "constraints"
+input constraints_on_conflict {
+  constraint: constraints_constraint!
+  update_columns: [constraints_update_column!]!
+  where: constraints_bool_exp
+}
+
+# ordering options when selecting data from "constraints"
+input constraints_order_by {
+  cloud_cover: order_by
+  id: order_by
+  image_quality: order_by
+  name: order_by
+  observations_aggregate: observations_aggregate_order_by
+  sky_background: order_by
+  water_vapor: order_by
+}
+
+# primary key columns input for table: "constraints"
+input constraints_pk_columns_input {
+  id: uuid!
+}
+
+# select columns of table "constraints"
+enum constraints_select_column {
+  # column name
+  cloud_cover
+
+  # column name
+  id
+
+  # column name
+  image_quality
+
+  # column name
+  name
+
+  # column name
+  sky_background
+
+  # column name
+  water_vapor
+}
+
+# input type for updating data in table "constraints"
+input constraints_set_input {
+  cloud_cover: cloudcover
+  id: uuid
+  image_quality: imagequality
+  name: String
+  sky_background: skybackground
+  water_vapor: watervapor
+}
+
+# update columns of table "constraints"
+enum constraints_update_column {
+  # column name
+  cloud_cover
+
+  # column name
+  id
+
+  # column name
+  image_quality
+
+  # column name
+  name
+
+  # column name
+  sky_background
+
+  # column name
+  water_vapor
+}
+
+scalar imagequality
+
+# expression to compare columns of type imagequality. All fields are combined with logical 'AND'.
+input imagequality_comparison_exp {
+  _eq: imagequality
+  _gt: imagequality
+  _gte: imagequality
+  _in: [imagequality!]
+  _is_null: Boolean
+  _lt: imagequality
+  _lte: imagequality
+  _neq: imagequality
+  _nin: [imagequality!]
+}
+
+# expression to compare columns of type Int. All fields are combined with logical 'AND'.
+input Int_comparison_exp {
+  _eq: Int
+  _gt: Int
+  _gte: Int
+  _in: [Int!]
+  _is_null: Boolean
+  _lt: Int
+  _lte: Int
+  _neq: Int
+  _nin: [Int!]
+}
+
+# mutation root
+type Mutation {
+  # delete data from the table: "constraints"
+  delete_constraints(
+    # filter the rows which have to be deleted
+    where: constraints_bool_exp!
+  ): constraints_mutation_response
+
+  # delete single row from the table: "constraints"
+  delete_constraints_by_pk(id: uuid!): constraints
+
+  # delete data from the table: "observations"
+  delete_observations(
+    # filter the rows which have to be deleted
+    where: observations_bool_exp!
+  ): observations_mutation_response
+
+  # delete single row from the table: "observations"
+  delete_observations_by_pk(id: uuid!): observations
+
+  # delete data from the table: "targets"
+  delete_targets(
+    # filter the rows which have to be deleted
+    where: targets_bool_exp!
+  ): targets_mutation_response
+
+  # delete single row from the table: "targets"
+  delete_targets_by_pk(id: uuid!): targets
+
+  # insert data into the table: "constraints"
+  insert_constraints(
+    # the rows to be inserted
+    objects: [constraints_insert_input!]!
+
+    # on conflict condition
+    on_conflict: constraints_on_conflict
+  ): constraints_mutation_response
+
+  # insert a single row into the table: "constraints"
+  insert_constraints_one(
+    # the row to be inserted
+    object: constraints_insert_input!
+
+    # on conflict condition
+    on_conflict: constraints_on_conflict
+  ): constraints
+
+  # insert data into the table: "observations"
+  insert_observations(
+    # the rows to be inserted
+    objects: [observations_insert_input!]!
+
+    # on conflict condition
+    on_conflict: observations_on_conflict
+  ): observations_mutation_response
+
+  # insert a single row into the table: "observations"
+  insert_observations_one(
+    # the row to be inserted
+    object: observations_insert_input!
+
+    # on conflict condition
+    on_conflict: observations_on_conflict
+  ): observations
+
+  # insert data into the table: "targets"
+  insert_targets(
+    # the rows to be inserted
+    objects: [targets_insert_input!]!
+
+    # on conflict condition
+    on_conflict: targets_on_conflict
+  ): targets_mutation_response
+
+  # insert a single row into the table: "targets"
+  insert_targets_one(
+    # the row to be inserted
+    object: targets_insert_input!
+
+    # on conflict condition
+    on_conflict: targets_on_conflict
+  ): targets
+
+  # update data of the table: "constraints"
+  update_constraints(
+    # sets the columns of the filtered rows to the given values
+    _set: constraints_set_input
+
+    # filter the rows which have to be updated
+    where: constraints_bool_exp!
+  ): constraints_mutation_response
+
+  # update single row of the table: "constraints"
+  update_constraints_by_pk(
+    # sets the columns of the filtered rows to the given values
+    _set: constraints_set_input
+    pk_columns: constraints_pk_columns_input!
+  ): constraints
+
+  # update data of the table: "observations"
+  update_observations(
+    # increments the integer columns with given value of the filtered values
+    _inc: observations_inc_input
+
+    # sets the columns of the filtered rows to the given values
+    _set: observations_set_input
+
+    # filter the rows which have to be updated
+    where: observations_bool_exp!
+  ): observations_mutation_response
+
+  # update single row of the table: "observations"
+  update_observations_by_pk(
+    # increments the integer columns with given value of the filtered values
+    _inc: observations_inc_input
+
+    # sets the columns of the filtered rows to the given values
+    _set: observations_set_input
+    pk_columns: observations_pk_columns_input!
+  ): observations
+
+  # update data of the table: "targets"
+  update_targets(
+    # sets the columns of the filtered rows to the given values
+    _set: targets_set_input
+
+    # filter the rows which have to be updated
+    where: targets_bool_exp!
+  ): targets_mutation_response
+
+  # update single row of the table: "targets"
+  update_targets_by_pk(
+    # sets the columns of the filtered rows to the given values
+    _set: targets_set_input
+    pk_columns: targets_pk_columns_input!
+  ): targets
+}
+
+# columns and relationships of "observations"
+type observations {
+  configuration: String!
+
+  # An object relationship
+  constraints: constraints
+  constraints_id: uuid
+  duration_seconds: Int!
+  id: uuid!
+  status: obsstatus!
+
+  # An object relationship
+  target: targets
+  target_id: uuid
+}
+
+# aggregated selection of "observations"
+type observations_aggregate {
+  aggregate: observations_aggregate_fields
+  nodes: [observations!]!
+}
+
+# aggregate fields of "observations"
+type observations_aggregate_fields {
+  avg: observations_avg_fields
+  count(columns: [observations_select_column!], distinct: Boolean): Int
+  max: observations_max_fields
+  min: observations_min_fields
+  stddev: observations_stddev_fields
+  stddev_pop: observations_stddev_pop_fields
+  stddev_samp: observations_stddev_samp_fields
+  sum: observations_sum_fields
+  var_pop: observations_var_pop_fields
+  var_samp: observations_var_samp_fields
+  variance: observations_variance_fields
+}
+
+# order by aggregate values of table "observations"
+input observations_aggregate_order_by {
+  avg: observations_avg_order_by
+  count: order_by
+  max: observations_max_order_by
+  min: observations_min_order_by
+  stddev: observations_stddev_order_by
+  stddev_pop: observations_stddev_pop_order_by
+  stddev_samp: observations_stddev_samp_order_by
+  sum: observations_sum_order_by
+  var_pop: observations_var_pop_order_by
+  var_samp: observations_var_samp_order_by
+  variance: observations_variance_order_by
+}
+
+# input type for inserting array relation for remote table "observations"
+input observations_arr_rel_insert_input {
+  data: [observations_insert_input!]!
+  on_conflict: observations_on_conflict
+}
+
+# aggregate avg on columns
+type observations_avg_fields {
+  duration_seconds: Float
+}
+
+# order by avg() on columns of table "observations"
+input observations_avg_order_by {
+  duration_seconds: order_by
+}
+
+# Boolean expression to filter rows from the table "observations". All fields are combined with a logical 'AND'.
+input observations_bool_exp {
+  _and: [observations_bool_exp]
+  _not: observations_bool_exp
+  _or: [observations_bool_exp]
+  configuration: String_comparison_exp
+  constraints: constraints_bool_exp
+  constraints_id: uuid_comparison_exp
+  duration_seconds: Int_comparison_exp
+  id: uuid_comparison_exp
+  status: obsstatus_comparison_exp
+  target: targets_bool_exp
+  target_id: uuid_comparison_exp
+}
+
+# unique or primary key constraints on table "observations"
+enum observations_constraint {
+  # unique or primary key constraint
+  observations_pkey
+}
+
+# input type for incrementing integer column in table "observations"
+input observations_inc_input {
+  duration_seconds: Int
+}
+
+# input type for inserting data into table "observations"
+input observations_insert_input {
+  configuration: String
+  constraints: constraints_obj_rel_insert_input
+  constraints_id: uuid
+  duration_seconds: Int
+  id: uuid
+  status: obsstatus
+  target: targets_obj_rel_insert_input
+  target_id: uuid
+}
+
+# aggregate max on columns
+type observations_max_fields {
+  configuration: String
+  constraints_id: uuid
+  duration_seconds: Int
+  id: uuid
+  target_id: uuid
+}
+
+# order by max() on columns of table "observations"
+input observations_max_order_by {
+  configuration: order_by
+  constraints_id: order_by
+  duration_seconds: order_by
+  id: order_by
+  target_id: order_by
+}
+
+# aggregate min on columns
+type observations_min_fields {
+  configuration: String
+  constraints_id: uuid
+  duration_seconds: Int
+  id: uuid
+  target_id: uuid
+}
+
+# order by min() on columns of table "observations"
+input observations_min_order_by {
+  configuration: order_by
+  constraints_id: order_by
+  duration_seconds: order_by
+  id: order_by
+  target_id: order_by
+}
+
+# response of any mutation on the table "observations"
+type observations_mutation_response {
+  # number of affected rows by the mutation
+  affected_rows: Int!
+
+  # data of the affected rows by the mutation
+  returning: [observations!]!
+}
+
+# input type for inserting object relation for remote table "observations"
+input observations_obj_rel_insert_input {
+  data: observations_insert_input!
+  on_conflict: observations_on_conflict
+}
+
+# on conflict condition type for table "observations"
+input observations_on_conflict {
+  constraint: observations_constraint!
+  update_columns: [observations_update_column!]!
+  where: observations_bool_exp
+}
+
+# ordering options when selecting data from "observations"
+input observations_order_by {
+  configuration: order_by
+  constraints: constraints_order_by
+  constraints_id: order_by
+  duration_seconds: order_by
+  id: order_by
+  status: order_by
+  target: targets_order_by
+  target_id: order_by
+}
+
+# primary key columns input for table: "observations"
+input observations_pk_columns_input {
+  id: uuid!
+}
+
+# select columns of table "observations"
+enum observations_select_column {
+  # column name
+  configuration
+
+  # column name
+  constraints_id
+
+  # column name
+  duration_seconds
+
+  # column name
+  id
+
+  # column name
+  status
+
+  # column name
+  target_id
+}
+
+# input type for updating data in table "observations"
+input observations_set_input {
+  configuration: String
+  constraints_id: uuid
+  duration_seconds: Int
+  id: uuid
+  status: obsstatus
+  target_id: uuid
+}
+
+# aggregate stddev on columns
+type observations_stddev_fields {
+  duration_seconds: Float
+}
+
+# order by stddev() on columns of table "observations"
+input observations_stddev_order_by {
+  duration_seconds: order_by
+}
+
+# aggregate stddev_pop on columns
+type observations_stddev_pop_fields {
+  duration_seconds: Float
+}
+
+# order by stddev_pop() on columns of table "observations"
+input observations_stddev_pop_order_by {
+  duration_seconds: order_by
+}
+
+# aggregate stddev_samp on columns
+type observations_stddev_samp_fields {
+  duration_seconds: Float
+}
+
+# order by stddev_samp() on columns of table "observations"
+input observations_stddev_samp_order_by {
+  duration_seconds: order_by
+}
+
+# aggregate sum on columns
+type observations_sum_fields {
+  duration_seconds: Int
+}
+
+# order by sum() on columns of table "observations"
+input observations_sum_order_by {
+  duration_seconds: order_by
+}
+
+# update columns of table "observations"
+enum observations_update_column {
+  # column name
+  configuration
+
+  # column name
+  constraints_id
+
+  # column name
+  duration_seconds
+
+  # column name
+  id
+
+  # column name
+  status
+
+  # column name
+  target_id
+}
+
+# aggregate var_pop on columns
+type observations_var_pop_fields {
+  duration_seconds: Float
+}
+
+# order by var_pop() on columns of table "observations"
+input observations_var_pop_order_by {
+  duration_seconds: order_by
+}
+
+# aggregate var_samp on columns
+type observations_var_samp_fields {
+  duration_seconds: Float
+}
+
+# order by var_samp() on columns of table "observations"
+input observations_var_samp_order_by {
+  duration_seconds: order_by
+}
+
+# aggregate variance on columns
+type observations_variance_fields {
+  duration_seconds: Float
+}
+
+# order by variance() on columns of table "observations"
+input observations_variance_order_by {
+  duration_seconds: order_by
+}
+
+scalar obsstatus
+
+# expression to compare columns of type obsstatus. All fields are combined with logical 'AND'.
+input obsstatus_comparison_exp {
+  _eq: obsstatus
+  _gt: obsstatus
+  _gte: obsstatus
+  _in: [obsstatus!]
+  _is_null: Boolean
+  _lt: obsstatus
+  _lte: obsstatus
+  _neq: obsstatus
+  _nin: [obsstatus!]
+}
+
+# column ordering options
+enum order_by {
+  # in the ascending order, nulls last
+  asc
+
+  # in the ascending order, nulls first
+  asc_nulls_first
+
+  # in the ascending order, nulls last
+  asc_nulls_last
+
+  # in the descending order, nulls first
+  desc
+
+  # in the descending order, nulls first
+  desc_nulls_first
+
+  # in the descending order, nulls last
+  desc_nulls_last
+}
+
+# query root
+type Query {
+  # fetch data from the table: "constraints"
+  constraints(
+    # distinct select on columns
+    distinct_on: [constraints_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [constraints_order_by!]
+
+    # filter the rows returned
+    where: constraints_bool_exp
+  ): [constraints!]!
+
+  # fetch aggregated fields from the table: "constraints"
+  constraints_aggregate(
+    # distinct select on columns
+    distinct_on: [constraints_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [constraints_order_by!]
+
+    # filter the rows returned
+    where: constraints_bool_exp
+  ): constraints_aggregate!
+
+  # fetch data from the table: "constraints" using primary key columns
+  constraints_by_pk(id: uuid!): constraints
+
+  # fetch data from the table: "observations"
+  observations(
+    # distinct select on columns
+    distinct_on: [observations_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [observations_order_by!]
+
+    # filter the rows returned
+    where: observations_bool_exp
+  ): [observations!]!
+
+  # fetch aggregated fields from the table: "observations"
+  observations_aggregate(
+    # distinct select on columns
+    distinct_on: [observations_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [observations_order_by!]
+
+    # filter the rows returned
+    where: observations_bool_exp
+  ): observations_aggregate!
+
+  # fetch data from the table: "observations" using primary key columns
+  observations_by_pk(id: uuid!): observations
+
+  # fetch data from the table: "targets"
+  targets(
+    # distinct select on columns
+    distinct_on: [targets_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [targets_order_by!]
+
+    # filter the rows returned
+    where: targets_bool_exp
+  ): [targets!]!
+
+  # fetch aggregated fields from the table: "targets"
+  targets_aggregate(
+    # distinct select on columns
+    distinct_on: [targets_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [targets_order_by!]
+
+    # filter the rows returned
+    where: targets_bool_exp
+  ): targets_aggregate!
+
+  # fetch data from the table: "targets" using primary key columns
+  targets_by_pk(id: uuid!): targets
+}
+
+scalar skybackground
+
+# expression to compare columns of type skybackground. All fields are combined with logical 'AND'.
+input skybackground_comparison_exp {
+  _eq: skybackground
+  _gt: skybackground
+  _gte: skybackground
+  _in: [skybackground!]
+  _is_null: Boolean
+  _lt: skybackground
+  _lte: skybackground
+  _neq: skybackground
+  _nin: [skybackground!]
+}
+
+# expression to compare columns of type String. All fields are combined with logical 'AND'.
+input String_comparison_exp {
+  _eq: String
+  _gt: String
+  _gte: String
+  _ilike: String
+  _in: [String!]
+  _is_null: Boolean
+  _like: String
+  _lt: String
+  _lte: String
+  _neq: String
+  _nilike: String
+  _nin: [String!]
+  _nlike: String
+  _nsimilar: String
+  _similar: String
+}
+
+# subscription root
+type Subscription {
+  # fetch data from the table: "constraints"
+  constraints(
+    # distinct select on columns
+    distinct_on: [constraints_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [constraints_order_by!]
+
+    # filter the rows returned
+    where: constraints_bool_exp
+  ): [constraints!]!
+
+  # fetch aggregated fields from the table: "constraints"
+  constraints_aggregate(
+    # distinct select on columns
+    distinct_on: [constraints_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [constraints_order_by!]
+
+    # filter the rows returned
+    where: constraints_bool_exp
+  ): constraints_aggregate!
+
+  # fetch data from the table: "constraints" using primary key columns
+  constraints_by_pk(id: uuid!): constraints
+
+  # fetch data from the table: "observations"
+  observations(
+    # distinct select on columns
+    distinct_on: [observations_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [observations_order_by!]
+
+    # filter the rows returned
+    where: observations_bool_exp
+  ): [observations!]!
+
+  # fetch aggregated fields from the table: "observations"
+  observations_aggregate(
+    # distinct select on columns
+    distinct_on: [observations_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [observations_order_by!]
+
+    # filter the rows returned
+    where: observations_bool_exp
+  ): observations_aggregate!
+
+  # fetch data from the table: "observations" using primary key columns
+  observations_by_pk(id: uuid!): observations
+
+  # fetch data from the table: "targets"
+  targets(
+    # distinct select on columns
+    distinct_on: [targets_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [targets_order_by!]
+
+    # filter the rows returned
+    where: targets_bool_exp
+  ): [targets!]!
+
+  # fetch aggregated fields from the table: "targets"
+  targets_aggregate(
+    # distinct select on columns
+    distinct_on: [targets_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [targets_order_by!]
+
+    # filter the rows returned
+    where: targets_bool_exp
+  ): targets_aggregate!
+
+  # fetch data from the table: "targets" using primary key columns
+  targets_by_pk(id: uuid!): targets
+}
+
+scalar targetobjecttype
+
+# expression to compare columns of type targetobjecttype. All fields are combined with logical 'AND'.
+input targetobjecttype_comparison_exp {
+  _eq: targetobjecttype
+  _gt: targetobjecttype
+  _gte: targetobjecttype
+  _in: [targetobjecttype!]
+  _is_null: Boolean
+  _lt: targetobjecttype
+  _lte: targetobjecttype
+  _neq: targetobjecttype
+  _nin: [targetobjecttype!]
+}
+
+# columns and relationships of "targets"
+type targets {
+  dec: String!
+  id: uuid!
+  name: String!
+  object_type: targetobjecttype!
+
+  # An array relationship
+  observations(
+    # distinct select on columns
+    distinct_on: [observations_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [observations_order_by!]
+
+    # filter the rows returned
+    where: observations_bool_exp
+  ): [observations!]!
+
+  # An aggregated array relationship
+  observations_aggregate(
+    # distinct select on columns
+    distinct_on: [observations_select_column!]
+
+    # limit the number of rows returned
+    limit: Int
+
+    # skip the first n rows. Use only with order_by
+    offset: Int
+
+    # sort the rows by one or more columns
+    order_by: [observations_order_by!]
+
+    # filter the rows returned
+    where: observations_bool_exp
+  ): observations_aggregate!
+  ra: String!
+}
+
+# aggregated selection of "targets"
+type targets_aggregate {
+  aggregate: targets_aggregate_fields
+  nodes: [targets!]!
+}
+
+# aggregate fields of "targets"
+type targets_aggregate_fields {
+  count(columns: [targets_select_column!], distinct: Boolean): Int
+  max: targets_max_fields
+  min: targets_min_fields
+}
+
+# order by aggregate values of table "targets"
+input targets_aggregate_order_by {
+  count: order_by
+  max: targets_max_order_by
+  min: targets_min_order_by
+}
+
+# input type for inserting array relation for remote table "targets"
+input targets_arr_rel_insert_input {
+  data: [targets_insert_input!]!
+  on_conflict: targets_on_conflict
+}
+
+# Boolean expression to filter rows from the table "targets". All fields are combined with a logical 'AND'.
+input targets_bool_exp {
+  _and: [targets_bool_exp]
+  _not: targets_bool_exp
+  _or: [targets_bool_exp]
+  dec: String_comparison_exp
+  id: uuid_comparison_exp
+  name: String_comparison_exp
+  object_type: targetobjecttype_comparison_exp
+  observations: observations_bool_exp
+  ra: String_comparison_exp
+}
+
+# unique or primary key constraints on table "targets"
+enum targets_constraint {
+  # unique or primary key constraint
+  targets_pkey
+}
+
+# input type for inserting data into table "targets"
+input targets_insert_input {
+  dec: String
+  id: uuid
+  name: String
+  object_type: targetobjecttype
+  observations: observations_arr_rel_insert_input
+  ra: String
+}
+
+# aggregate max on columns
+type targets_max_fields {
+  dec: String
+  id: uuid
+  name: String
+  ra: String
+}
+
+# order by max() on columns of table "targets"
+input targets_max_order_by {
+  dec: order_by
+  id: order_by
+  name: order_by
+  ra: order_by
+}
+
+# aggregate min on columns
+type targets_min_fields {
+  dec: String
+  id: uuid
+  name: String
+  ra: String
+}
+
+# order by min() on columns of table "targets"
+input targets_min_order_by {
+  dec: order_by
+  id: order_by
+  name: order_by
+  ra: order_by
+}
+
+# response of any mutation on the table "targets"
+type targets_mutation_response {
+  # number of affected rows by the mutation
+  affected_rows: Int!
+
+  # data of the affected rows by the mutation
+  returning: [targets!]!
+}
+
+# input type for inserting object relation for remote table "targets"
+input targets_obj_rel_insert_input {
+  data: targets_insert_input!
+  on_conflict: targets_on_conflict
+}
+
+# on conflict condition type for table "targets"
+input targets_on_conflict {
+  constraint: targets_constraint!
+  update_columns: [targets_update_column!]!
+  where: targets_bool_exp
+}
+
+# ordering options when selecting data from "targets"
+input targets_order_by {
+  dec: order_by
+  id: order_by
+  name: order_by
+  object_type: order_by
+  observations_aggregate: observations_aggregate_order_by
+  ra: order_by
+}
+
+# primary key columns input for table: "targets"
+input targets_pk_columns_input {
+  id: uuid!
+}
+
+# select columns of table "targets"
+enum targets_select_column {
+  # column name
+  dec
+
+  # column name
+  id
+
+  # column name
+  name
+
+  # column name
+  object_type
+
+  # column name
+  ra
+}
+
+# input type for updating data in table "targets"
+input targets_set_input {
+  dec: String
+  id: uuid
+  name: String
+  object_type: targetobjecttype
+  ra: String
+}
+
+# update columns of table "targets"
+enum targets_update_column {
+  # column name
+  dec
+
+  # column name
+  id
+
+  # column name
+  name
+
+  # column name
+  object_type
+
+  # column name
+  ra
+}
+
+scalar uuid
+
+# expression to compare columns of type uuid. All fields are combined with logical 'AND'.
+input uuid_comparison_exp {
+  _eq: uuid
+  _gt: uuid
+  _gte: uuid
+  _in: [uuid!]
+  _is_null: Boolean
+  _lt: uuid
+  _lte: uuid
+  _neq: uuid
+  _nin: [uuid!]
+}
+
+scalar watervapor
+
+# expression to compare columns of type watervapor. All fields are combined with logical 'AND'.
+input watervapor_comparison_exp {
+  _eq: watervapor
+  _gt: watervapor
+  _gte: watervapor
+  _in: [watervapor!]
+  _is_null: Boolean
+  _lt: watervapor
+  _lte: watervapor
+  _neq: watervapor
+  _nin: [watervapor!]
+}
+
