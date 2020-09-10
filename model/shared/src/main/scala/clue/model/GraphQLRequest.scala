@@ -14,13 +14,13 @@ import io.circe.Json
 // }
 
 /**
-  * A raw (pre-parsed) GraphQL request.
-  *
-  * @param query         the query itself
-  * @param operationName identifies a particular operation in the query to
-  *                      execute
-  * @param variables     values corresponding to variables in the query
-  */
+ * A raw (pre-parsed) GraphQL request.
+ *
+ * @param query         the query itself
+ * @param operationName identifies a particular operation in the query to
+ *                      execute
+ * @param variables     values corresponding to variables in the query
+ */
 final case class GraphQLRequest(
   query:         String,
   operationName: Option[String] = None,
