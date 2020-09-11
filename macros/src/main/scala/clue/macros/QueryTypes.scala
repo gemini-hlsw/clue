@@ -20,9 +20,15 @@ import edu.gemini.grackle.ObjectType
 import edu.gemini.grackle.InterfaceType
 import edu.gemini.grackle.Value
 import scala.annotation.meta.field
+import scala.annotation.Annotation
 
-@compileTimeOnly("Macro annotations must be enabled")
-class QueryTypes(schema: String, debug: Boolean = false) extends StaticAnnotation {
+// Parameters must match exactly between this class and annotation class.
+class QueryTypesParams(val schema: String, val debug: Boolean = false) extends Annotation
+
+// @compileTimeOnly("Macro annotations must be enabled")
+class QueryTypes(schema: String, debug: Boolean = false)
+    extends QueryTypesParams(schema, debug)
+    with StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro QueryTypesImpl.expand
 }
 
@@ -32,15 +38,39 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
   val TypeMappings: Map[String, String] =
     Map("ID" -> "String", "uuid" -> "java.util.UUID", "targetobjecttype" -> "String")
 
+  /**
+   * Abort the macro showing an error message.
+   */
   private[this] def abort(msg: Any): Nothing =
     c.abort(c.enclosingPosition, msg.toString)
 
+  /**
+   * Log debug info.
+   */
   private[this] def log(msg: Any): Unit =
     c.info(c.enclosingPosition, msg.toString, force = true)
 
+  /**
+   * Log an actual Tree AST (not the Scala code equivalent).
+   */
   private[this] def debugTree(tree: c.Tree): Unit =
     log(c.universe.showRaw(tree))
 
+  /**
+   * Parse a type name (c.parse only parses terms).
+   */
+  def parseType(tpe: String): c.Tree =
+    c.parse(tpe) match {
+      case Ident(TermName(name))        => Ident(TypeName(name))
+      case Select(tree, TermName(name)) => Select(tree, TypeName(name))
+      case other                        =>
+        debugTree(other)
+        abort(s"Unexpected type [$tpe]")
+    }
+
+  /**
+   * Get the annotation name.
+   */
   private[this] val macroName: Tree = {
     c.prefix.tree match {
       case Apply(Select(New(name), _), _) => name
@@ -48,6 +78,9 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
     }
   }
 
+  /**
+   * Extract the `document` contents from the `GraphQLQuery` the marcro was applied to.
+   */
   @tailrec
   private[this] def documentDef(tree: List[c.Tree]): Option[String] =
     tree match {
@@ -56,27 +89,25 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
       case _ :: tail                                  => documentDef(tail)
     }
 
+  /**
+   * Attempt to guess the root directory for the project.
+   * Assumes `.../project[/module]/src/[main|test|*]/` dir structure.
+   */
   private[this] val PathExtract = "(.*/src/.*?/).*".r
 
+  /**
+   * Represents a parameter that will be used for a generated case class or variable.
+   *
+   * Consists of the name of the parameter and its Grackle type.
+   */
   private[this] case class TypedPar(name: String, tpe: GType) {
-    private def resolveType(tpe: GType): c.Tree = {
-
-      def unqualify(tpe: String): c.Tree =
-        tpe.split("\\.").toList match {
-          case Nil           => abort("Empty type")
-          case single :: Nil => tq"${TypeName(single)}"
-          case list          =>
-            val selectors = list.tail.init.map(s => TermName(s)) :+ TypeName(list.last)
-            tq"${selectors.foldLeft[c.Tree](Ident(TermName(list.head)))(Select.apply)}"
-        }
-
+    private def resolveType(tpe: GType): c.Tree =
       tpe match {
         case NullableType(tpe) => tq"Option[${resolveType(tpe)}]"
         case ListType(tpe)     => tq"List[${resolveType(tpe)}]"
-        case nt: NamedType     => unqualify(TypeMappings.getOrElse(nt.name, nt.name))
+        case nt: NamedType     => parseType(TypeMappings.getOrElse(nt.name, nt.name))
         case GNoType           => tq"Any"
       }
-    }
 
     def toTree: c.Tree = {
       // log(s"Resolving typed par: [$this]")
@@ -86,6 +117,12 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
       q"val $n: $t = $d"
     }
   }
+
+  /**
+   * The definition of a case class to contain an object from the query response.
+   *
+   * Consists of the class name and its [[TypedPar]] parameters.
+   */
   private[this] case class CaseClass(name: String, params: List[TypedPar]) {
     def toTree: List[c.Tree] = {
       val n = TypeName(name)
@@ -97,16 +134,27 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
       )
     }
   }
+
+  /**
+   * Holds the aggregated [[CaseClass]]es and their [[TypedPar]]s as we recurse the query AST.
+   */
   private[this] case class Resolve(
     classes:  List[CaseClass] = List.empty,
     parAccum: List[TypedPar] = List.empty,
     vars:     List[TypedPar] = List.empty
   )
 
+  /**
+   * Recurse the query AST and collect the necessary [[CaseClass]]es to hold its results.
+   *
+   * `Resolve.parAccum` accumulates parameters unit we have a whole case class definition.
+   * It should be empty by the time we are done.
+   */
   private[this] def resolveTypes(query: Query, tpe: GType): Resolve = {
 
     def go(currentQuery: Query, currentType: GType): Resolve = {
 
+      /** Resolve the types of the querie's parameters */
       def fieldArgs(fieldName: String, args: List[Query.Binding]): List[TypedPar] =
         // log(s"NAME: [$fieldName] - ARGS : [$args]")
         currentType match {
@@ -153,9 +201,14 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
 
     // log(query)
     // log(tpe.dealias.getClass())
-    go(query, tpe.underlyingObject)
+    val resolve = go(query, tpe.underlyingObject)
+    assert(resolve.parAccum.isEmpty)
+    resolve
   }
 
+  /**
+   * Parse the schema file.
+   */
   private[this] def retrieveSchema(schemaName: String): Schema = {
     val PathExtract(basePath) = c.enclosingPosition.source.path
     val jFile                 = new java.io.File(s"$basePath/resources/$schemaName.schema.graphql")
@@ -172,29 +225,33 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
     schema.right.get
   }
 
+  /**
+   * Actual macro application, generating case classes to hold the query results and its variables.
+   */
   final def expand(annottees: Tree*): Tree =
     annottees match {
       case List(
             q"..$mods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf => ..$objDefs }"
-          ) /* if object extends GraphQLQuery */ =>
+          ) /* TODO if object extends GraphQLQuery */ =>
         documentDef(objDefs) match {
 
           case None =>
             abort("The GraphQLQuery must define a 'val document' with a literal String")
 
           case Some(document) =>
-            val (schema, debug) =
-              c.prefix.tree match {
-                case q"new ${`macroName`}(${schema: String})"                    =>
-                  (retrieveSchema(schema), false)
-                case q"new ${`macroName`}(${schema: String}, ${debug: Boolean})" =>
-                  (retrieveSchema(schema), debug)
-                case _                                                           =>
-                  abort(
-                    "Use @QueryTypes(<schemaName>) or @QueryTypes(<schemaName>, <debug>) (without naming parameters)."
+            // Get annotation parameters and parse schema.
+            val (schema, debug) = c.prefix.tree match {
+              case q"new ${macroName}(..$params)" =>
+                val Ident(TypeName(macroClassName)) = macroName
+                val paramsClassName                 = parseType(s"clue.macros.${macroName}Params")
+                val annotationParams                =
+                  c.eval(
+                    c.Expr[QueryTypesParams](c.untypecheck(q"new $paramsClassName(..$params)"))
                   )
-              }
+                (retrieveSchema(annotationParams.schema), annotationParams.debug)
+            }
 
+            // Parse the query.
             val queryResult = QueryParser.parseText(document)
             if (queryResult.isLeft)
               abort(
@@ -208,13 +265,16 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
 
             // log(query)
 
+            // Resolve types needed for the query result and its variables.
             val resolvedTypes = resolveTypes(query, schema.queryType)
 
+            // Build AST to define case classes.
             val caseClasses     = resolvedTypes.classes
             val caseClassesDefs = caseClasses.map(_.toTree).flatten
 
             // log(resolvedTypes.vars)
 
+            // Build root return type.
             val rootName  = query match {
               case Query.Select(name, _, _) => TermName(name)
               case _                        => TermName("???")
@@ -222,8 +282,10 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
             val rootType  = TypeName(caseClasses.last.name)
             val rootParam = q"val $rootName: $rootType = $EmptyTree"
 
+            // Build Variables parameters.
             val variables = resolvedTypes.vars.map(_.toTree)
 
+            // Congratulations! You got a full-fledged GraphQLQuery (hopefully).
             val result =
               q"""
                 $mods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>

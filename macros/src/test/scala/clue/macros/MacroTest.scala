@@ -7,7 +7,7 @@ import scala.annotation.compileTimeOnly
 
 class MacroTest extends FunSuite {
 
-  @QueryTypes("explore-simple", true)
+  @QueryTypes("explore-simple", debug = false)
   object ExploreSubscription extends GraphQLQuery {
     val document = """
       query ($id: uuid!) {
