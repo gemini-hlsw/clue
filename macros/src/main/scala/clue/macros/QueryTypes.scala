@@ -21,6 +21,7 @@ import edu.gemini.grackle.InterfaceType
 import edu.gemini.grackle.Value
 import scala.annotation.meta.field
 import scala.annotation.Annotation
+import edu.gemini.grackle.GraphQLParser
 
 // Parameters must match exactly between this class and annotation class.
 class QueryTypesParams(val schema: String, val debug: Boolean = false) extends Annotation
@@ -105,7 +106,7 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
       tpe match {
         case NullableType(tpe) => tq"Option[${resolveType(tpe)}]"
         case ListType(tpe)     => tq"List[${resolveType(tpe)}]"
-        case nt: NamedType     => parseType(TypeMappings.getOrElse(nt.name, nt.name))
+        case nt: NamedType     => parseType(TypeMappings.getOrElse(nt.name, nt.name.capitalize))
         case GNoType           => tq"Any"
       }
 
@@ -144,38 +145,21 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
     vars:     List[TypedPar] = List.empty
   )
 
+  private[this] case class Definitions(
+    classes:    List[CaseClass] = List.empty,
+    variables:  List[TypedPar] = List.empty,
+    returnType: TypedPar
+  )
+
   /**
    * Recurse the query AST and collect the necessary [[CaseClass]]es to hold its results.
    *
    * `Resolve.parAccum` accumulates parameters unit we have a whole case class definition.
    * It should be empty by the time we are done.
    */
-  private[this] def resolveTypes(query: Query, tpe: GType): Resolve = {
+  private[this] def resolveDefinitions(query: Query, tpe: GType): Definitions = {
 
-    def go(currentQuery: Query, currentType: GType): Resolve = {
-
-      /** Resolve the types of the querie's parameters */
-      def fieldArgs(fieldName: String, args: List[Query.Binding]): List[TypedPar] =
-        // log(s"NAME: [$fieldName] - ARGS : [$args]")
-        currentType match {
-          case ObjectType(_, _, fields, _) =>
-            // log(s"NAME: [$fieldName] - ARGS : [$args] - FIELDS: [$fields]")
-            args.collect { case Query.Binding(parName, Value.UntypedVariableValue(varName)) =>
-              val typedParOpt =
-                fields
-                  .find(_.name == fieldName)
-                  .flatMap(field =>
-                    field.args.find(_.name == parName).map(input => TypedPar(varName, input.tpe))
-                  )
-              if (typedParOpt.isEmpty)
-                abort(s"Unexpected binding [$parName] in selector [$fieldName]")
-              typedParOpt.get
-            }
-          case _                           =>
-            // log(s"Not resolved args [$args] with currentType [$currentType]")
-            List.empty // TODO This is a query error if args.nonEmpty, report it.
-        }
-
+    def go(currentQuery: Query, currentType: GType): Resolve =
       currentQuery match {
         case (Query.Select(name, args, Query.Empty))                  => // Leaf
           Resolve(parAccum = List(TypedPar(name, currentType.field(name).dealias)),
@@ -197,13 +181,39 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
           go(Query.Select(name, args, Query.Group(List(select))), currentType)
         case _                                                        => Resolve()
       }
-    }
 
-    // log(query)
-    // log(tpe.dealias.getClass())
-    val resolve = go(query, tpe.underlyingObject)
-    assert(resolve.parAccum.isEmpty)
-    resolve
+    /** Resolve the types of the querie's parameters */
+    def fieldArgs(fieldName: String, args: List[Query.Binding]): List[TypedPar] =
+      // log(s"NAME: [$fieldName] - ARGS : [$args]")
+      tpe match {
+        case ObjectType(_, _, fields, _) =>
+          // log(s"NAME: [$fieldName] - ARGS : [$args] - FIELDS: [$fields]")
+          args.collect { case Query.Binding(parName, Value.UntypedVariableValue(varName)) =>
+            val typedParOpt =
+              fields
+                .find(_.name == fieldName)
+                .flatMap(field =>
+                  field.args.find(_.name == parName).map(input => TypedPar(varName, input.tpe))
+                )
+            if (typedParOpt.isEmpty)
+              abort(s"Unexpected binding [$parName] in selector [$fieldName]")
+            typedParOpt.get
+          }
+        case _                           =>
+          // log(s"Not resolved args [$args] with currentType [$currentType]")
+          List.empty // TODO This is a query error if args.nonEmpty, report it.
+      }
+
+    query match {
+      case Query.Select(opName, opArgs, _) =>
+        val resolve = go(query, tpe.underlyingObject)
+        if (resolve.parAccum.nonEmpty)
+          abort(
+            s"Error constructing case classes. Remaining uncaptured parameters: [${resolve.parAccum}]"
+          )
+        Definitions(resolve.classes, fieldArgs(opName, opArgs), TypedPar(opName, tpe.field(opName)))
+      case _                               => abort(s"Unexpected operation structure: $query")
+    }
   }
 
   /**
@@ -264,26 +274,29 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
             val query       = queryResult.toOption.get._1
 
             // log(query)
+            // import atto.Atto._
+            // log(GraphQLParser.Document.parseOnly(document))
 
             // Resolve types needed for the query result and its variables.
-            val resolvedTypes = resolveTypes(query, schema.queryType)
+            val definitions = resolveDefinitions(query, schema.queryType)
 
             // Build AST to define case classes.
-            val caseClasses     = resolvedTypes.classes
+            val caseClasses     = definitions.classes
             val caseClassesDefs = caseClasses.map(_.toTree).flatten
 
             // log(resolvedTypes.vars)
 
             // Build root return type.
-            val rootName  = query match {
-              case Query.Select(name, _, _) => TermName(name)
-              case _                        => TermName("???")
-            }
-            val rootType  = TypeName(caseClasses.last.name)
-            val rootParam = q"val $rootName: $rootType = $EmptyTree"
+            // val rootName  = query match {
+            //   case Query.Select(name, _, _) => TermName(name)
+            //   case _                        => TermName("???")
+            // }
+            // val rootType  = TypeName(caseClasses.last.name)
+            // val rootParam = q"val $rootName: $rootType = $EmptyTree"
+            val rootParam = definitions.returnType.toTree
 
             // Build Variables parameters.
-            val variables = resolvedTypes.vars.map(_.toTree)
+            val variables = definitions.variables.map(_.toTree)
 
             // Congratulations! You got a full-fledged GraphQLQuery (hopefully).
             val result =
