@@ -13,7 +13,7 @@ trait GraphQLClient[F[_]] {
     graphQLQuery:  GraphQLQuery,
     operationName: Option[String] = None
   )(variables:     Option[graphQLQuery.Variables] = None): F[graphQLQuery.Data] = {
-    import graphQLQuery._
+    import graphQLQuery.implicits._
 
     queryInternal(graphQLQuery.document, operationName, variables.map(_.asJson))
   }

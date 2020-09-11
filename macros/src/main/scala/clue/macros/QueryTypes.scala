@@ -22,6 +22,7 @@ import edu.gemini.grackle.Value
 import scala.annotation.meta.field
 import scala.annotation.Annotation
 import edu.gemini.grackle.GraphQLParser
+import edu.gemini.grackle.Ast
 
 // Parameters must match exactly between this class and annotation class.
 class QueryTypesParams(val schema: String, val debug: Boolean = false) extends Annotation
@@ -101,7 +102,7 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
    *
    * Consists of the name of the parameter and its Grackle type.
    */
-  private[this] case class TypedPar(name: String, tpe: GType) {
+  private[this] case class ClassParam(name: String, tpe: GType) {
     private def resolveType(tpe: GType): c.Tree =
       tpe match {
         case NullableType(tpe) => tq"Option[${resolveType(tpe)}]"
@@ -111,7 +112,6 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
       }
 
     def toTree: c.Tree = {
-      // log(s"Resolving typed par: [$this]")
       val n = TermName(name)
       val t = tq"${resolveType(tpe)}"
       val d = EmptyTree
@@ -122,9 +122,9 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
   /**
    * The definition of a case class to contain an object from the query response.
    *
-   * Consists of the class name and its [[TypedPar]] parameters.
+   * Consists of the class name and its [[ClassParam]] parameters.
    */
-  private[this] case class CaseClass(name: String, params: List[TypedPar]) {
+  private[this] case class CaseClass(name: String, params: List[ClassParam]) {
     def toTree: List[c.Tree] = {
       val n = TypeName(name)
       val o = TermName(name)
@@ -137,84 +137,72 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
   }
 
   /**
-   * Holds the aggregated [[CaseClass]]es and their [[TypedPar]]s as we recurse the query AST.
-   */
-  private[this] case class Resolve(
-    classes:  List[CaseClass] = List.empty,
-    parAccum: List[TypedPar] = List.empty,
-    vars:     List[TypedPar] = List.empty
-  )
-
-  private[this] case class Definitions(
-    classes:    List[CaseClass] = List.empty,
-    variables:  List[TypedPar] = List.empty,
-    returnType: TypedPar
-  )
-
-  /**
    * Recurse the query AST and collect the necessary [[CaseClass]]es to hold its results.
    *
    * `Resolve.parAccum` accumulates parameters unit we have a whole case class definition.
    * It should be empty by the time we are done.
    */
-  private[this] def resolveDefinitions(query: Query, tpe: GType): Definitions = {
+  private[this] def resolveData(operation: Query, rootType: GType): List[CaseClass] = {
+
+    // Holds the aggregated [[CaseClass]]es and their [[ClassParam]]s as we recurse the query AST.
+    case class Resolve(
+      classes:  List[CaseClass] = List.empty,
+      parAccum: List[ClassParam] = List.empty
+    )
 
     def go(currentQuery: Query, currentType: GType): Resolve =
       currentQuery match {
         case (Query.Select(name, args, Query.Empty))                  => // Leaf
-          Resolve(parAccum = List(TypedPar(name, currentType.field(name).dealias)),
-                  vars = fieldArgs(name, args)
-          )
+          Resolve(parAccum = List(ClassParam(name, currentType.field(name).dealias)))
         case Query.Select(name, args, Query.Group(queries))           => // Intermediate
           val nextType = currentType.field(name).underlyingObject
-          // log(nextType)
           val next     = queries
             .map(q => go(q, nextType))
             .foldLeft(Resolve())((r1, r2) =>
-              Resolve(r1.classes ++ r2.classes, r1.parAccum ++ r2.parAccum, r1.vars ++ r2.vars)
+              Resolve(r1.classes ++ r2.classes, r1.parAccum ++ r2.parAccum)
             )
-          Resolve(
-            classes = next.classes :+ CaseClass(name.capitalize, next.parAccum),
-            vars = fieldArgs(name, args) ++ next.vars
-          )
+          Resolve(classes = next.classes :+ CaseClass(name.capitalize, next.parAccum))
         case Query.Select(name, args, select @ Query.Select(_, _, _)) => // Intermediate with 1 Leaf
           go(Query.Select(name, args, Query.Group(List(select))), currentType)
         case _                                                        => Resolve()
       }
 
-    /** Resolve the types of the querie's parameters */
-    def fieldArgs(fieldName: String, args: List[Query.Binding]): List[TypedPar] =
-      // log(s"NAME: [$fieldName] - ARGS : [$args]")
-      tpe match {
-        case ObjectType(_, _, fields, _) =>
-          // log(s"NAME: [$fieldName] - ARGS : [$args] - FIELDS: [$fields]")
-          args.collect { case Query.Binding(parName, Value.UntypedVariableValue(varName)) =>
-            val typedParOpt =
-              fields
-                .find(_.name == fieldName)
-                .flatMap(field =>
-                  field.args.find(_.name == parName).map(input => TypedPar(varName, input.tpe))
-                )
-            if (typedParOpt.isEmpty)
-              abort(s"Unexpected binding [$parName] in selector [$fieldName]")
-            typedParOpt.get
-          }
-        case _                           =>
-          // log(s"Not resolved args [$args] with currentType [$currentType]")
-          List.empty // TODO This is a query error if args.nonEmpty, report it.
-      }
-
-    query match {
+    operation match {
       case Query.Select(opName, opArgs, _) =>
-        val resolve = go(query, tpe.underlyingObject)
+        val resolve = go(operation, rootType.underlyingObject)
         if (resolve.parAccum.nonEmpty)
           abort(
             s"Error constructing case classes. Remaining uncaptured parameters: [${resolve.parAccum}]"
           )
-        Definitions(resolve.classes, fieldArgs(opName, opArgs), TypedPar(opName, tpe.field(opName)))
-      case _                               => abort(s"Unexpected operation structure: $query")
+        resolve.classes :+ CaseClass("Data", List(ClassParam(opName, rootType.field(opName))))
+      case _                               => abort(s"Unexpected operation structure: $operation")
     }
   }
+
+  private[this] case class Variable(name: String, tpe: Ast.Type) {
+    private def resolveType(tpe: Ast.Type, isOptional: Boolean = true): c.Tree =
+      tpe match {
+        case Ast.Type.Named(astName) =>
+          val baseType = parseType(TypeMappings.getOrElse(astName.value, astName.value.capitalize))
+          if (isOptional) tq"Option[$baseType]" else baseType
+        case Ast.Type.List(ofType)   => tq"List[${resolveType(tpe, isOptional)}]"
+        case Ast.Type.NonNull(of)    => resolveType(of.merge, isOptional = false)
+      }
+
+    def toTree: c.Tree = {
+      val n = TermName(name)
+      val t = tq"${resolveType(tpe)}"
+      val d = EmptyTree
+      q"val $n: $t = $d"
+    }
+  }
+
+  /**
+   * Resolve the types of the operation's variable arguments.
+   */
+  // def resolveVariables(opName: String, opArgs: List[Query.Binding]): List[ClassParam] =
+  private[this] def resolveVariables(vars: List[Query.UntypedVarDef]): List[Variable] =
+    vars.map(varDef => Variable(varDef.name, varDef.tpe))
 
   /**
    * Parse the schema file.
@@ -262,7 +250,7 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
             }
 
             // Parse the query.
-            val queryResult = QueryParser.parseText(document)
+            val queryResult       = QueryParser.parseText(document)
             if (queryResult.isLeft)
               abort(
                 s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
@@ -271,32 +259,15 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
               log(
                 s"Warning parsing document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
               )
-            val query       = queryResult.toOption.get._1
-
-            // log(query)
-            // import atto.Atto._
-            // log(GraphQLParser.Document.parseOnly(document))
+            val (operation, vars) = queryResult.toOption.get
 
             // Resolve types needed for the query result and its variables.
-            val definitions = resolveDefinitions(query, schema.queryType)
-
+            val caseClasses     = resolveData(operation, schema.queryType)
             // Build AST to define case classes.
-            val caseClasses     = definitions.classes
             val caseClassesDefs = caseClasses.map(_.toTree).flatten
 
-            // log(resolvedTypes.vars)
-
-            // Build root return type.
-            // val rootName  = query match {
-            //   case Query.Select(name, _, _) => TermName(name)
-            //   case _                        => TermName("???")
-            // }
-            // val rootType  = TypeName(caseClasses.last.name)
-            // val rootParam = q"val $rootName: $rootType = $EmptyTree"
-            val rootParam = definitions.returnType.toTree
-
             // Build Variables parameters.
-            val variables = definitions.variables.map(_.toTree)
+            val variables = resolveVariables(vars).map(_.toTree)
 
             // Congratulations! You got a full-fledged GraphQLQuery (hopefully).
             val result =
@@ -304,18 +275,14 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
                 $mods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
                   ..$objDefs
 
-                  ..$caseClassesDefs
-
                   // @Lenses
                   case class Variables(..$variables)
-                  object Variables { val jsonEncoder: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables] }
+                  object Variables { implicit val jsonEncoder: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables] }
 
-                  // @Lenses
-                  case class Data($rootParam)
-                  object Data { val jsonDecoder: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data] }
+                  ..$caseClassesDefs
 
-                  implicit val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoder
-                  implicit val dataDecoder: io.circe.Decoder[Data]     = Data.jsonDecoder
+                  override val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoder
+                  override val dataDecoder: io.circe.Decoder[Data]     = Data.jsonDecoder
                 }
               """
 

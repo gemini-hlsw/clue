@@ -24,7 +24,7 @@ trait GraphQLStreamingClient[F[_]] extends GraphQLClient[F] {
   def subscribe(
     graphQLQuery: GraphQLQuery
   )(variables:    Option[graphQLQuery.Variables] = None): F[Subscription[graphQLQuery.Data]] = {
-    import graphQLQuery._
+    import graphQLQuery.implicits._
 
     variables.fold(subscribe[graphQLQuery.Data](graphQLQuery.document)) { v =>
       subscribe[graphQLQuery.Variables, graphQLQuery.Data](graphQLQuery.document, v)

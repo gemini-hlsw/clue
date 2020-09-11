@@ -3,12 +3,13 @@ package clue.macros
 import clue._
 import munit._
 import io.circe.parser.decode
+import io.circe.syntax._
 import scala.annotation.compileTimeOnly
 import java.{ util => ju }
 
 class MacroTest extends FunSuite {
 
-  @QueryTypes("explore-simple", debug = true)
+  @QueryTypes("explore-simple", debug = false)
   object ExploreSubscription extends GraphQLQuery {
     val document = """
       query ($id: uuid!) {
@@ -51,8 +52,8 @@ class MacroTest extends FunSuite {
         ]
       }
       """
-    println(decode[ExploreSubscription.Data](json))
-    println(ExploreSubscription.Variables(ju.UUID.randomUUID()).toJson)
+    println("*** DECODED DATA: " + decode[ExploreSubscription.Data](json))
+    println("*** ENCODED VARIABLES: " + ExploreSubscription.Variables(ju.UUID.randomUUID()).asJson)
   }
 
   // @QueryTypes("starwars", true)
