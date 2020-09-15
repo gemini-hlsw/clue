@@ -9,22 +9,22 @@ import java.{ util => ju }
 
 class MacroTest extends FunSuite {
 
-  @QueryTypes("explore-simple", debug = false)
-  object ExploreSubscription extends GraphQLQuery {
+  @GraphQL("explore-simple", debug = false)
+  object ExploreSubscription extends GraphQLOperation {
     val document = """
-      query ($id: uuid!) {
-        targets(where: {id: {_eq: $id}}) {
-          id
-          name
-          objType: object_type
-          ra
-          dec
-        }
-        observations {
-          id
-        }
-      }
-      """
+      |query ($id: uuid!) {
+      |  targets(where: {id: {_eq: $id}}) {
+      |    id
+      |    name
+      |    objType: object_type
+      |    ra
+      |    dec
+      |  }
+      |  observations {
+      |    id
+      |  }
+      |}
+      """.stripMargin
   }
 
   test("Explore query macro") {
@@ -68,7 +68,7 @@ class MacroTest extends FunSuite {
   }
 
   // @QueryTypes("starwars", true)
-  // object BasicQuery extends GraphQLQuery {
+  // object BasicQuery extends GraphQLOperation {
   //   val document = """
   //       query {
   //         character(id: $charId) {

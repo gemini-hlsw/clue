@@ -12,7 +12,7 @@ import edu.gemini.grackle.QueryCompiler
 import edu.gemini.grackle.OperationParser
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.{ Type => GType }
-import edu.gemini.grackle.Operation
+import edu.gemini.grackle.UntypedOperation
 import edu.gemini.grackle.NullableType
 import edu.gemini.grackle.ListType
 import edu.gemini.grackle.{ NoType => GNoType }
@@ -23,21 +23,21 @@ import scala.annotation.meta.field
 import scala.annotation.Annotation
 import edu.gemini.grackle.GraphQLParser
 import edu.gemini.grackle.Ast
-import edu.gemini.grackle.SelectionSet
+import edu.gemini.grackle.OperationAlgebra
 import edu.gemini.grackle.Ast.Type.Named
 import edu.gemini.grackle.Ast.Name
 
 // Parameters must match exactly between this class and annotation class.
-class QueryTypesParams(val schema: String, val debug: Boolean = false) extends Annotation
+class GraphQLParams(val schema: String, val debug: Boolean = false) extends Annotation
 
 // @compileTimeOnly("Macro annotations must be enabled")
-class QueryTypes(schema: String, debug: Boolean = false)
-    extends QueryTypesParams(schema, debug)
+class GraphQL(schema: String, debug: Boolean = false)
+    extends GraphQLParams(schema, debug)
     with StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro QueryTypesImpl.expand
+  def macroTransform(annottees: Any*): Any = macro GraphQLImpl.expand
 }
 
-private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
+private[clue] final class GraphQLImpl(val c: blackbox.Context) {
   import c.universe._
 
   val TypeMappings: Map[String, String] =
@@ -89,9 +89,9 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
   @tailrec
   private[this] def documentDef(tree: List[c.Tree]): Option[String] =
     tree match {
-      case Nil                                        => None
-      case q"val document = ${document: String}" :: _ => Some(document)
-      case _ :: tail                                  => documentDef(tail)
+      case Nil                              => None
+      case q"val document = $document" :: _ => Some(c.eval(c.Expr[String](document)))
+      case _ :: tail                        => documentDef(tail)
     }
 
   /**
@@ -145,8 +145,11 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
    * `Resolve.parAccum` accumulates parameters unit we have a whole case class definition.
    * It should be empty by the time we are done.
    */
-  private[this] def resolveSelection(selection: SelectionSet, rootType: GType): List[CaseClass] = {
-    import SelectionSet._
+  private[this] def resolveOperation(
+    algebra:  OperationAlgebra,
+    rootType: GType
+  ): List[CaseClass] = {
+    import OperationAlgebra._
 
     // Holds the aggregated [[CaseClass]]es and their [[ClassParam]]s as we recurse the query AST.
     case class Resolve(
@@ -155,11 +158,11 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
     )
 
     def go(
-      currentSelection: SelectionSet,
-      currentType:      GType,
-      nameOverride:     Option[String] = None
+      currentAlgebra: OperationAlgebra,
+      currentType:    GType,
+      nameOverride:   Option[String] = None
     ): Resolve =
-      currentSelection match {
+      currentAlgebra match {
         case Select(name, args, child) => // Intermediate
           val nextType = currentType.field(name)
           val baseType = nextType.underlyingObject
@@ -186,13 +189,13 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
             )
         case Empty                     => Resolve()
         case _                         =>
-          log(s"Unhandled Selection: [$selection]")
+          log(s"Unhandled Algebra: [$algebra]")
           Resolve()
       }
 
-    val selectionTypes = go(selection, rootType.underlyingObject)
+    val algebraTypes = go(algebra, rootType.underlyingObject)
 
-    selectionTypes.classes :+ CaseClass("Data", selectionTypes.parAccum)
+    algebraTypes.classes :+ CaseClass("Data", algebraTypes.parAccum)
   }
 
   private[this] case class Variable(name: String, tpe: Ast.Type) {
@@ -217,7 +220,7 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
    * Resolve the types of the operation's variable arguments.
    */
   // def resolveVariables(opName: String, opArgs: List[Query.Binding]): List[ClassParam] =
-  private[this] def resolveVariables(vars: List[SelectionSet.UntypedVarDef]): List[Variable] =
+  private[this] def resolveVariables(vars: List[OperationAlgebra.UntypedVarDef]): List[Variable] =
     vars.map(varDef => Variable(varDef.name, varDef.tpe))
 
   /**
@@ -250,7 +253,9 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
         documentDef(objDefs) match {
 
           case None =>
-            abort("The GraphQLQuery must define a 'val document' with a literal String")
+            abort(
+              "The GraphQLQuery must define a 'val document' that can be evaluated at compile time."
+            )
 
           case Some(document) =>
             // Get annotation parameters and parse schema.
@@ -260,7 +265,7 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
                 val paramsClassName                 = parseType(s"clue.macros.${macroName}Params")
                 val annotationParams                =
                   c.eval(
-                    c.Expr[QueryTypesParams](c.untypecheck(q"new $paramsClassName(..$params)"))
+                    c.Expr[GraphQLParams](c.untypecheck(q"new $paramsClassName(..$params)"))
                   )
                 (retrieveSchema(annotationParams.schema), annotationParams.debug)
             }
@@ -278,7 +283,7 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
             val operation   = queryResult.toOption.get
 
             // Resolve types needed for the query result and its variables.
-            val caseClasses     = resolveSelection(operation.selectionSet, schema.queryType)
+            val caseClasses     = resolveOperation(operation.operation, schema.queryType)
             // Build AST to define case classes.
             val caseClassesDefs = caseClasses.map(_.toTree).flatten
 

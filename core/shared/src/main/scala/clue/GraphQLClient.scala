@@ -10,12 +10,12 @@ import io.circe.syntax._
 trait GraphQLClient[F[_]] {
   // Query with GraphQLQuery
   def query(
-    graphQLQuery:  GraphQLQuery,
+    operation:     GraphQLOperation,
     operationName: Option[String] = None
-  )(variables:     Option[graphQLQuery.Variables] = None): F[graphQLQuery.Data] = {
-    import graphQLQuery.implicits._
+  )(variables:     Option[operation.Variables] = None): F[operation.Data] = {
+    import operation.implicits._
 
-    queryInternal(graphQLQuery.document, operationName, variables.map(_.asJson))
+    queryInternal(operation.document, operationName, variables.map(_.asJson))
   }
 
   // Queries with String

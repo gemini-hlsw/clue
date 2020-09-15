@@ -10,7 +10,7 @@ object Settings {
     val circe           = "0.13.0"
     val disciplineMUnit = "0.3.0"
     val fs2             = "2.4.4"
-    val grackle         = "0.0.16+4-15287b7a-SNAPSHOT"
+    val grackle         = "0.0.16+1-67c8032e+20200915-1149-SNAPSHOT"
     val log4Cats        = "1.1.1"
     val scalaJSDom      = "1.1.0"
     val sttpModel       = "1.1.4"

@@ -22,12 +22,12 @@ trait GraphQLStreamingClient[F[_]] extends GraphQLClient[F] {
   type Subscription[D] <: StoppableSubscription[D]
 
   def subscribe(
-    graphQLQuery: GraphQLQuery
-  )(variables:    Option[graphQLQuery.Variables] = None): F[Subscription[graphQLQuery.Data]] = {
-    import graphQLQuery.implicits._
+    subscription: GraphQLOperation
+  )(variables:    Option[subscription.Variables] = None): F[Subscription[subscription.Data]] = {
+    import subscription.implicits._
 
-    variables.fold(subscribe[graphQLQuery.Data](graphQLQuery.document)) { v =>
-      subscribe[graphQLQuery.Variables, graphQLQuery.Data](graphQLQuery.document, v)
+    variables.fold(subscribe[subscription.Data](subscription.document)) { v =>
+      subscribe[subscription.Variables, subscription.Data](subscription.document, v)
     }
   }
 

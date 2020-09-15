@@ -6,7 +6,7 @@ package clue
 import io.circe.Decoder
 import io.circe.Encoder
 
-trait GraphQLQuery {
+trait GraphQLOperation {
   val document: String
   type Variables
   type Data
