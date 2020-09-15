@@ -24,6 +24,8 @@ import scala.annotation.Annotation
 import edu.gemini.grackle.GraphQLParser
 import edu.gemini.grackle.Ast
 import edu.gemini.grackle.SelectionSet
+import edu.gemini.grackle.Ast.Type.Named
+import edu.gemini.grackle.Ast.Name
 
 // Parameters must match exactly between this class and annotation class.
 class QueryTypesParams(val schema: String, val debug: Boolean = false) extends Annotation
@@ -158,41 +160,39 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
       nameOverride:     Option[String] = None
     ): Resolve =
       currentSelection match {
-        case (Select(name, args, Empty))                  => // Leaf
-          Resolve(parAccum =
-            List(ClassParam(nameOverride.getOrElse(name), currentType.field(name).dealias))
+        case Select(name, args, child) => // Intermediate
+          val nextType = currentType.field(name)
+          val baseType = nextType.underlyingObject
+          val next     = go(child, baseType)
+          val newClass = next.parAccum match {
+            case Nil  => None
+            case pars =>
+              val caseClassName = baseType.asNamed
+                .map(_.name.capitalize)
+                .getOrElse(abort(s"Unexpected unnamed underlying type for [$baseType]"))
+              Some(CaseClass(caseClassName, next.parAccum))
+          }
+          Resolve(
+            classes = next.classes ++ newClass,
+            parAccum = List(ClassParam(nameOverride.getOrElse(name), nextType.dealias))
           )
-        case Select(name, args, Group(queries))           => // Intermediate
-          val nextType = currentType.field(name).underlyingObject
-          val next     = queries
-            .map(q => go(q, nextType))
+        case Rename(name, child)       =>
+          go(child, currentType, Some(name))
+        case Group(selections)         =>
+          selections
+            .map(q => go(q, currentType))
             .foldLeft(Resolve())((r1, r2) =>
               Resolve(r1.classes ++ r2.classes, r1.parAccum ++ r2.parAccum)
             )
-          Resolve(classes =
-            next.classes :+ CaseClass(nameOverride.getOrElse(name).capitalize, next.parAccum)
-          )
-        case Select(name, args, select @ Select(_, _, _)) => // Intermediate with 1 Leaf
-          go(Select(name, args, Group(List(select))), currentType, nameOverride)
-        case Rename(name, child)                          =>
-          go(child, currentType, Some(name))
-        case _                                            =>
+        case Empty                     => Resolve()
+        case _                         =>
           log(s"Unhandled Selection: [$selection]")
           Resolve()
       }
 
-    log(selection)
+    val selectionTypes = go(selection, rootType.underlyingObject)
 
-    selection match {
-      case Select(opName, opArgs, _) =>
-        val resolve = go(selection, rootType.underlyingObject)
-        if (resolve.parAccum.nonEmpty)
-          abort(
-            s"Error constructing case classes. Remaining uncaptured parameters: [${resolve.parAccum}]"
-          )
-        resolve.classes :+ CaseClass("Data", List(ClassParam(opName, rootType.field(opName))))
-      case _                         => abort(s"Unexpected selection: $selection")
-    }
+    selectionTypes.classes :+ CaseClass("Data", selectionTypes.parAccum)
   }
 
   private[this] case class Variable(name: String, tpe: Ast.Type) {
