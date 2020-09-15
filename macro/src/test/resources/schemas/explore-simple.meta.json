@@ -1,5 +1,7 @@
 {
   "mappings": {
-    "targetobjecttype": "String"
+    "targetobjecttype": "String",
+    "obsstatus": "String",
+    "targets_insert_input": "io.circe.Json"
   }
 }

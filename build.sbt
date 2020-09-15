@@ -79,6 +79,7 @@ lazy val macros =
       libraryDependencies ++=
         Settings.Libraries.DisciplineMUnit.value ++
           Settings.Libraries.Grackle.value ++
+          Settings.Libraries.Jawn.value ++
           Settings.Libraries.Monocle.value,
       scalacOptions ~= (_.filterNot(
         Set(

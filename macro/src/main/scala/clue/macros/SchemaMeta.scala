@@ -2,6 +2,11 @@ package clue.macros
 
 import cats._
 import io.circe._
+import org.typelevel.jawn.ast._
+import scala.util.Try
+import scala.util.Failure
+import shapeless.Succ
+import scala.util.Success
 
 case class SchemaMeta(imports: List[String], mappings: Map[String, String])
 
@@ -22,11 +27,25 @@ object SchemaMeta {
       SchemaMeta(x.imports ++ y.imports, x.mappings ++ y.mappings)
   }
 
-  implicit val decoderSchemaMeta: Decoder[SchemaMeta] = new Decoder[SchemaMeta] {
-    final def apply(c: HCursor): Decoder.Result[SchemaMeta] =
-      for {
-        imports  <- c.downField("imports").as[Option[List[String]]]
-        mappings <- c.downField("mappings").as[Option[Map[String, String]]]
-      } yield new SchemaMeta(imports.getOrElse(List.empty), mappings.getOrElse(Map.empty))
-  }
+  def fromJson(json: String): Try[SchemaMeta] =
+    JParser.parseFromString(json).flatMap {
+      _ match {
+        case JObject(map) =>
+          (map.get("imports") match {
+            case None               => Success(Nil)
+            case Some(JArray(list)) => Try(list.toList.map(_.asString))
+            case other              => Failure(new Exception(s"Invalid Schema Meta imports: [$other]"))
+          }).flatMap { imports =>
+            (map.get("mappings") match {
+              case None                       => Success(Map.empty[String, String])
+              case Some(JObject(mappingsMap)) =>
+                Try(mappingsMap.map { case (k, v) => (k, v.asString) }.toMap)
+              case other                      => Failure(new Exception(s"Invalid Schema Meta mappings: [$other]"))
+            }).map { mappings =>
+              SchemaMeta(imports, mappings)
+            }
+          }
+        case _            => Failure(new Exception(s"Invalid Schema Meta JSON: [$json]"))
+      }
+    }
 }

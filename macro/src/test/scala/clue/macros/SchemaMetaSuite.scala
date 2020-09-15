@@ -9,6 +9,7 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import cats.instances.map
 import io.circe.parser.decode
+import scala.util._
 
 class SchemaMetaSuite extends DisciplineSuite {
   val genSchemaMeta: Gen[SchemaMeta] =
@@ -33,10 +34,10 @@ class SchemaMetaSuite extends DisciplineSuite {
       |  }
       |}""".stripMargin
     assertEquals(
-      decode[SchemaMeta](json),
-      SchemaMeta(List("java.util._"),
-                 Map("uuid" -> "UUID", "map" -> "TreeMap[String, String]")
-      ).asRight
+      SchemaMeta.fromJson(json),
+      Success(
+        SchemaMeta(List("java.util._"), Map("uuid" -> "UUID", "map" -> "TreeMap[String, String]"))
+      )
     )
   }
 
@@ -49,10 +50,12 @@ class SchemaMetaSuite extends DisciplineSuite {
       |  }
       |}""".stripMargin
     assertEquals(
-      decode[SchemaMeta](json),
-      SchemaMeta(Nil,
-                 Map("uuid" -> "java.util.UUID", "map" -> "java.util.TreeMap[String, String]")
-      ).asRight
+      SchemaMeta.fromJson(json),
+      Success(
+        SchemaMeta(Nil,
+                   Map("uuid" -> "java.util.UUID", "map" -> "java.util.TreeMap[String, String]")
+        )
+      )
     )
   }
 }

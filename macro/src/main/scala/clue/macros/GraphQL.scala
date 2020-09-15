@@ -11,6 +11,8 @@ import edu.gemini.grackle.{ NoType => GNoType }
 import scala.annotation.Annotation
 import io.circe.parser.decode
 import io.circe.ParsingFailure
+import scala.util.Success
+import scala.util.Failure
 
 // Parameters must match exactly between this class and annotation class.
 class GraphQLParams(
@@ -290,15 +292,11 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
     val jFile    = new java.io.File(fileName)
     if (jFile.exists) {
       val json = new File(jFile).slurp()
-      decode[SchemaMeta](json) match {
-        case Right(schemaMeta) => SchemaMeta.Default.combine(schemaMeta)
-        case Left(failure)     =>
-          val errors = failure match {
-            case ParsingFailure(message, throwable) =>
-              s"$message\n${throwable.getMessage}:\n" + throwable.getStackTrace().mkString("\n")
-            case _                                  => failure.toString
-          }
-          abort(s"Could not parse schema metadata at [$fileName]:\n $errors")
+
+      SchemaMeta.fromJson(json) match {
+        case Success(schemaMeta) => SchemaMeta.Default.combine(schemaMeta)
+        case Failure(failure)    =>
+          abort(s"Could not parse schema metadata at [$fileName]:\n $failure")
       }
     } else
       SchemaMeta.Default

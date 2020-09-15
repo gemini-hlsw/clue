@@ -11,6 +11,7 @@ object Settings {
     val disciplineMUnit = "0.3.0"
     val fs2             = "2.4.4"
     val grackle         = "0.0.16+1-67c8032e+20200915-1149-SNAPSHOT"
+    val jawn            = "1.0.0"
     val log4Cats        = "1.1.1"
     val monocle         = "2.0.3"
     val scalaJSDom      = "1.1.0"
@@ -62,6 +63,12 @@ object Settings {
     val Grackle = Def.setting(
       Seq(
         "edu.gemini" %%% "gsp-graphql-core" % grackle
+      )
+    )
+
+    val Jawn = Def.setting(
+      Seq(
+        "org.typelevel" %%% "jawn-ast" % jawn
       )
     )
 

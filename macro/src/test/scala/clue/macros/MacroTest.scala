@@ -9,6 +9,17 @@ import java.{ util => ju }
 
 class MacroTest extends FunSuite {
 
+  @GraphQL("schemas/explore-simple")
+  object AddTarget extends GraphQLOperation {
+    val document = """
+      mutation($target: targets_insert_input!) {
+        insert_targets_one(object: $target) {
+          id 
+        }
+      }
+    """
+  }
+
   @GraphQL("schemas/explore-simple", debug = false)
   object RemoveTarget extends GraphQLOperation {
     val document = """
