@@ -59,6 +59,27 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
     }
 
   /**
+   * Parse an import name (only simple and wildcard supported, no groups or aliases).
+   */
+  def parseImport(imp: String): c.Tree = {
+    val Wildcard   = "_WILDCARD_"
+    val unwildcard = if (imp.trim.endsWith("_")) imp.trim.init + Wildcard else imp
+    c.parse(unwildcard) match {
+      case Ident(TermName(name))               => Import(Ident(TypeName(name)), List.empty)
+      case Select(tree, term @ TermName(name)) =>
+        val selector =
+          if (name === Wildcard)
+            ImportSelector(termNames.WILDCARD, -1, null, -1)
+          else
+            ImportSelector(term, -1, term, -1)
+        Import(tree, List(selector))
+      case other                               =>
+        debugTree(other)
+        abort(s"Unexpected import [$imp]")
+    }
+  }
+
+  /**
    * Get the annotation name.
    */
   private[this] val macroName: Tree = {
@@ -216,16 +237,17 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
    * Parse the schema file.
    */
   private[this] def retrieveSchema(basePath: String, schemaName: String): Schema = {
-    val jFile        = new java.io.File(s"$basePath/resources/$schemaName.graphql")
+    val fileName     = s"$basePath/resources/$schemaName.graphql"
+    val jFile        = new java.io.File(fileName)
     val schemaString = new File(jFile).slurp()
     val schema       = Schema(schemaString)
     if (schema.isLeft)
       abort(
-        s"Could not parse schema [$schemaName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+        s"Could not parse schema at [$fileName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
       )
     if (schema.isBoth)
       log(
-        s"Warning parsing schema [$schemaName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+        s"Warning parsing schema [$fileName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
       )
     schema.right.get
   }
@@ -234,12 +256,13 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
    * Parse the schema meta file, if any.
    */
   private[this] def retrieveSchemaMeta(basePath: String, schemaName: String): SchemaMeta = {
-    val jFile = new java.io.File(s"$basePath/resources/$schemaName.meta.json")
+    val fileName = s"$basePath/resources/$schemaName.meta.json"
+    val jFile    = new java.io.File(fileName)
     if (jFile.exists) {
       val json = new File(jFile).slurp()
       decode[SchemaMeta](json) match {
         case Right(schemaMeta) => SchemaMeta.Default.combine(schemaMeta)
-        case Left(failure)     => abort(s"Failure parsing schema metadata: [$failure]")
+        case Left(failure)     => abort(s"Could not parse schema metadata at [$fileName]:\n [$failure]")
       }
     } else
       SchemaMeta.Default
@@ -277,6 +300,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             val schema     = retrieveSchema(basePath, params.schema)
             val schemaMeta = retrieveSchemaMeta(basePath, params.schema)
 
+            // Build imports.
+            val imports = schemaMeta.imports.map(parseImport)
+
             // Parse the operation.
             val queryResult = QueryParser.parseText(document)
             if (queryResult.isLeft)
@@ -301,6 +327,8 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             val result =
               q"""
                 $mods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
+                  ..$imports
+
                   ..$objDefs
 
                   // @Lenses
