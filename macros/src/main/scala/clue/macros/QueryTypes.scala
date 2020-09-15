@@ -9,10 +9,10 @@ import edu.gemini.grackle.Schema
 import edu.gemini.grackle.TypeWithFields
 import edu.gemini.grackle.ScalarType
 import edu.gemini.grackle.QueryCompiler
-import edu.gemini.grackle.QueryParser
+import edu.gemini.grackle.OperationParser
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.{ Type => GType }
-import edu.gemini.grackle.Query
+import edu.gemini.grackle.Operation
 import edu.gemini.grackle.NullableType
 import edu.gemini.grackle.ListType
 import edu.gemini.grackle.{ NoType => GNoType }
@@ -23,6 +23,7 @@ import scala.annotation.meta.field
 import scala.annotation.Annotation
 import edu.gemini.grackle.GraphQLParser
 import edu.gemini.grackle.Ast
+import edu.gemini.grackle.SelectionSet
 
 // Parameters must match exactly between this class and annotation class.
 class QueryTypesParams(val schema: String, val debug: Boolean = false) extends Annotation
@@ -108,7 +109,7 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
         case NullableType(tpe) => tq"Option[${resolveType(tpe)}]"
         case ListType(tpe)     => tq"List[${resolveType(tpe)}]"
         case nt: NamedType     => parseType(TypeMappings.getOrElse(nt.name, nt.name.capitalize))
-        case GNoType           => tq"Any"
+        case GNoType           => tq"io.circe.Json"
       }
 
     def toTree: c.Tree = {
@@ -142,7 +143,8 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
    * `Resolve.parAccum` accumulates parameters unit we have a whole case class definition.
    * It should be empty by the time we are done.
    */
-  private[this] def resolveData(operation: Query, rootType: GType): List[CaseClass] = {
+  private[this] def resolveSelection(selection: SelectionSet, rootType: GType): List[CaseClass] = {
+    import SelectionSet._
 
     // Holds the aggregated [[CaseClass]]es and their [[ClassParam]]s as we recurse the query AST.
     case class Resolve(
@@ -150,11 +152,11 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
       parAccum: List[ClassParam] = List.empty
     )
 
-    def go(currentQuery: Query, currentType: GType): Resolve =
-      currentQuery match {
-        case (Query.Select(name, args, Query.Empty))                  => // Leaf
+    def go(currentSelection: SelectionSet, currentType: GType): Resolve =
+      currentSelection match {
+        case (Select(name, args, Empty))                  => // Leaf
           Resolve(parAccum = List(ClassParam(name, currentType.field(name).dealias)))
-        case Query.Select(name, args, Query.Group(queries))           => // Intermediate
+        case Select(name, args, Group(queries))           => // Intermediate
           val nextType = currentType.field(name).underlyingObject
           val next     = queries
             .map(q => go(q, nextType))
@@ -162,20 +164,20 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
               Resolve(r1.classes ++ r2.classes, r1.parAccum ++ r2.parAccum)
             )
           Resolve(classes = next.classes :+ CaseClass(name.capitalize, next.parAccum))
-        case Query.Select(name, args, select @ Query.Select(_, _, _)) => // Intermediate with 1 Leaf
-          go(Query.Select(name, args, Query.Group(List(select))), currentType)
-        case _                                                        => Resolve()
+        case Select(name, args, select @ Select(_, _, _)) => // Intermediate with 1 Leaf
+          go(Select(name, args, Group(List(select))), currentType)
+        case _                                            => Resolve()
       }
 
-    operation match {
-      case Query.Select(opName, opArgs, _) =>
-        val resolve = go(operation, rootType.underlyingObject)
+    selection match {
+      case Select(opName, opArgs, _) =>
+        val resolve = go(selection, rootType.underlyingObject)
         if (resolve.parAccum.nonEmpty)
           abort(
             s"Error constructing case classes. Remaining uncaptured parameters: [${resolve.parAccum}]"
           )
         resolve.classes :+ CaseClass("Data", List(ClassParam(opName, rootType.field(opName))))
-      case _                               => abort(s"Unexpected operation structure: $operation")
+      case _                         => abort(s"Unexpected selection: $selection")
     }
   }
 
@@ -201,7 +203,7 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
    * Resolve the types of the operation's variable arguments.
    */
   // def resolveVariables(opName: String, opArgs: List[Query.Binding]): List[ClassParam] =
-  private[this] def resolveVariables(vars: List[Query.UntypedVarDef]): List[Variable] =
+  private[this] def resolveVariables(vars: List[SelectionSet.UntypedVarDef]): List[Variable] =
     vars.map(varDef => Variable(varDef.name, varDef.tpe))
 
   /**
@@ -249,8 +251,8 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
                 (retrieveSchema(annotationParams.schema), annotationParams.debug)
             }
 
-            // Parse the query.
-            val queryResult       = QueryParser.parseText(document)
+            // Parse the operation.
+            val queryResult = OperationParser.parseText(document)
             if (queryResult.isLeft)
               abort(
                 s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
@@ -259,15 +261,15 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
               log(
                 s"Warning parsing document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
               )
-            val (operation, vars) = queryResult.toOption.get
+            val operation   = queryResult.toOption.get
 
             // Resolve types needed for the query result and its variables.
-            val caseClasses     = resolveData(operation, schema.queryType)
+            val caseClasses     = resolveSelection(operation.selectionSet, schema.queryType)
             // Build AST to define case classes.
             val caseClassesDefs = caseClasses.map(_.toTree).flatten
 
             // Build Variables parameters.
-            val variables = resolveVariables(vars).map(_.toTree)
+            val variables = resolveVariables(operation.variables).map(_.toTree)
 
             // Congratulations! You got a full-fledged GraphQLQuery (hopefully).
             val result =

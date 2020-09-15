@@ -9,10 +9,10 @@ import java.{ util => ju }
 
 class MacroTest extends FunSuite {
 
-  @QueryTypes("explore-simple", debug = false)
+  @QueryTypes("explore-simple", debug = true)
   object ExploreSubscription extends GraphQLQuery {
     val document = """
-      query ($id: uuid!) {
+      subscription ($id: uuid!) {
         targets(where: {id: {_eq: $id}}) {
           id
           name

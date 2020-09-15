@@ -10,6 +10,7 @@ object Settings {
     val circe           = "0.13.0"
     val disciplineMUnit = "0.3.0"
     val fs2             = "2.4.4"
+    val grackle         = "0.0.16+4-15287b7a-SNAPSHOT"
     val log4Cats        = "1.1.1"
     val scalaJSDom      = "1.1.0"
     val sttpModel       = "1.1.4"
@@ -54,6 +55,12 @@ object Settings {
     val Fs2 = Def.setting(
       Seq(
         "co.fs2" %%% "fs2-core" % fs2
+      )
+    )
+
+    val Grackle = Def.setting(
+      Seq(
+        "edu.gemini" %%% "gsp-graphql-core" % grackle
       )
     )
 
