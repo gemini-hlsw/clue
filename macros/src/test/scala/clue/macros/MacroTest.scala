@@ -9,7 +9,7 @@ import java.{ util => ju }
 
 class MacroTest extends FunSuite {
 
-  @GraphQL("explore-simple", debug = false)
+  @GraphQL("schemas/explore-simple", debug = false)
   object ExploreSubscription extends GraphQLOperation {
 
     val document = """

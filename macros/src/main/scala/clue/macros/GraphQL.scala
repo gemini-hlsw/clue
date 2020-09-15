@@ -1,31 +1,19 @@
 package clue.macros
 
+import cats.syntax.all._
 import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import scala.annotation.tailrec
 import scala.annotation.compileTimeOnly
 import scala.reflect.io.File
-import edu.gemini.grackle.Schema
-import edu.gemini.grackle.TypeWithFields
-import edu.gemini.grackle.ScalarType
-import edu.gemini.grackle.QueryCompiler
-import edu.gemini.grackle.QueryParser
-import edu.gemini.grackle.NamedType
+import edu.gemini.grackle._
 import edu.gemini.grackle.{ Type => GType }
-import edu.gemini.grackle.UntypedOperation
-import edu.gemini.grackle.NullableType
-import edu.gemini.grackle.ListType
 import edu.gemini.grackle.{ NoType => GNoType }
-import edu.gemini.grackle.ObjectType
-import edu.gemini.grackle.InterfaceType
-import edu.gemini.grackle.Value
 import scala.annotation.meta.field
 import scala.annotation.Annotation
-import edu.gemini.grackle.GraphQLParser
-import edu.gemini.grackle.Ast
-import edu.gemini.grackle.Query
 import edu.gemini.grackle.Ast.Type.Named
 import edu.gemini.grackle.Ast.Name
+import io.circe.parser.decode
 
 // Parameters must match exactly between this class and annotation class.
 class GraphQLParams(val schema: String, val debug: Boolean = false) extends Annotation
@@ -39,9 +27,6 @@ class GraphQL(schema: String, debug: Boolean = false)
 
 private[clue] final class GraphQLImpl(val c: blackbox.Context) {
   import c.universe._
-
-  val TypeMappings: Map[String, String] =
-    Map("ID" -> "String", "uuid" -> "java.util.UUID", "targetobjecttype" -> "String")
 
   /**
    * Abort the macro showing an error message.
@@ -89,7 +74,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
   @tailrec
   private[this] def documentDef(tree: List[c.Tree]): Option[String] =
     tree match {
-      case Nil                              => None
+      case Nil                              => none
       case q"val document = $document" :: _ =>
         scala.util.Try(c.eval(c.Expr[String](document))).toOption
       case _ :: tail                        => documentDef(tail)
@@ -107,15 +92,16 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
    * Consists of the name of the parameter and its Grackle type.
    */
   private[this] case class ClassParam(name: String, tpe: GType) {
-    private def resolveType(tpe: GType): c.Tree =
-      tpe match {
-        case NullableType(tpe) => tq"Option[${resolveType(tpe)}]"
-        case ListType(tpe)     => tq"List[${resolveType(tpe)}]"
-        case nt: NamedType     => parseType(TypeMappings.getOrElse(nt.name, nt.name.capitalize))
-        case GNoType           => tq"io.circe.Json"
-      }
+    def toTree(mappings: Map[String, String]): c.Tree = {
 
-    def toTree: c.Tree = {
+      def resolveType(tpe: GType): c.Tree =
+        tpe match {
+          case NullableType(tpe) => tq"Option[${resolveType(tpe)}]"
+          case ListType(tpe)     => tq"List[${resolveType(tpe)}]"
+          case nt: NamedType     => parseType(mappings.getOrElse(nt.name, nt.name.capitalize))
+          case GNoType           => tq"io.circe.Json"
+        }
+
       val n = TermName(name)
       val t = tq"${resolveType(tpe)}"
       val d = EmptyTree
@@ -129,12 +115,12 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
    * Consists of the class name and its [[ClassParam]] parameters.
    */
   private[this] case class CaseClass(name: String, params: List[ClassParam]) {
-    def toTree: List[c.Tree] = {
+    def toTree(mappings: Map[String, String]): List[c.Tree] = {
       val n = TypeName(name)
       val o = TermName(name)
       // @Lenses
       List(
-        q"""case class $n(...${List(params.map(_.toTree))})""",
+        q"""case class $n(...${List(params.map(_.toTree(mappings)))})""",
         q"""object $o {implicit val jsonDecoder: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]}"""
       )
     }
@@ -161,7 +147,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
     def go(
       currentAlgebra: Query,
       currentType:    GType,
-      nameOverride:   Option[String] = None
+      nameOverride:   Option[String] = none
     ): Resolve =
       currentAlgebra match {
         case Select(name, args, child) => // Intermediate
@@ -169,19 +155,19 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
           val baseType = nextType.underlyingObject
           val next     = go(child, baseType)
           val newClass = next.parAccum match {
-            case Nil  => None
+            case Nil  => none
             case pars =>
               val caseClassName = baseType.asNamed
                 .map(_.name.capitalize)
                 .getOrElse(abort(s"Unexpected unnamed underlying type for [$baseType]"))
-              Some(CaseClass(caseClassName, next.parAccum))
+              CaseClass(caseClassName, next.parAccum).some
           }
           Resolve(
             classes = next.classes ++ newClass,
             parAccum = List(ClassParam(nameOverride.getOrElse(name), nextType.dealias))
           )
         case Rename(name, child)       =>
-          go(child, currentType, Some(name))
+          go(child, currentType, name.some)
         case Group(selections)         =>
           selections
             .map(q => go(q, currentType))
@@ -200,16 +186,18 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
   }
 
   private[this] case class Variable(name: String, tpe: Ast.Type) {
-    private def resolveType(tpe: Ast.Type, isOptional: Boolean = true): c.Tree =
-      tpe match {
-        case Ast.Type.Named(astName) =>
-          val baseType = parseType(TypeMappings.getOrElse(astName.value, astName.value.capitalize))
-          if (isOptional) tq"Option[$baseType]" else baseType
-        case Ast.Type.List(ofType)   => tq"List[${resolveType(tpe, isOptional)}]"
-        case Ast.Type.NonNull(of)    => resolveType(of.merge, isOptional = false)
-      }
 
-    def toTree: c.Tree = {
+    def toTree(mappings: Map[String, String]): c.Tree = {
+
+      def resolveType(tpe: Ast.Type, isOptional: Boolean = true): c.Tree =
+        tpe match {
+          case Ast.Type.Named(astName) =>
+            val baseType = parseType(mappings.getOrElse(astName.value, astName.value.capitalize))
+            if (isOptional) tq"Option[$baseType]" else baseType
+          case Ast.Type.List(ofType)   => tq"List[${resolveType(tpe, isOptional)}]"
+          case Ast.Type.NonNull(of)    => resolveType(of.merge, isOptional = false)
+        }
+
       val n = TermName(name)
       val t = tq"${resolveType(tpe)}"
       val d = EmptyTree
@@ -227,11 +215,10 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
   /**
    * Parse the schema file.
    */
-  private[this] def retrieveSchema(schemaName: String): Schema = {
-    val PathExtract(basePath) = c.enclosingPosition.source.path
-    val jFile                 = new java.io.File(s"$basePath/resources/$schemaName.schema.graphql")
-    val schemaString          = new File(jFile).slurp()
-    val schema                = Schema(schemaString)
+  private[this] def retrieveSchema(basePath: String, schemaName: String): Schema = {
+    val jFile        = new java.io.File(s"$basePath/resources/$schemaName.graphql")
+    val schemaString = new File(jFile).slurp()
+    val schema       = Schema(schemaString)
     if (schema.isLeft)
       abort(
         s"Could not parse schema [$schemaName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
@@ -241,6 +228,21 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
         s"Warning parsing schema [$schemaName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
       )
     schema.right.get
+  }
+
+  /**
+   * Parse the schema meta file, if any.
+   */
+  private[this] def retrieveSchemaMeta(basePath: String, schemaName: String): SchemaMeta = {
+    val jFile = new java.io.File(s"$basePath/resources/$schemaName.meta.json")
+    if (jFile.exists) {
+      val json = new File(jFile).slurp()
+      decode[SchemaMeta](json) match {
+        case Right(schemaMeta) => SchemaMeta.Default.combine(schemaMeta)
+        case Left(failure)     => abort(s"Failure parsing schema metadata: [$failure]")
+      }
+    } else
+      SchemaMeta.Default
   }
 
   /**
@@ -259,17 +261,21 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             )
 
           case Some(document) =>
-            // Get annotation parameters and parse schema.
-            val (schema, debug) = c.prefix.tree match {
+            // Get annotation parameters.
+            val params = c.prefix.tree match {
               case q"new ${macroName}(..$params)" =>
                 val Ident(TypeName(macroClassName)) = macroName
                 val paramsClassName                 = parseType(s"clue.macros.${macroName}Params")
-                val annotationParams                =
-                  c.eval(
-                    c.Expr[GraphQLParams](c.untypecheck(q"new $paramsClassName(..$params)"))
-                  )
-                (retrieveSchema(annotationParams.schema), annotationParams.debug)
+                c.eval(
+                  c.Expr[GraphQLParams](c.untypecheck(q"new $paramsClassName(..$params)"))
+                )
             }
+
+            val PathExtract(basePath) = c.enclosingPosition.source.path
+
+            // Parse schema and metadata.
+            val schema     = retrieveSchema(basePath, params.schema)
+            val schemaMeta = retrieveSchemaMeta(basePath, params.schema)
 
             // Parse the operation.
             val queryResult = QueryParser.parseText(document)
@@ -286,10 +292,10 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             // Resolve types needed for the query result and its variables.
             val caseClasses     = resolveQueryData(operation.query, schema.queryType)
             // Build AST to define case classes.
-            val caseClassesDefs = caseClasses.map(_.toTree).flatten
+            val caseClassesDefs = caseClasses.map(_.toTree(schemaMeta.mappings)).flatten
 
             // Build Variables parameters.
-            val variables = resolveVariables(operation.variables).map(_.toTree)
+            val variables = resolveVariables(operation.variables).map(_.toTree(schemaMeta.mappings))
 
             // Congratulations! You got a full-fledged GraphQLQuery (hopefully).
             val result =
@@ -308,7 +314,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                 }
               """
 
-            if (debug) log(result)
+            if (params.debug) log(result)
 
             result
         }
