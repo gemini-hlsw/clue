@@ -12,6 +12,7 @@ object Settings {
     val fs2             = "2.4.4"
     val grackle         = "0.0.16+1-67c8032e+20200915-1149-SNAPSHOT"
     val log4Cats        = "1.1.1"
+    val monocle         = "2.0.3"
     val scalaJSDom      = "1.1.0"
     val sttpModel       = "1.1.4"
   }
@@ -67,6 +68,13 @@ object Settings {
     val Log4Cats = Def.setting(
       Seq(
         "io.chrisdavenport" %%% "log4cats-core" % log4Cats
+      )
+    )
+
+    val Monocle = Def.setting(
+      Seq(
+        "com.github.julien-truffaut" %%% "monocle-core"  % monocle % "test",
+        "com.github.julien-truffaut" %%% "monocle-macro" % monocle % "test"
       )
     )
 

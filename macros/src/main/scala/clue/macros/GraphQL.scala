@@ -16,12 +16,21 @@ import edu.gemini.grackle.Ast.Name
 import io.circe.parser.decode
 
 // Parameters must match exactly between this class and annotation class.
-class GraphQLParams(val schema: String, val debug: Boolean = false) extends Annotation
+class GraphQLParams(
+  val schema: String,
+  val eq:     Boolean = true,
+  val show:   Boolean = true,
+  val lenses: Boolean = true,
+  val debug:  Boolean = false
+) extends Annotation
 
-// @compileTimeOnly("Macro annotations must be enabled")
-class GraphQL(schema: String, debug: Boolean = false)
-    extends GraphQLParams(schema, debug)
-    with StaticAnnotation {
+class GraphQL(
+  schema: String,
+  eq:     Boolean = true,
+  show:   Boolean = true,
+  lenses: Boolean = true,
+  debug:  Boolean = false
+) extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro GraphQLImpl.expand
 }
 
@@ -136,13 +145,37 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
    * Consists of the class name and its [[ClassParam]] parameters.
    */
   private[this] case class CaseClass(name: String, params: List[ClassParam]) {
-    def toTree(mappings: Map[String, String]): List[c.Tree] = {
-      val n = TypeName(name)
-      val o = TermName(name)
-      // @Lenses
+    def toTree(
+      mappings: Map[String, String],
+      eq:       Boolean,
+      show:     Boolean,
+      lenses:   Boolean
+    ): List[c.Tree] = {
+      val n        = TypeName(name)
+      val o        = TermName(name)
+      val pars     = List(params.map(_.toTree(mappings)))
+      val classDef =
+        if (lenses)
+          q"@monocle.macros.Lenses case class $n(...$pars)"
+        else
+          q"case class $n(...$pars)"
+      val eqDef    =
+        if (eq)
+          q"implicit val ${TermName(s"eq$name")}: cats.Eq[$n] = cats.Eq.fromUniversalEquals"
+        else
+          EmptyTree
+      val showDef  =
+        if (show)
+          q"implicit val ${TermName(s"show$name")}: cats.Show[$n] = cats.Show.fromToString"
+        else
+          EmptyTree
       List(
-        q"""case class $n(...${List(params.map(_.toTree(mappings)))})""",
-        q"""object $o {implicit val jsonDecoder: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]}"""
+        classDef,
+        q"""object $o {
+          $eqDef
+          $showDef
+          implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]
+        }"""
       )
     }
   }
@@ -270,15 +303,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
 
   private[this] def includesOperationType(list: List[c.Tree]): Boolean = {
     val OperationType = List(tq"GraphQLOperation", tq"clue.GraphQLOperation")
-
-    // OperationType.foreach(debugTree)
-    // log("xxxx")
-    list.foreach(debugTree)
-
     OperationType.exists(op => list.exists(_.equalsStructure(op)))
-
-    // Select(Ident(TermName("clue")), TypeName("GraphQLOperation"))
-    // Ident(TypeName("GraphQLOperation"))
   }
 
   /**
@@ -293,7 +318,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
 
           case None =>
             abort(
-              "The GraphQLQuery must define a 'val document' that can be evaluated at compile time."
+              "The GraphQLOperation must define a 'val document' that can be evaluated at compile time."
             )
 
           case Some(document) =>
@@ -307,6 +332,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                 )
             }
 
+            // Get the path of the source file. Assumes /src/*/scala.
             val PathExtract(basePath) = c.enclosingPosition.source.path
 
             // Parse schema and metadata.
@@ -331,12 +357,14 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             // Resolve types needed for the query result and its variables.
             val caseClasses     = resolveQueryData(operation.query, schema.queryType)
             // Build AST to define case classes.
-            val caseClassesDefs = caseClasses.map(_.toTree(schemaMeta.mappings)).flatten
+            val caseClassesDefs = caseClasses
+              .map(_.toTree(schemaMeta.mappings, params.eq, params.show, params.lenses))
+              .flatten
 
             // Build Variables parameters.
             val variables = resolveVariables(operation.variables).map(_.toTree(schemaMeta.mappings))
 
-            // Congratulations! You got a full-fledged GraphQLQuery (hopefully).
+            // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
             val result =
               q"""
                 $mods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
@@ -346,12 +374,12 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
 
                   // @Lenses
                   case class Variables(..$variables)
-                  object Variables { implicit val jsonEncoder: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables] }
+                  object Variables { implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables] }
 
                   ..$caseClassesDefs
 
-                  override val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoder
-                  override val dataDecoder: io.circe.Decoder[Data]     = Data.jsonDecoder
+                  override val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
+                  override val dataDecoder: io.circe.Decoder[Data]     = Data.jsonDecoderData
                 }
               """
 

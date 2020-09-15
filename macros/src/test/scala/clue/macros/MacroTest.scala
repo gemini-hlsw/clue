@@ -64,7 +64,9 @@ class MacroTest extends FunSuite {
         ]
       }
       """
-    println("*** DECODED DATA: " + decode[ExploreSubscription.Data](json))
+    val data = decode[ExploreSubscription.Data](json)
+    println("*** DECODED DATA: " + data)
+    println(ExploreSubscription.Data.observations.get(data.toOption.get))
     println("*** ENCODED VARIABLES: " + ExploreSubscription.Variables(ju.UUID.randomUUID()).asJson)
   }
 

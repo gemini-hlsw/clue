@@ -78,7 +78,8 @@ lazy val macros = project
     moduleName := "clue-macros",
     libraryDependencies ++=
       Settings.Libraries.DisciplineMUnit.value ++
-        Settings.Libraries.Grackle.value
+        Settings.Libraries.Grackle.value ++
+        Settings.Libraries.Monocle.value
     // scalacOptions ~= (_.filterNot(
     //   Set(
     //     // Disabling these to explore macros.
