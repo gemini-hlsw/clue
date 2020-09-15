@@ -10,6 +10,17 @@ import java.{ util => ju }
 class MacroTest extends FunSuite {
 
   @GraphQL("schemas/explore-simple", debug = false)
+  object RemoveTarget extends GraphQLOperation {
+    val document = """
+      mutation ($id: uuid!) {
+        delete_targets_by_pk(id: $id) {
+          id
+        }
+      }
+    """
+  }
+
+  @GraphQL("schemas/explore-simple", debug = false)
   object ExploreSubscription extends AnyRef with GraphQLOperation {
 
     val document = """
@@ -68,6 +79,12 @@ class MacroTest extends FunSuite {
     println("*** DECODED DATA: " + data)
     println(ExploreSubscription.Data.observations.get(data.toOption.get))
     println("*** ENCODED VARIABLES: " + ExploreSubscription.Variables(ju.UUID.randomUUID()).asJson)
+
+    println(
+      decode[RemoveTarget.Data](
+        """ { "delete_targets_by_pk": {"id": "e892547a-8a9c-4fed-b676-cbb1d6a0241d"} } """
+      )
+    )
   }
 
   // @QueryTypes("starwars", true)

@@ -4,16 +4,13 @@ import cats.syntax.all._
 import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import scala.annotation.tailrec
-import scala.annotation.compileTimeOnly
 import scala.reflect.io.File
 import edu.gemini.grackle._
 import edu.gemini.grackle.{ Type => GType }
 import edu.gemini.grackle.{ NoType => GNoType }
-import scala.annotation.meta.field
 import scala.annotation.Annotation
-import edu.gemini.grackle.Ast.Type.Named
-import edu.gemini.grackle.Ast.Name
 import io.circe.parser.decode
+import io.circe.ParsingFailure
 
 // Parameters must match exactly between this class and annotation class.
 class GraphQLParams(
@@ -204,20 +201,20 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
       nameOverride:   Option[String] = none
     ): Resolve =
       currentAlgebra match {
-        case Select(name, args, child) => // Intermediate
-          val nextType = currentType.field(name)
-          val baseType = nextType.underlyingObject
-          val next     = go(child, baseType)
-          val newClass = next.parAccum match {
-            case Nil  => none
-            case pars =>
-              val caseClassName = baseType.asNamed
-                .map(_.name.capitalize)
-                .getOrElse(abort(s"Unexpected unnamed underlying type for [$baseType]"))
-              CaseClass(caseClassName, next.parAccum).some
-          }
+        case Select(name, args, child) =>
+          val nextType   = currentType.field(name)
+          val newClasses =
+            nextType.underlyingObject match {
+              case GNoType  => Nil
+              case baseType =>
+                val next          = go(child, baseType)
+                val caseClassName = baseType.asNamed
+                  .map(_.name.capitalize)
+                  .getOrElse(abort(s"Unexpected unnamed underlying type for [$baseType]"))
+                next.classes :+ CaseClass(caseClassName, next.parAccum)
+            }
           Resolve(
-            classes = next.classes ++ newClass,
+            classes = newClasses,
             parAccum = List(ClassParam(nameOverride.getOrElse(name), nextType.dealias))
           )
         case Rename(name, child)       =>
@@ -295,7 +292,13 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
       val json = new File(jFile).slurp()
       decode[SchemaMeta](json) match {
         case Right(schemaMeta) => SchemaMeta.Default.combine(schemaMeta)
-        case Left(failure)     => abort(s"Could not parse schema metadata at [$fileName]:\n [$failure]")
+        case Left(failure)     =>
+          val errors = failure match {
+            case ParsingFailure(message, throwable) =>
+              s"$message\n${throwable.getMessage}:\n" + throwable.getStackTrace().mkString("\n")
+            case _                                  => failure.toString
+          }
+          abort(s"Could not parse schema metadata at [$fileName]:\n $errors")
       }
     } else
       SchemaMeta.Default
