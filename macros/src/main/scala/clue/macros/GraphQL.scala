@@ -268,6 +268,19 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
       SchemaMeta.Default
   }
 
+  private[this] def includesOperationType(list: List[c.Tree]): Boolean = {
+    val OperationType = List(tq"GraphQLOperation", tq"clue.GraphQLOperation")
+
+    // OperationType.foreach(debugTree)
+    // log("xxxx")
+    list.foreach(debugTree)
+
+    OperationType.exists(op => list.exists(_.equalsStructure(op)))
+
+    // Select(Ident(TermName("clue")), TypeName("GraphQLOperation"))
+    // Ident(TypeName("GraphQLOperation"))
+  }
+
   /**
    * Actual macro application, generating case classes to hold the query results and its variables.
    */
@@ -275,7 +288,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
     annottees match {
       case List(
             q"..$mods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf => ..$objDefs }"
-          ) /* TODO if object extends GraphQLQuery */ =>
+          ) if includesOperationType(objEarlyDefs) || includesOperationType(objParents) =>
         documentDef(objDefs) match {
 
           case None =>
@@ -348,6 +361,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
         }
 
       case _ =>
-        abort("Invalid annotation target: must be an object extending GraphQLQuery")
+        abort("Invalid annotation target: must be an object extending GraphQLOperation")
     }
 }
