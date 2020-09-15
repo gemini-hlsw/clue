@@ -90,7 +90,8 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
   private[this] def documentDef(tree: List[c.Tree]): Option[String] =
     tree match {
       case Nil                              => None
-      case q"val document = $document" :: _ => Some(c.eval(c.Expr[String](document)))
+      case q"val document = $document" :: _ =>
+        scala.util.Try(c.eval(c.Expr[String](document))).toOption
       case _ :: tail                        => documentDef(tail)
     }
 

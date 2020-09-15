@@ -11,6 +11,7 @@ class MacroTest extends FunSuite {
 
   @GraphQL("explore-simple", debug = false)
   object ExploreSubscription extends GraphQLOperation {
+
     val document = """
       |query ($id: uuid!) {
       |  targets(where: {id: {_eq: $id}}) {
