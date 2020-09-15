@@ -9,7 +9,7 @@ import edu.gemini.grackle.Schema
 import edu.gemini.grackle.TypeWithFields
 import edu.gemini.grackle.ScalarType
 import edu.gemini.grackle.QueryCompiler
-import edu.gemini.grackle.OperationParser
+import edu.gemini.grackle.QueryParser
 import edu.gemini.grackle.NamedType
 import edu.gemini.grackle.{ Type => GType }
 import edu.gemini.grackle.UntypedOperation
@@ -23,7 +23,7 @@ import scala.annotation.meta.field
 import scala.annotation.Annotation
 import edu.gemini.grackle.GraphQLParser
 import edu.gemini.grackle.Ast
-import edu.gemini.grackle.OperationAlgebra
+import edu.gemini.grackle.Query
 import edu.gemini.grackle.Ast.Type.Named
 import edu.gemini.grackle.Ast.Name
 
@@ -146,11 +146,11 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
    * `Resolve.parAccum` accumulates parameters unit we have a whole case class definition.
    * It should be empty by the time we are done.
    */
-  private[this] def resolveOperation(
-    algebra:  OperationAlgebra,
+  private[this] def resolveQueryData(
+    algebra:  Query,
     rootType: GType
   ): List[CaseClass] = {
-    import OperationAlgebra._
+    import Query._
 
     // Holds the aggregated [[CaseClass]]es and their [[ClassParam]]s as we recurse the query AST.
     case class Resolve(
@@ -159,7 +159,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
     )
 
     def go(
-      currentAlgebra: OperationAlgebra,
+      currentAlgebra: Query,
       currentType:    GType,
       nameOverride:   Option[String] = None
     ): Resolve =
@@ -221,7 +221,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
    * Resolve the types of the operation's variable arguments.
    */
   // def resolveVariables(opName: String, opArgs: List[Query.Binding]): List[ClassParam] =
-  private[this] def resolveVariables(vars: List[OperationAlgebra.UntypedVarDef]): List[Variable] =
+  private[this] def resolveVariables(vars: List[Query.UntypedVarDef]): List[Variable] =
     vars.map(varDef => Variable(varDef.name, varDef.tpe))
 
   /**
@@ -272,7 +272,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             }
 
             // Parse the operation.
-            val queryResult = OperationParser.parseText(document)
+            val queryResult = QueryParser.parseText(document)
             if (queryResult.isLeft)
               abort(
                 s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
@@ -284,7 +284,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             val operation   = queryResult.toOption.get
 
             // Resolve types needed for the query result and its variables.
-            val caseClasses     = resolveOperation(operation.operation, schema.queryType)
+            val caseClasses     = resolveQueryData(operation.query, schema.queryType)
             // Build AST to define case classes.
             val caseClassesDefs = caseClasses.map(_.toTree).flatten
 

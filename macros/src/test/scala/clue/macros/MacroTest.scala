@@ -13,7 +13,7 @@ class MacroTest extends FunSuite {
   object ExploreSubscription extends GraphQLOperation {
 
     val document = """
-      |query ($id: uuid!) {
+      |subscription ($id: uuid!) {
       |  targets(where: {id: {_eq: $id}}) {
       |    id
       |    name
