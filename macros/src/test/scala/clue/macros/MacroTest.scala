@@ -16,7 +16,7 @@ class MacroTest extends FunSuite {
         targets(where: {id: {_eq: $id}}) {
           id
           name
-          object_type
+          objType: object_type
           ra
           dec
         }

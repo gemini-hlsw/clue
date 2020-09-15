@@ -152,10 +152,16 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
       parAccum: List[ClassParam] = List.empty
     )
 
-    def go(currentSelection: SelectionSet, currentType: GType): Resolve =
+    def go(
+      currentSelection: SelectionSet,
+      currentType:      GType,
+      nameOverride:     Option[String] = None
+    ): Resolve =
       currentSelection match {
         case (Select(name, args, Empty))                  => // Leaf
-          Resolve(parAccum = List(ClassParam(name, currentType.field(name).dealias)))
+          Resolve(parAccum =
+            List(ClassParam(nameOverride.getOrElse(name), currentType.field(name).dealias))
+          )
         case Select(name, args, Group(queries))           => // Intermediate
           val nextType = currentType.field(name).underlyingObject
           val next     = queries
@@ -163,11 +169,19 @@ private[clue] final class QueryTypesImpl(val c: blackbox.Context) {
             .foldLeft(Resolve())((r1, r2) =>
               Resolve(r1.classes ++ r2.classes, r1.parAccum ++ r2.parAccum)
             )
-          Resolve(classes = next.classes :+ CaseClass(name.capitalize, next.parAccum))
+          Resolve(classes =
+            next.classes :+ CaseClass(nameOverride.getOrElse(name).capitalize, next.parAccum)
+          )
         case Select(name, args, select @ Select(_, _, _)) => // Intermediate with 1 Leaf
-          go(Select(name, args, Group(List(select))), currentType)
-        case _                                            => Resolve()
+          go(Select(name, args, Group(List(select))), currentType, nameOverride)
+        case Rename(name, child)                          =>
+          go(child, currentType, Some(name))
+        case _                                            =>
+          log(s"Unhandled Selection: [$selection]")
+          Resolve()
       }
+
+    log(selection)
 
     selection match {
       case Select(opName, opArgs, _) =>
