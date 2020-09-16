@@ -95,7 +95,12 @@ lazy val macros =
           "-Yno-predef",
           "-Ywarn-unused-import"
         )
-      ))
+      )),
+      scalacOptions += "-Xmacro-settings:" + buildDependencies.value
+        .classpathTransitiveRefs(
+          ProjectRef((LocalRootProject / baseDirectory).value.toURI, name.value)
+        )
+        .mkString
     )
     // .dependsOn(core)
     .dependsOn(coreJVM)

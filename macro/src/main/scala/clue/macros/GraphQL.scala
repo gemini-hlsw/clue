@@ -323,6 +323,8 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             )
 
           case Some(document) =>
+            log(c.settings)
+
             // Get annotation parameters.
             val params = c.prefix.tree match {
               case q"new ${macroName}(..$params)" =>
