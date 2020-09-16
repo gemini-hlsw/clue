@@ -11,7 +11,7 @@ class MacroTest extends FunSuite {
 
   @GraphQL("schemas/explore-simple")
   object AddTarget extends GraphQLOperation {
-    val document = """
+    override val document = """
       mutation($target: targets_insert_input!) {
         insert_targets_one(object: $target) {
           id 
@@ -22,7 +22,7 @@ class MacroTest extends FunSuite {
 
   @GraphQL("schemas/explore-simple", debug = false)
   object RemoveTarget extends GraphQLOperation {
-    val document = """
+    val document: String = """
       mutation ($id: uuid!) {
         delete_targets_by_pk(id: $id) {
           id
@@ -31,7 +31,7 @@ class MacroTest extends FunSuite {
     """
   }
 
-  @GraphQL("schemas/explore-simple", debug = false)
+  @GraphQL("schemas/explore-simple", debug = true)
   object ExploreSubscription extends AnyRef with GraphQLOperation {
 
     val document = """

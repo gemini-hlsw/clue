@@ -70,11 +70,28 @@ lazy val scalaJS = project
   .dependsOn(coreJS)
   .enablePlugins(ScalaJSPlugin)
 
+// val depsResourceDirs = taskKey[Seq[Seq[File]]](
+//   "List of all resource directories from this project and dependencies, both managed and unmanaged."
+// )
+
+// val depsResourceDirsTask: sbt.Def.Initialize[sbt.Task[Seq[sbt.SettingKey[Seq[java.io.File]]]]] =
+//   Def.taskDyn {
+//     val deps =
+//       buildDependencies.value
+//         .classpathTransitiveRefs(
+//           ProjectRef((LocalRootProject / baseDirectory).value, name.value)
+//         )
+//     Def.task {
+//       deps.map(project => (project / Compile / resourceDirectories))
+//     }
+//   } //.value
+
 lazy val macros =
 // crossProject(JVMPlatform, JSPlatform)
   project
-    .in(file("macro"))
+    .in(file("macros"))
     .settings(
+      // depsResourceDirs := depsResourceDirsTask.value.map(_.value),
       moduleName := "clue-macro",
       libraryDependencies ++=
         Settings.Libraries.DisciplineMUnit.value ++
@@ -96,11 +113,22 @@ lazy val macros =
           "-Ywarn-unused-import"
         )
       )),
-      scalacOptions += "-Xmacro-settings:" + buildDependencies.value
-        .classpathTransitiveRefs(
-          ProjectRef((LocalRootProject / baseDirectory).value.toURI, name.value)
-        )
-        .mkString
+      scalacOptions += {
+        val thisProject   = thisProjectRef.value
+        val projects      = buildDependencies.value.classpathTransitiveRefs(thisProject) :+ thisProject
+        val macroSettings =
+          projects
+            .filter(_.build.getScheme == "file")
+            .map(project =>
+              project.build.getSchemeSpecificPart + project.project
+            ) // Only works if project name == directory
+            // .map(_ + "/src/main/resources") // TODO Add test only when in test environment.
+            .flatMap(base => List(base + "/src/main/resources", base + "/src/test/resources"))
+            .map(s => s"clue.path=$s")
+            .mkString(",")
+        // println(macroSettings)
+        "-Xmacro-settings:" + macroSettings
+      }
     )
     // .dependsOn(core)
     .dependsOn(coreJVM)
