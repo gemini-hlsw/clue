@@ -12,6 +12,7 @@ import io.circe.parser.decode
 import scala.util._
 
 class SchemaMetaSuite extends DisciplineSuite {
+
   val genSchemaMeta: Gen[SchemaMeta] =
     for {
       imports  <- Gen.listOfN(5, arbitrary[String])

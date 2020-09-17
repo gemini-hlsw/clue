@@ -8,7 +8,9 @@ import scala.util.Failure
 import shapeless.Succ
 import scala.util.Success
 
-protected[macros] case class SchemaMeta(imports: List[String], mappings: Map[String, String])
+protected[macros] case class SchemaMeta(imports: List[String], mappings: Map[String, String]) {
+  def addMappings(other: Map[String, String]): SchemaMeta = copy(mappings = mappings ++ other)
+}
 
 protected[macros] object SchemaMeta {
   val Empty: SchemaMeta = SchemaMeta(List.empty, Map.empty)

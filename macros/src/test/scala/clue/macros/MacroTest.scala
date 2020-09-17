@@ -6,10 +6,11 @@ import io.circe.parser.decode
 import io.circe.syntax._
 import scala.annotation.compileTimeOnly
 import java.{ util => ju }
+import scala.reflect.ClassTag
 
 class MacroTest extends FunSuite {
 
-  @GraphQL("schemas/explore-simple")
+  @GraphQL("explore-simple")
   object AddTarget extends GraphQLOperation {
     override val document = """
       mutation($target: targets_insert_input!) {
@@ -20,7 +21,7 @@ class MacroTest extends FunSuite {
     """
   }
 
-  @GraphQL("schemas/explore-simple", debug = false)
+  @GraphQL("explore-simple", debug = false)
   object RemoveTarget extends GraphQLOperation {
     val document: String = """
       mutation ($id: uuid!) {
@@ -31,7 +32,7 @@ class MacroTest extends FunSuite {
     """
   }
 
-  @GraphQL("schemas/explore-simple", debug = true)
+  @GraphQL("explore-simple", debug = false, mappings = Map("targetobjecttype" -> "String"))
   object ExploreSubscription extends AnyRef with GraphQLOperation {
 
     val document = """

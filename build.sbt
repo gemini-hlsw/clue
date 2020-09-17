@@ -114,20 +114,24 @@ lazy val macros =
         )
       )),
       scalacOptions += {
-        val thisProject   = thisProjectRef.value
-        val projects      = buildDependencies.value.classpathTransitiveRefs(thisProject) :+ thisProject
-        val macroSettings =
+        val thisProject    = thisProjectRef.value
+        val projects       = buildDependencies.value.classpathTransitiveRefs(thisProject) :+ thisProject
+        val schemaSettings =
           projects
             .filter(_.build.getScheme == "file")
             .map(project =>
               project.build.getSchemeSpecificPart + project.project
             ) // Only works if project name == directory
             // .map(_ + "/src/main/resources") // TODO Add test only when in test environment.
-            .flatMap(base => List(base + "/src/main/resources", base + "/src/test/resources"))
-            .map(s => s"clue.path=$s")
+            .flatMap(base =>
+              List(base + "/src/main/resources/graphql/schemas",
+                   base + "/src/test/resources/graphql/schemas"
+              )
+            )
+            .map(s => s"clue.schemaDir=$s")
             .mkString(",")
-        // println(macroSettings)
-        "-Xmacro-settings:" + macroSettings
+        // println(schemaSettings)
+        "-Xmacro-settings:clue.cats.eq=true,clue.cats.show=true,clue.monocle.lenses=true,clue.scalajs-react.reusability=true," + schemaSettings
       }
     )
     // .dependsOn(core)

@@ -15,37 +15,56 @@ import io.circe.ParsingFailure
 import scala.util.Success
 import scala.util.Failure
 
-// Parameters must match exactly between this class and annotation class.
-class GraphQLParams(
-  val schema: String,
-  val eq:     Boolean = true,
-  val show:   Boolean = true,
-  val lenses: Boolean = true,
-  val debug:  Boolean = false
-) extends Annotation
-
 class GraphQL(
-  schema: String,
-  eq:     Boolean = true,
-  show:   Boolean = true,
-  lenses: Boolean = true,
-  debug:  Boolean = false
+  schema:   String,
+  mappings: Map[String, String] = Map.empty,
+  eq:       Boolean = false,
+  show:     Boolean = false,
+  lenses:   Boolean = false,
+  reuse:    Boolean = false,
+  debug:    Boolean = false
 ) extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro GraphQLImpl.expand
 }
 
+// Parameter order and names must match exactly between this class and annotation class.
+case class GraphQLOptionalParams(
+  val schema:   Option[String] = None,
+  val mappings: Some[Map[String, String]] = Some(Map.empty),
+  val eq:       Option[Boolean] = None,
+  val show:     Option[Boolean] = None,
+  val lenses:   Option[Boolean] = None,
+  val reuse:    Option[Boolean] = None,
+  val debug:    Some[Boolean] = Some(false)
+) {
+  def resolve(settings: MacroSettings): Option[GraphQLParams] =
+    schema
+      .orElse(settings.defaultSchema)
+      .map(schemaName =>
+        GraphQLParams(
+          schemaName,
+          mappings.get,
+          eq.getOrElse(settings.catsEq),
+          show.getOrElse(settings.catsShow),
+          lenses.getOrElse(settings.monocleLenses),
+          reuse.getOrElse(settings.scalajsReactReusability),
+          debug.get
+        )
+      )
+}
+
+case class GraphQLParams(
+  schema:   String,
+  mappings: Map[String, String],
+  eq:       Boolean,
+  show:     Boolean,
+  lenses:   Boolean,
+  reuse:    Boolean,
+  debug:    Boolean
+)
+
 private[clue] final class GraphQLImpl(val c: blackbox.Context) {
   import c.universe._
-
-  private[this] case class MacroSettings(resourceDirs: List[JFile])
-  private[this] object MacroSettings {
-    def fromCtxSettings: MacroSettings = {
-      val settings      = c.settings
-      val resourcePaths = settings.filter(_.trim.startsWith("clue.path=")).map(_.split("=")(1).trim)
-      val resourceDirs  = resourcePaths.map(path => new JFile(path)) //.filter(_.isDirectory)
-      MacroSettings(resourceDirs)
-    }
-  }
 
   /**
    * Abort the macro showing an error message.
@@ -142,6 +161,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
     name:    String,
     eq:      Boolean,
     show:    Boolean,
+    reuse:   Boolean,
     encoder: Boolean = false,
     decoder: Boolean = false
   ): c.Tree = {
@@ -153,6 +173,11 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
 
     val showDef =
       if (show) q"implicit val ${TermName(s"show$name")}: cats.Show[$n] = cats.Show.fromToString"
+      else EmptyTree
+
+    val reuseDef =
+      if (reuse)
+        q"implicit val ${TermName(s"reuse$name")}: japgolly.scalajs.react.Reusability[$n] = japgolly.scalajs.react.Reusability.derive"
       else EmptyTree
 
     val encoderDef =
@@ -168,6 +193,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
     q"""object ${TermName(name)} {
           $eqDef
           $showDef
+          $reuseDef
           $encoderDef
           $decoderDef
         }"""
@@ -364,21 +390,36 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
 
           case Some(document) =>
             // Get macro settings passed thru -Xmacro-settings.
-            val settings = MacroSettings.fromCtxSettings
+            val settings = MacroSettings.fromCtxSettings(c.settings)
 
             // Get annotation parameters.
             val params = c.prefix.tree match {
               case q"new ${macroName}(..$params)" =>
                 val Ident(TypeName(macroClassName)) = macroName
-                val paramsClassName                 = parseType(s"clue.macros.${macroName}Params")
+                val paramsClassName                 = parseType(s"clue.macros.${macroClassName}OptionalParams")
+                // Convert parameters to Some(...).
+                val optionalParams                  = params.map {
+                  case value @ Literal(Constant(_)) =>
+                    Apply(Ident(TermName("Some")), List(value))
+                  case NamedArg(name, value)        =>
+                    NamedArg(name, Apply(Ident(TermName("Some")), List(value)))
+                }
+
                 c.eval(
-                  c.Expr[GraphQLParams](c.untypecheck(q"new $paramsClassName(..$params)"))
-                )
+                  c.Expr[GraphQLOptionalParams](
+                    c.untypecheck(q"new $paramsClassName(..$optionalParams)")
+                  )
+                ).resolve(settings) match {
+                  case Some(params) => params
+                  case None         =>
+                    abort(s"No default schema defined and no schema present in annotation.")
+                }
             }
 
             // Parse schema and metadata.
-            val schema     = retrieveSchema(settings.resourceDirs, params.schema)
-            val schemaMeta = retrieveSchemaMeta(settings.resourceDirs, params.schema)
+            val schema     = retrieveSchema(settings.schemaDirs, params.schema)
+            val schemaMeta =
+              retrieveSchemaMeta(settings.schemaDirs, params.schema).addMappings(params.mappings)
 
             // Check if a Data class and module are already defined.
             val hasDataClass  = objDefs.exists {
