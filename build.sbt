@@ -131,7 +131,7 @@ lazy val macros =
             .map(s => s"clue.schemaDir=$s")
             .mkString(",")
         // println(schemaSettings)
-        "-Xmacro-settings:clue.cats.eq=true,clue.cats.show=true,clue.monocle.lenses=true,clue.scalajs-react.reusability=true," + schemaSettings
+        "-Xmacro-settings:clue.defaultSchema=explore-simple, clue.cats.eq=true, clue.cats.show=true, clue.monocle.lenses=true, clue.scalajs-react.reusability=false," + schemaSettings
       }
     )
     // .dependsOn(core)

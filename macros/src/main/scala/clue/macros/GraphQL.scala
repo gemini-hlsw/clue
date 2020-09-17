@@ -232,11 +232,12 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
       mappings: Map[String, String],
       eq:       Boolean,
       show:     Boolean,
-      lenses:   Boolean
+      lenses:   Boolean,
+      reuse:    Boolean
     ): List[c.Tree] =
       List(
         caseClassDef(name, params.map(_.toTree(mappings)), lenses),
-        moduleDef(name, eq, show, decoder = true)
+        moduleDef(name, eq, show, reuse, decoder = true)
       )
   }
 
@@ -393,7 +394,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             val settings = MacroSettings.fromCtxSettings(c.settings)
 
             // Get annotation parameters.
-            val params = c.prefix.tree match {
+            val optionalParams = c.prefix.tree match {
               case q"new ${macroName}(..$params)" =>
                 val Ident(TypeName(macroClassName)) = macroName
                 val paramsClassName                 = parseType(s"clue.macros.${macroClassName}OptionalParams")
@@ -407,13 +408,16 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
 
                 c.eval(
                   c.Expr[GraphQLOptionalParams](
-                    c.untypecheck(q"new $paramsClassName(..$optionalParams)")
+                    q"new $paramsClassName(..$optionalParams)"
                   )
-                ).resolve(settings) match {
-                  case Some(params) => params
-                  case None         =>
-                    abort(s"No default schema defined and no schema present in annotation.")
-                }
+                )
+              case q"new ${macroName}"            => GraphQLOptionalParams()
+            }
+
+            val params = optionalParams.resolve(settings) match {
+              case Some(params) => params
+              case None         =>
+                abort(s"No default schema defined and no schema present in annotation.")
             }
 
             // Parse schema and metadata.
@@ -466,10 +470,17 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                 // Resolve types needed for the query result and its variables.
                 val dataClasses = resolveQueryData(operation.query, schema.queryType)
                 dataClasses
-                  .map(_.toTree(schemaMeta.mappings, params.eq, params.show, params.lenses))
+                  .map(
+                    _.toTree(schemaMeta.mappings,
+                             params.eq,
+                             params.show,
+                             params.lenses,
+                             params.reuse
+                    )
+                  )
                   .flatten
               } else if (!hasDataModule)
-                List(moduleDef("Data", params.eq, params.show, decoder = true))
+                List(moduleDef("Data", params.eq, params.show, params.reuse, decoder = true))
               else
                 List.empty
             val dataDecoderDef =
@@ -486,7 +497,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
               } else EmptyTree
             val variablesModuleDef  =
               if (!hasVariablesModule)
-                moduleDef("Variables", params.eq, params.show, encoder = true)
+                moduleDef("Variables", params.eq, params.show, reuse = false, encoder = true)
               else EmptyTree
             val variablesEncoderDef =
               if (!hasVariablesModule)

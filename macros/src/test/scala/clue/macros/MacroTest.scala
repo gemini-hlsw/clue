@@ -10,7 +10,7 @@ import scala.reflect.ClassTag
 
 class MacroTest extends FunSuite {
 
-  @GraphQL("explore-simple")
+  @GraphQL
   object AddTarget extends GraphQLOperation {
     override val document = """
       mutation($target: targets_insert_input!) {
@@ -75,7 +75,7 @@ class MacroTest extends FunSuite {
             "objType": "Sidereal",
             "ra": "02:46:25.154457",
             "dec": "-00:29:55.449960"
-          }          
+          }
         ],
         "observations": [
           {
@@ -99,7 +99,7 @@ class MacroTest extends FunSuite {
     )
   }
 
-  // @QueryTypes("starwars", true)
+  // @GraphQL("starwars", debug = false)
   // object BasicQuery extends GraphQLOperation {
   //   val document = """
   //       query {
@@ -112,7 +112,7 @@ class MacroTest extends FunSuite {
   //     """
   // }
 
-  // test("Query macro") {
+  // test("StarWars") {
   //   val json = """
   //     {
   //       "character": {
