@@ -457,11 +457,11 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                 }
 
                 // Check if a Variables class and module are already defined.
-                val hasVariablesClass  = objDefs.exists {
+                val varParams          = objDefs.collect {
                   case q"$mods class Variables $ctorMods(...$paramss) extends { ..$earlyDefs } with ..$parents { $self => ..$stats }" =>
-                    true
-                  case _                                                                                                              => false
-                }
+                    paramss
+                }.headOption
+                val hasVariablesClass  = varParams.isDefined
                 val hasVariablesModule = objDefs.exists {
                   case q"$mods object Variables extends { ..$earlyDefs } with ..$parents { $self => ..$stats }" =>
                     true
@@ -525,23 +525,25 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                   else EmptyTree
 
                 // Build convenience method.
-                val variableNames        = variables.map { case q"$mods val $name: $tpt = $rhs" => name }
+                val variableParams       = varParams.getOrElse(List(variables))
+                val variableNames        = variableParams
+                  .map(_.map { case q"$mods val $name: $tpt = $rhs" => name })
                 val convenienceMethodDef =
                   operation match {
                     case _: UntypedQuery        =>
                       q"""
-                        def query[F[_]](..$variables)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
-                          client.request(this)(Variables(..$variableNames))
+                        def query[F[_]](...$variableParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                          client.request(this)(Variables(...$variableNames))
                       """
                     case _: UntypedMutation     =>
                       q"""
-                        def mutate[F[_]](..$variables)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
-                          client.request(this)(Variables(..$variableNames))
+                        def mutate[F[_]](...$variableParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                          client.request(this)(Variables(...$variableNames))
                       """
                     case _: UntypedSubscription =>
                       q"""
-                        def subscribe[F[_]](..$variables)(implicit client: _root_.clue.GraphQLStreamingClient[F, $schemaType]) =
-                          client.subscribe(this)(Variables(..$variableNames))
+                        def subscribe[F[_]](...$variableParams)(implicit client: _root_.clue.GraphQLStreamingClient[F, $schemaType]) =
+                          client.subscribe(this)(Variables(...$variableNames))
                       """
                   }
 

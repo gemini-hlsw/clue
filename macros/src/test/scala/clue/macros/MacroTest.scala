@@ -20,7 +20,7 @@ class MacroTest extends FunSuite {
         insert_targets_one(object: $target) {
           id 
         }
-      }
+      } 
     """
   }
 
