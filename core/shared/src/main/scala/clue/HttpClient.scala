@@ -28,11 +28,11 @@ object Backend {
 //   "data": { ... }, // Typed
 //   "errors": [ ... ]
 // }
-class HttpClient[F[_]: Logger: Backend](uri: Uri)(implicit me: MonadError[F, Throwable])
-    extends GraphQLClient[F] {
+class HttpClient[F[_]: Logger: Backend, S](uri: Uri)(implicit me: MonadError[F, Throwable])
+    extends GraphQLClient[F, S] {
   private val LogPrefix = "[clue.HttpClient]"
 
-  override protected def queryInternal[D: Decoder](
+  override protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
@@ -54,6 +54,8 @@ class HttpClient[F[_]: Logger: Backend](uri: Uri)(implicit me: MonadError[F, Thr
 }
 
 object HttpClient {
-  def of[F[_]: Logger: Backend](uri: Uri)(implicit me: MonadError[F, Throwable]): F[HttpClient[F]] =
-    Applicative[F].pure(new HttpClient[F](uri))
+  def of[F[_]: Logger: Backend, S](uri: Uri)(implicit
+    me:                                 MonadError[F, Throwable]
+  ): F[HttpClient[F, S]] =
+    Applicative[F].pure(new HttpClient[F, S](uri))
 }

@@ -7,7 +7,6 @@ import scala.util.matching.Regex
 
 protected[macros] case class MacroSettings(
   schemaDirs:              List[File] = List.empty,
-  defaultSchema:           Option[String] = None,
   catsEq:                  Boolean = false,
   catsShow:                Boolean = false,
   monocleLenses:           Boolean = false,
@@ -27,7 +26,6 @@ protected[macros] object MacroSettings {
     override def combine(x: MacroSettings, y: MacroSettings): MacroSettings =
       MacroSettings(
         x.schemaDirs ++ y.schemaDirs,
-        y.defaultSchema.orElse(x.defaultSchema),
         x.catsEq || y.catsEq,
         x.catsShow || y.catsShow,
         x.monocleLenses || y.monocleLenses,
@@ -43,7 +41,6 @@ protected[macros] object MacroSettings {
   private def booleanOption(option: String): Regex = optionRegex(option, "(?i:true)")
 
   private val SchemaDir               = stringOption("schemaDir")
-  private val DefaultSchema           = stringOption("defaultSchema")
   private val CatsEq                  = booleanOption("cats\\.eq")
   private val CatsShow                = booleanOption("cats\\.show")
   private val MonocleLenses           = booleanOption("monocle\\.lenses")
@@ -52,7 +49,6 @@ protected[macros] object MacroSettings {
   def fromCtxSettings(settings: List[String]): MacroSettings =
     settings.collectFold {
       case SchemaDir(schemaDir)      => MacroSettings(schemaDirs = List(new File(schemaDir.trim)))
-      case DefaultSchema(schema)     => MacroSettings(defaultSchema = schema.trim.some)
       case CatsEq()                  => MacroSettings(catsEq = true)
       case CatsShow()                => MacroSettings(catsShow = true)
       case MonocleLenses()           => MacroSettings(monocleLenses = true)

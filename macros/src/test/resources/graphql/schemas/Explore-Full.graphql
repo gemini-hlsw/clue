@@ -1,3 +1,9 @@
+schema {
+  query: query_root
+  mutation: mutation_root
+  subscription: subscription_root
+}
+
 scalar cloudcover
 
 # expression to compare columns of type cloudcover. All fields are combined with logical 'AND'.
@@ -259,7 +265,7 @@ input Int_comparison_exp {
 }
 
 # mutation root
-type Mutation {
+type mutation_root {
   # delete data from the table: "constraints"
   delete_constraints(
     # filter the rows which have to be deleted
@@ -736,7 +742,7 @@ enum order_by {
 }
 
 # query root
-type Query {
+type query_root {
   # fetch data from the table: "constraints"
   constraints(
     # distinct select on columns
@@ -890,7 +896,7 @@ input String_comparison_exp {
 }
 
 # subscription root
-type Subscription {
+type subscription_root {
   # fetch data from the table: "constraints"
   constraints(
     # distinct select on columns

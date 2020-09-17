@@ -15,18 +15,11 @@ class MacroSettingsSuite extends DisciplineSuite {
   val genMacroSettings: Gen[MacroSettings] =
     for {
       schemaDirs              <- Gen.listOfN(5, arbitrary[String]).map(_.map(f => new File(f)))
-      defaultSchema           <- Gen.option(arbitrary[String])
       catsEq                  <- arbitrary[Boolean]
       catsShow                <- arbitrary[Boolean]
       monocleLenses           <- arbitrary[Boolean]
       scalajsReactReusability <- arbitrary[Boolean]
-    } yield MacroSettings(schemaDirs,
-                          defaultSchema,
-                          catsEq,
-                          catsShow,
-                          monocleLenses,
-                          scalajsReactReusability
-    )
+    } yield MacroSettings(schemaDirs, catsEq, catsShow, monocleLenses, scalajsReactReusability)
 
   implicit val arbitraryMacroSettings: Arbitrary[MacroSettings] = Arbitrary(genMacroSettings)
 
@@ -37,7 +30,6 @@ class MacroSettingsSuite extends DisciplineSuite {
       List(
         "schemaDir=/main/resources/graphql/schemas/",
         "schemaDir=/test/resources/graphql/schemas/",
-        "defaultSchema=starwars",
         "cats.eq=true",
         "cats.show=true",
         "monocle.lenses=true",
@@ -52,7 +44,6 @@ class MacroSettingsSuite extends DisciplineSuite {
         List(new File("/main/resources/graphql/schemas/"),
              new File("/test/resources/graphql/schemas/")
         ),
-        "starwars".some,
         true,
         true,
         true,

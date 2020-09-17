@@ -10,10 +10,13 @@ import scala.reflect.ClassTag
 
 class MacroTest extends FunSuite {
 
-  @GraphQL
-  object AddTarget extends GraphQLOperation {
+  import Schemas._
+
+  @GraphQL(debug = false)
+  object AddTarget extends GraphQLOperation[Schemas.Explore] {
+
     override val document = """
-      mutation($target: targets_insert_input!) {
+      query($target: targets_insert_input!) {
         insert_targets_one(object: $target) {
           id 
         }
@@ -21,8 +24,8 @@ class MacroTest extends FunSuite {
     """
   }
 
-  @GraphQL("explore-simple", debug = false)
-  object RemoveTarget extends GraphQLOperation {
+  @GraphQL(debug = false)
+  object RemoveTarget extends GraphQLOperation[Explore] {
     val document: String = """
       mutation ($id: uuid!) {
         delete_targets_by_pk(id: $id) {
@@ -32,8 +35,8 @@ class MacroTest extends FunSuite {
     """
   }
 
-  @GraphQL("explore-simple", debug = false, mappings = Map("targetobjecttype" -> "String"))
-  object ExploreSubscription extends AnyRef with GraphQLOperation {
+  @GraphQL(debug = false, mappings = Map("targetobjecttype" -> "String"))
+  object ExploreSubscription extends AnyRef with GraphQLOperation[Explore] {
 
     val document = """
       |subscription ($id: uuid!) {

@@ -7,7 +7,7 @@ import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
 
-trait GraphQLStreamingClient[F[_]] extends GraphQLClient[F] {
+trait GraphQLStreamingClient[F[_], S] extends GraphQLClient[F, S] {
   def status: F[StreamingClientStatus]
 
   def statusStream: fs2.Stream[F, StreamingClientStatus]
@@ -22,39 +22,30 @@ trait GraphQLStreamingClient[F[_]] extends GraphQLClient[F] {
   type Subscription[D] <: StoppableSubscription[D]
 
   def subscribe(
-    subscription: GraphQLOperation
-  )(variables:    Option[subscription.Variables] = None): F[Subscription[subscription.Data]] = {
+    subscription:  GraphQLOperation[S],
+    operationName: Option[String] = None
+  ): SubscriptionApplied[subscription.Variables, subscription.Data] = {
     import subscription.implicits._
-
-    variables.fold(subscribe[subscription.Data](subscription.document)) { v =>
-      subscribe[subscription.Variables, subscription.Data](subscription.document, v)
-    }
+    SubscriptionApplied(subscription, operationName)
   }
 
-  def subscribe[V: Encoder, D: Decoder](
-    subscription:  String,
-    variables:     V,
-    operationName: String
-  ): F[Subscription[D]] =
-    subscribeInternal[D](subscription, operationName.some, variables.asJson.some)
+  case class SubscriptionApplied[V, D] private (
+    subscription:        GraphQLOperation[S],
+    operationName:       Option[String] = None
+  )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
+    def apply(variables: V): F[Subscription[D]] =
+      subscribeInternal[D](subscription.document, operationName, variables.asJson.some)
 
-  def subscribe[D: Decoder](
-    subscription:  String,
-    operationName: String
-  ): F[Subscription[D]] =
-    subscribeInternal[D](subscription, operationName.some)
-
-  def subscribe[V: Encoder, D: Decoder](
-    subscription: String,
-    variables:    V
-  ): F[Subscription[D]] =
-    subscribeInternal[D](subscription, None, variables.asJson.some)
-
-  def subscribe[D: Decoder](subscription: String): F[Subscription[D]] =
-    subscribeInternal[D](subscription)
+    def apply: F[Subscription[D]] =
+      subscribeInternal[D](subscription.document, operationName)
+  }
+  object SubscriptionApplied {
+    implicit def withoutVariables[V, D](applied: SubscriptionApplied[V, D]): F[Subscription[D]] =
+      applied.apply
+  }
 
   protected def subscribeInternal[D: Decoder](
-    subscription:  String,
+    document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
   ): F[Subscription[D]]
