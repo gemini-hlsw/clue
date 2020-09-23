@@ -9,6 +9,7 @@ import java.io.{ File => JFile }
 import edu.gemini.grackle._
 import edu.gemini.grackle.{ Type => GType }
 import edu.gemini.grackle.{ NoType => GNoType }
+import edu.gemini.grackle.{ TypeRef => GTypeRef }
 import scala.annotation.Annotation
 import io.circe.parser.decode
 import io.circe.ParsingFailure
@@ -17,6 +18,8 @@ import scala.util.Failure
 import edu.gemini.grackle.UntypedOperation.UntypedQuery
 import edu.gemini.grackle.UntypedOperation.UntypedMutation
 import edu.gemini.grackle.UntypedOperation.UntypedSubscription
+import cats.data.Ior
+import shapeless.PolyDefns.Case
 
 class GraphQL(
   schema:   String,
@@ -59,78 +62,8 @@ case class GraphQLParams(
   debug:    Boolean
 )
 
-private[clue] final class GraphQLImpl(val c: blackbox.Context) {
+private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMacro {
   import c.universe._
-
-  /**
-   * Abort the macro showing an error message.
-   */
-  private[this] def abort(msg: Any): Nothing =
-    c.abort(c.enclosingPosition, msg.toString)
-
-  /**
-   * Log debug info.
-   */
-  private[this] def log(msg: Any): Unit =
-    c.info(c.enclosingPosition, msg.toString, force = true)
-
-  /**
-   * Log an actual Tree AST (not the Scala code equivalent).
-   */
-  private[this] def debugTree(tree: c.Tree): Unit =
-    log(c.universe.showRaw(tree))
-
-  /**
-   * Parse a type name (c.parse only parses terms).
-   */
-  def parseType(tpe: String): c.Tree =
-    c.parse(tpe) match {
-      case Ident(TermName(name))        => Ident(TypeName(name))
-      case Select(tree, TermName(name)) => Select(tree, TypeName(name))
-      case other                        =>
-        debugTree(other)
-        abort(s"Unexpected type [$tpe]")
-    }
-
-  /**
-   * Extract the unqualified type name from a type.
-   */
-  def unqualifiedType(tpe: c.Tree): Option[String] = tpe match {
-    case Ident(TypeName(schema))     => schema.some
-    case Select(_, TypeName(schema)) => schema.some
-    case _                           => none
-  }
-
-  /**
-   * Parse an import name (only simple and wildcard supported, no groups or aliases).
-   */
-  def parseImport(imp: String): c.Tree = {
-    val Wildcard   = "_WILDCARD_"
-    val unwildcard = if (imp.trim.endsWith("_")) imp.trim.init + Wildcard else imp
-    c.parse(unwildcard) match {
-      case Ident(TermName(name))               => Import(Ident(TypeName(name)), List.empty)
-      case Select(tree, term @ TermName(name)) =>
-        val selector =
-          if (name === Wildcard)
-            ImportSelector(termNames.WILDCARD, -1, null, -1)
-          else
-            ImportSelector(term, -1, term, -1)
-        Import(tree, List(selector))
-      case other                               =>
-        debugTree(other)
-        abort(s"Unexpected import [$imp]")
-    }
-  }
-
-  /**
-   * Get the annotation name.
-   */
-  private[this] val macroName: Tree = {
-    c.prefix.tree match {
-      case Apply(Select(New(name), _), _) => name
-      case _                              => abort("Unexpected macro application")
-    }
-  }
 
   /**
    * Extract the `document` contents from the `GraphQLQuery` the marcro was applied to.
@@ -145,134 +78,29 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
     }
 
   /**
-   * Compute a case class definition.
-   */
-  private[this] def caseClassDef(
-    name:   String,
-    pars:   List[c.universe.ValDef],
-    lenses: Boolean
-  ): c.Tree = {
-    val n = TypeName(name)
-    if (lenses)
-      q"@monocle.macros.Lenses case class $n(..$pars)"
-    else
-      q"case class $n(..$pars)"
-  }
-
-  /**
-   * Compute a companion object with typeclasses.
-   */
-  private[this] def moduleDef(
-    name:    String,
-    eq:      Boolean,
-    show:    Boolean,
-    reuse:   Boolean,
-    encoder: Boolean = false,
-    decoder: Boolean = false
-  ): c.Tree = {
-    val n = TypeName(name)
-
-    val eqDef =
-      if (eq) q"implicit val ${TermName(s"eq$name")}: cats.Eq[$n] = cats.Eq.fromUniversalEquals"
-      else EmptyTree
-
-    val showDef =
-      if (show) q"implicit val ${TermName(s"show$name")}: cats.Show[$n] = cats.Show.fromToString"
-      else EmptyTree
-
-    val reuseDef =
-      if (reuse)
-        q"""implicit val ${TermName(s"reuse$name")}: japgolly.scalajs.react.Reusability[$n] = {
-              import japgolly.scalajs.react.Reusability
-              japgolly.scalajs.react.Reusability.derive
-            }
-          """
-      else EmptyTree
-
-    val encoderDef =
-      if (encoder)
-        q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n]"
-      else EmptyTree
-
-    val decoderDef =
-      if (decoder)
-        q"implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
-      else EmptyTree
-
-    q"""object ${TermName(name)} {
-          $eqDef
-          $showDef
-          $reuseDef
-          $encoderDef
-          $decoderDef
-        }"""
-  }
-
-  /**
-   * Represents a parameter that will be used for a generated case class or variable.
+   *  Holds the aggregated [[CaseClass]]es and their [[ClassParam]]s as we recurse the query AST.
    *
-   * Consists of the name of the parameter and its Grackle type.
+   * `parAccum` accumulates parameters until we have a whole case class definition.
    */
-  private[this] case class ClassParam(name: String, tpe: GType) {
-    def toTree(mappings: Map[String, String]): c.universe.ValDef = {
-
-      def resolveType(tpe: GType): c.Tree =
-        tpe match {
-          case NullableType(tpe) => tq"Option[${resolveType(tpe)}]"
-          case ListType(tpe)     => tq"List[${resolveType(tpe)}]"
-          case nt: NamedType     => parseType(mappings.getOrElse(nt.name, nt.name.capitalize))
-          case GNoType           => tq"io.circe.Json"
-        }
-
-      val n = TermName(name)
-      val t = tq"${resolveType(tpe)}"
-      val d = EmptyTree
-      q"val $n: $t = $d"
-    }
-  }
-
-  /**
-   * The definition of a case class to contain an object from the query response.
-   *
-   * Consists of the class name and its [[ClassParam]] parameters.
-   */
-  private[this] case class CaseClass(name: String, params: List[ClassParam]) {
-    def toTree(
-      mappings: Map[String, String],
-      eq:       Boolean,
-      show:     Boolean,
-      lenses:   Boolean,
-      reuse:    Boolean
-    ): List[c.Tree] =
-      List(
-        caseClassDef(name, params.map(_.toTree(mappings)), lenses),
-        moduleDef(name, eq, show, reuse, decoder = true)
-      )
-  }
+  private[this] case class ClassAccumulator(
+    classes:  List[CaseClass] = List.empty,
+    parAccum: List[ClassParam] = List.empty
+  )
 
   /**
    * Recurse the query AST and collect the necessary [[CaseClass]]es to hold its results.
-   *
-   * `Resolve.parAccum` accumulates parameters unit we have a whole case class definition.
-   * It should be empty by the time we are done.
    */
-  private[this] def resolveQueryData(
+  private[this] def resolveData(
     algebra:  Query,
     rootType: GType
   ): List[CaseClass] = {
     import Query._
 
-    // Holds the aggregated [[CaseClass]]es and their [[ClassParam]]s as we recurse the query AST.
-    case class Resolve(
-      classes:  List[CaseClass] = List.empty,
-      parAccum: List[ClassParam] = List.empty
-    )
-
     def go(
       currentAlgebra: Query,
       currentType:    GType,
       nameOverride:   Option[String] = none
-    ): Resolve =
+    ): ClassAccumulator =
       currentAlgebra match {
         case Select(name, args, child) =>
           val nextType   = currentType.field(name)
@@ -286,7 +114,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                   .getOrElse(abort(s"Unexpected unnamed underlying type for [$baseType]"))
                 next.classes :+ CaseClass(caseClassName, next.parAccum)
             }
-          Resolve(
+          ClassAccumulator(
             classes = newClasses,
             parAccum = List(ClassParam(nameOverride.getOrElse(name), nextType.dealias))
           )
@@ -295,13 +123,13 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
         case Group(selections)         =>
           selections
             .map(q => go(q, currentType))
-            .foldLeft(Resolve())((r1, r2) =>
-              Resolve(r1.classes ++ r2.classes, r1.parAccum ++ r2.parAccum)
+            .foldLeft(ClassAccumulator())((r1, r2) =>
+              ClassAccumulator(r1.classes ++ r2.classes, r1.parAccum ++ r2.parAccum)
             )
-        case Empty                     => Resolve()
+        case Empty                     => ClassAccumulator()
         case _                         =>
           log(s"Unhandled Algebra: [$algebra]")
-          Resolve()
+          ClassAccumulator()
       }
 
     val algebraTypes = go(algebra, rootType.underlyingObject)
@@ -309,31 +137,68 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
     algebraTypes.classes :+ CaseClass("Data", algebraTypes.parAccum)
   }
 
-  private[this] case class Variable(name: String, tpe: Ast.Type) {
+  // This might be useful in Grackle?
+  private[this] def underlyingInputObject(tpe: GType): GType = {
+    log(s"Searching for [$tpe] - [${tpe.getClass()}]")
+    tpe match {
+      case NullableType(tpe)  => underlyingInputObject(tpe)
+      case ListType(tpe)      => underlyingInputObject(tpe)
+      case _: GTypeRef        => underlyingInputObject(tpe.dealias)
+      case o: InputObjectType => o
+      case _                  => GNoType
+    }
+  }
 
-    def toTree(mappings: Map[String, String]): c.universe.ValDef = {
+  /**
+   * Resolve the types needed to define another type.
+   */
+  private[this] def typeDependencies(
+    tpe:     GType,
+    visited: List[CaseClass] = List.empty
+  ): List[CaseClass] = {
+    log(
+      s"Type dep for [$tpe] - class [${tpe.getClass}] - under: [${underlyingInputObject(tpe)}] - under class [${underlyingInputObject(tpe).getClass()}]"
+    )
+    underlyingInputObject(tpe) match {
+      case InputObjectType(name, _, inputFields) if !visited.exists(_.name == name.capitalize) =>
+        val deps = inputFields.foldLeft(List.empty[CaseClass])((visitedNow, field) =>
+          visitedNow ++ typeDependencies(field.tpe, visitedNow ++ visited)
+        )
 
-      def resolveType(tpe: Ast.Type, isOptional: Boolean = true): c.Tree =
-        tpe match {
-          case Ast.Type.Named(astName) =>
-            val baseType = parseType(mappings.getOrElse(astName.value, astName.value.capitalize))
-            if (isOptional) tq"Option[$baseType]" else baseType
-          case Ast.Type.List(ofType)   => tq"List[${resolveType(tpe, isOptional)}]"
-          case Ast.Type.NonNull(of)    => resolveType(of.merge, isOptional = false)
-        }
-
-      val n = TermName(name)
-      val t = tq"${resolveType(tpe)}"
-      val d = EmptyTree
-      q"val $n: $t = $d"
+        deps :+ CaseClass(name.capitalize,
+                          inputFields.map(field => ClassParam(field.name, field.tpe))
+        )
+      case _                                                                                   => List.empty
     }
   }
 
   /**
    * Resolve the types of the operation's variable arguments.
    */
-  private[this] def resolveVariables(vars: List[Query.UntypedVarDef]): List[Variable] =
-    vars.map(varDef => Variable(varDef.name, varDef.tpe))
+  private[this] def resolveVariables(
+    schema: Schema,
+    vars:   List[Query.UntypedVarDef]
+  ): List[CaseClass] = {
+    val inputs = compileVarDefs(schema, vars)
+
+    // Actually define a sum type here.
+    val enums = schema.types.collect { case EnumType(name, _, _) =>
+      CaseClass(name.capitalize, List.empty)
+    }
+
+    val inputClasses = schema.types
+      .collect { case InputObjectType(name, _, fields) =>
+        CaseClass(name.capitalize, fields.map(iv => ClassParam(iv.name, iv.tpe)))
+      }
+
+    if (inputs.isLeft)
+      abort(s"Error resolving operation input variables types [$vars]: [${inputs.left}]]")
+    if (inputs.isBoth)
+      log(s"Warning resolving operation input variables types [$vars]: [${inputs.left}]]")
+    val inputValues = inputs.right.get
+    (enums ++ inputClasses) :+
+      CaseClass("Variables", inputValues.map(iv => ClassParam(iv.name, iv.tpe)))
+  }
 
   /**
    * Parse the schema file.
@@ -379,7 +244,8 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
 
   // We cannot fully resolve types since we cannot evaluate in the current annotated context.
   // Therefore, the schema name is always treated as unqualified, and therefore must be unique
-  // across the whole compilation.
+  // across the whole compilation unit.
+  // See: https://stackoverflow.com/questions/19379436/cant-access-parents-members-while-dealing-with-macro-annotations
   private[this] def schemaType(list: List[c.Tree]): Option[c.Tree] =
     list.collect {
       case tq"GraphQLOperation[$schema]"      => schema
@@ -396,7 +262,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
           ) =>
         schemaType(objEarlyDefs).orElse(schemaType(objParents)) match {
           case None =>
-            abort("Invalid annotation target: must be an object extending GraphQLOperation[Schema]")
+            abort(
+              "Invalid annotation target: must be an object extending GraphQLOperation[Schema]"
+            )
 
           case Some(schemaType) =>
             documentDef(objDefs) match {
@@ -410,12 +278,16 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                 val settings = MacroSettings.fromCtxSettings(c.settings)
 
                 // Get annotation parameters.
+                // TODO Can we generalize this and move to Macro trait?
                 val optionalParams = c.prefix.tree match {
                   case q"new ${macroName}(..$params)" =>
                     val Ident(TypeName(macroClassName)) = macroName
-                    val paramsClassName                 = parseType(s"clue.macros.${macroClassName}OptionalParams")
+
+                    val paramsClassName =
+                      parseType(s"clue.macros.${macroClassName}OptionalParams")
+
                     // Convert parameters to Some(...).
-                    val optionalParams                  = params.map {
+                    val optionalParams = params.map {
                       case value @ Literal(Constant(_)) =>
                         Apply(Ident(TermName("Some")), List(value))
                       case NamedArg(name, value)        =>
@@ -468,9 +340,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                   case _                                                                                        => false
                 }
 
-                // Build imports.
-                val imports = schemaMeta.imports.map(parseImport)
-
                 // Parse the operation.
                 val queryResult = QueryParser.parseText(document)
                 if (queryResult.isLeft)
@@ -484,17 +353,18 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                 val operation   = queryResult.toOption.get
 
                 // Build AST to define case classes to hold Data.
-                val dataDefs       =
+                val dataDefs: List[Tree] =
                   if (!hasDataClass) {
                     // Resolve types needed for the query result and its variables.
-                    val dataClasses = resolveQueryData(operation.query, schema.queryType)
+                    val dataClasses = resolveData(operation.query, schema.queryType)
                     dataClasses
                       .map(
                         _.toTree(schemaMeta.mappings,
                                  params.eq,
                                  params.show,
                                  params.lenses,
-                                 params.reuse
+                                 params.reuse,
+                                 decoder = true
                         )
                       )
                       .flatten
@@ -502,48 +372,60 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                     List(moduleDef("Data", params.eq, params.show, params.reuse, decoder = true))
                   else
                     List.empty
-                val dataDecoderDef =
+                val dataDecoderDef       =
                   if (!hasDataModule)
                     q"override val dataDecoder: io.circe.Decoder[Data]     = Data.jsonDecoderData"
                   else EmptyTree
 
                 // Build AST to define case classe to hold Variables.
-                val variables           =
-                  resolveVariables(operation.variables).map(_.toTree(schemaMeta.mappings))
-                val variablesClassDef   =
-                  if (!hasVariablesClass) {
-                    // Build Variables parameters.
-                    caseClassDef("Variables", variables, params.lenses)
-                  } else EmptyTree
-                val variablesModuleDef  =
-                  if (!hasVariablesModule)
-                    moduleDef("Variables", params.eq, params.show, reuse = false, encoder = true)
-                  else EmptyTree
+                val variablesClasses    = resolveVariables(schema, operation.variables)
+                val variablesDefs       =
+                  if (!hasVariablesClass)
+                    variablesClasses
+                      .map(
+                        _.toTree(schemaMeta.mappings,
+                                 params.eq,
+                                 params.show,
+                                 params.lenses,
+                                 params.reuse,
+                                 encoder = true
+                        )
+                      )
+                      .flatten
+                  else if (!hasVariablesModule)
+                    List(
+                      moduleDef("Variables", params.eq, params.show, reuse = false, encoder = true)
+                    )
+                  else
+                    List.empty
                 val variablesEncoderDef =
                   if (!hasVariablesModule)
                     q"override val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables"
                   else EmptyTree
 
                 // Build convenience method.
-                val variableParams       = varParams.getOrElse(List(variables))
-                val variableNames        = variableParams
+                val variablesParams      =
+                  varParams.getOrElse(
+                    List(variablesClasses.last.params.map(_.toTree(schemaMeta.mappings)))
+                  )
+                val variablesNames       = variablesParams
                   .map(_.map { case q"$mods val $name: $tpt = $rhs" => name })
                 val convenienceMethodDef =
                   operation match {
                     case _: UntypedQuery        =>
                       q"""
-                        def query[F[_]](...$variableParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
-                          client.request(this)(Variables(...$variableNames))
+                        def query[F[_]](...$variablesParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                          client.request(this)(Variables(...$variablesNames))
                       """
                     case _: UntypedMutation     =>
                       q"""
-                        def mutate[F[_]](...$variableParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
-                          client.request(this)(Variables(...$variableNames))
+                        def mutate[F[_]](...$variablesParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                          client.request(this)(Variables(...$variablesNames))
                       """
                     case _: UntypedSubscription =>
                       q"""
-                        def subscribe[F[_]](...$variableParams)(implicit client: _root_.clue.GraphQLStreamingClient[F, $schemaType]) =
-                          client.subscribe(this)(Variables(...$variableNames))
+                        def subscribe[F[_]](...$variablesParams)(implicit client: _root_.clue.GraphQLStreamingClient[F, $schemaType]) =
+                          client.subscribe(this)(Variables(...$variablesNames))
                       """
                   }
 
@@ -551,12 +433,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
                 val result =
                   q"""
                 $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
-                  ..$imports
-
                   ..$objDefs
 
-                  $variablesClassDef
-                  $variablesModuleDef
+                  ..$variablesDefs
 
                   ..$dataDefs
 
@@ -573,7 +452,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) {
             }
 
           case _ =>
-            abort("Invalid annotation target: must be an object extending GraphQLOperation[Schema]")
+            abort(
+              "Invalid annotation target: must be an object extending GraphQLOperation[Schema]"
+            )
         }
     }
 }

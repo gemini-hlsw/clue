@@ -12,8 +12,9 @@ class MacroTest extends FunSuite {
 
   import Schemas._
 
-  @GraphQL(debug = false)
+  @GraphQL(debug = true)
   object AddTarget extends GraphQLOperation[Schemas.Explore] {
+    //"targets_insert_input": "io.circe.Json"
 
     override val document = """
       query($target: targets_insert_input!) {

@@ -70,28 +70,30 @@ lazy val scalaJS = project
   .dependsOn(coreJS)
   .enablePlugins(ScalaJSPlugin)
 
-// val depsResourceDirs = taskKey[Seq[Seq[File]]](
-//   "List of all resource directories from this project and dependencies, both managed and unmanaged."
-// )
+val depsResourceDirs = taskKey[Seq[File]](
+  "List of all resource directories from this project and dependencies, both managed and unmanaged."
+)
 
 // val depsResourceDirsTask: sbt.Def.Initialize[sbt.Task[Seq[sbt.SettingKey[Seq[java.io.File]]]]] =
-//   Def.taskDyn {
-//     val deps =
-//       buildDependencies.value
-//         .classpathTransitiveRefs(
-//           ProjectRef((LocalRootProject / baseDirectory).value, name.value)
-//         )
-//     Def.task {
-//       deps.map(project => (project / Compile / resourceDirectories))
-//     }
-//   } //.value
+val depsResourceDirsTask /*(conf: sbt.Configuration)*/
+  : sbt.Def.Initialize[sbt.Task[Seq[java.io.File]]] =
+  Def.taskDyn {
+    val thisProjectRef0 = thisProjectRef.value
+    Def.task {
+      // (conf / resourceDirectories)
+      (Compile / resourceDirectories)
+        .all(ScopeFilter(inDependencies(thisProjectRef0)))
+        .value
+        .flatten
+    }
+  }
 
 lazy val macros =
 // crossProject(JVMPlatform, JSPlatform)
   project
     .in(file("macros"))
     .settings(
-      // depsResourceDirs := depsResourceDirsTask.value.map(_.value),
+      depsResourceDirs := depsResourceDirsTask.value,
       moduleName := "clue-macro",
       libraryDependencies ++=
         Settings.Libraries.DisciplineMUnit.value ++
