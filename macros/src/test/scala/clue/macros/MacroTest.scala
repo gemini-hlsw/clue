@@ -4,9 +4,7 @@ import clue._
 import munit._
 import io.circe.parser.decode
 import io.circe.syntax._
-import scala.annotation.compileTimeOnly
 import java.{ util => ju }
-import scala.reflect.ClassTag
 
 class MacroTest extends FunSuite {
 
@@ -24,6 +22,7 @@ class MacroTest extends FunSuite {
   }
 
   @GraphQL(debug = false)
+  @scala.annotation.unused
   object RemoveTarget extends GraphQLOperation[Explore] {
     val document: String = """
       mutation ($id: uuid!) {

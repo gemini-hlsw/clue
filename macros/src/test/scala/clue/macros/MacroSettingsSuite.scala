@@ -1,14 +1,11 @@
 package clue.macros
 
 import munit._
-import cats.syntax.all._
 import java.io.File
 import cats.kernel.laws.discipline.MonoidTests
 import org.scalacheck.Gen
-import org.scalacheck.Gen._
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
-import monocle.macros.internal.Macro
 
 class MacroSettingsSuite extends DisciplineSuite {
 

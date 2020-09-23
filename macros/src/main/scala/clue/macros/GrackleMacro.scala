@@ -5,8 +5,6 @@ import scala.reflect.macros.blackbox
 import edu.gemini.grackle._
 import scala.reflect.io.File
 import java.io.{ File => JFile }
-import scala.util.Success
-import scala.util.Failure
 
 protected[macros] trait GrackleMacro extends Macro {
   val c: blackbox.Context

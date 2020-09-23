@@ -5,12 +5,12 @@ import scala.reflect.macros.blackbox
 import edu.gemini.grackle._
 
 class GraphQLSchema(
-  mappings: Map[String, String] = Map.empty,
-  eq:       Boolean = false,
-  show:     Boolean = false,
-  lenses:   Boolean = false,
-  reuse:    Boolean = false,
-  debug:    Boolean = false
+  val mappings: Map[String, String] = Map.empty,
+  val eq:       Boolean = false,
+  val show:     Boolean = false,
+  val lenses:   Boolean = false,
+  val reuse:    Boolean = false,
+  val debug:    Boolean = false
 ) extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro GraphQLSchemaImpl.expand
 }
@@ -68,8 +68,15 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
             $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
               ..$objDefs
 
-              ..$enumDefs
-              ..$inputDefs
+              trait Enums {
+                ..$enumDefs
+              }
+              object Enums extends Enums
+
+              trait Types extends Scalars with Enums {
+                ..$inputDefs
+              }
+              object Types extends Types
             }
           """
 

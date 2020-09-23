@@ -2,7 +2,6 @@ package clue.macros
 
 import cats.syntax.all._
 import scala.reflect.macros.blackbox
-import scala.reflect.macros.Universe
 import scala.reflect.ClassTag
 
 protected[macros] trait Macro {
@@ -64,8 +63,6 @@ protected[macros] trait Macro {
     val tree =
       c.prefix.tree match {
         case q"new ${macroName}(..$params)" =>
-          val Ident(TypeName(macroClassName)) = macroName
-
           // Convert parameters to Some(...).
           val optionalParams = params.map {
             case value @ Literal(Constant(_)) =>

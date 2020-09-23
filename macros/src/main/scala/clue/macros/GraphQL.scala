@@ -4,30 +4,21 @@ import cats.syntax.all._
 import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import scala.annotation.tailrec
-import scala.reflect.io.File
-import java.io.{ File => JFile }
 import edu.gemini.grackle._
 import edu.gemini.grackle.{ Type => GType }
 import edu.gemini.grackle.{ NoType => GNoType }
 import edu.gemini.grackle.{ TypeRef => GTypeRef }
-import scala.annotation.Annotation
-import io.circe.parser.decode
-import io.circe.ParsingFailure
-import scala.util.Success
-import scala.util.Failure
 import edu.gemini.grackle.UntypedOperation.UntypedQuery
 import edu.gemini.grackle.UntypedOperation.UntypedMutation
 import edu.gemini.grackle.UntypedOperation.UntypedSubscription
-import cats.data.Ior
-import shapeless.PolyDefns.Case
 
 class GraphQL(
-  mappings: Map[String, String] = Map.empty,
-  eq:       Boolean = false,
-  show:     Boolean = false,
-  lenses:   Boolean = false,
-  reuse:    Boolean = false,
-  debug:    Boolean = false
+  val mappings: Map[String, String] = Map.empty,
+  val eq:       Boolean = false,
+  val show:     Boolean = false,
+  val lenses:   Boolean = false,
+  val reuse:    Boolean = false,
+  val debug:    Boolean = false
 ) extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro GraphQLImpl.expand
 }
@@ -41,7 +32,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
   private[this] def documentDef(tree: List[c.Tree]): Option[String] =
     tree match {
       case Nil                                          => none
-      case q"$mods val document: $tpt = $document" :: _ =>
+      case q"$mods val document: $tpe = $document" :: _ =>
         scala.util.Try(c.eval(c.Expr[String](c.untypecheck(document.duplicate)))).toOption
       case _ :: tail                                    => documentDef(tail)
     }
@@ -119,29 +110,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
   }
 
   /**
-   * Resolve the types needed to define another type.
-   */
-  private[this] def typeDependencies(
-    tpe:     GType,
-    visited: List[CaseClass] = List.empty
-  ): List[CaseClass] = {
-    log(
-      s"Type dep for [$tpe] - class [${tpe.getClass}] - under: [${underlyingInputObject(tpe)}] - under class [${underlyingInputObject(tpe).getClass()}]"
-    )
-    underlyingInputObject(tpe) match {
-      case InputObjectType(name, _, inputFields) if !visited.exists(_.name == name.capitalize) =>
-        val deps = inputFields.foldLeft(List.empty[CaseClass])((visitedNow, field) =>
-          visitedNow ++ typeDependencies(field.tpe, visitedNow ++ visited)
-        )
-
-        deps :+ CaseClass(name.capitalize,
-                          inputFields.map(field => ClassParam(field.name, field.tpe))
-        )
-      case _                                                                                   => List.empty
-    }
-  }
-
-  /**
    * Resolve the types of the operation's variable arguments.
    */
   private[this] def resolveVariables(
@@ -177,7 +145,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
       case List(
             q"$objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf => ..$objDefs }"
           ) =>
-        schemaType(objEarlyDefs).orElse(schemaType(objParents)) match {
+        schemaType(objParents) match {
           case None =>
             abort(
               "Invalid annotation target: must be an object extending GraphQLOperation[Schema]"
@@ -197,12 +165,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 val optionalParams = buildOptionalParams[GraphQLOptionalParams]
                 val params         = optionalParams.resolve(settings)
 
-                // Wildcard import from schema object.
-                val schemaImportDef =
-                  Import(
-                    typeNameToTermName(schemaType),
-                    List(ImportSelector(termNames.WILDCARD, -1, null, -1))
-                  )
+                // Extend Types from schema object.
+                val objParentsWithTypes =
+                  objParents :+ Select(typeNameToTermName(schemaType), TypeName("Types"))
 
                 // Parse schema and metadata.
                 val schemaTypeName = unqualifiedType(schemaType) match {
@@ -324,9 +289,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
                 val result =
                   q"""
-                    $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
-                      $schemaImportDef
-
+                    $objMods object $objName extends { ..$objEarlyDefs } with ..$objParentsWithTypes { $objSelf =>
                       ..$objDefs
 
                       ..$variablesDef
