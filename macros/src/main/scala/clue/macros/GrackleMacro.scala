@@ -3,6 +3,10 @@ package clue.macros
 import cats.syntax.all._
 import scala.reflect.macros.blackbox
 import edu.gemini.grackle._
+import scala.reflect.io.File
+import java.io.{ File => JFile }
+import scala.util.Success
+import scala.util.Failure
 
 protected[macros] trait GrackleMacro extends Macro {
   val c: blackbox.Context
@@ -82,4 +86,46 @@ protected[macros] trait GrackleMacro extends Macro {
   //
   // END COPIED FROM GRACKLE.
   //
+
+  /**
+   * Parse the schema file.
+   */
+  protected[this] def retrieveSchema(resourceDirs: List[JFile], schemaName: String): Schema = {
+    val fileName = s"$schemaName.graphql"
+    resourceDirs.view.map(dir => new JFile(dir, fileName)).find(_.exists) match {
+      case None             => abort(s"No schema [$fileName] found in paths [${resourceDirs.mkString(", ")}]")
+      case Some(schemaFile) =>
+        val schemaString = new File(schemaFile).slurp()
+        val schema       = Schema(schemaString)
+        if (schema.isLeft)
+          abort(
+            s"Could not parse schema at [${schemaFile.getAbsolutePath}]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+          )
+        if (schema.isBoth)
+          log(
+            s"Warning when parsing schema [${schemaFile.getAbsolutePath}]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+          )
+        schema.right.get
+    }
+  }
+
+  /**
+   * Parse the schema meta file, if any.
+   */
+  protected[this] def retrieveSchemaMeta(
+    resourceDirs: List[JFile],
+    schemaName:   String
+  ): SchemaMeta = {
+    val fileName = s"$schemaName.meta.json"
+    resourceDirs.view.map(dir => new JFile(dir, fileName)).find(_.exists) match {
+      case None           => SchemaMeta.Default
+      case Some(metaFile) =>
+        val json = new File(metaFile).slurp()
+        SchemaMeta.fromJson(json) match {
+          case Success(schemaMeta) => SchemaMeta.Default.combine(schemaMeta)
+          case Failure(failure)    =>
+            abort(s"Could not parse schema metadata at [${metaFile.getAbsolutePath}]:\n $failure")
+        }
+    }
+  }
 }

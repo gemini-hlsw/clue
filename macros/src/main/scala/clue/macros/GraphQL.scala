@@ -178,75 +178,23 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
   private[this] def resolveVariables(
     schema: Schema,
     vars:   List[Query.UntypedVarDef]
-  ): List[CaseClass] = {
+  ): CaseClass = {
     val inputs = compileVarDefs(schema, vars)
-
-    // Actually define a sum type here.
-    val enums = schema.types.collect { case EnumType(name, _, _) =>
-      CaseClass(name.capitalize, List.empty)
-    }
-
-    val inputClasses = schema.types
-      .collect { case InputObjectType(name, _, fields) =>
-        CaseClass(name.capitalize, fields.map(iv => ClassParam(iv.name, iv.tpe)))
-      }
 
     if (inputs.isLeft)
       abort(s"Error resolving operation input variables types [$vars]: [${inputs.left}]]")
     if (inputs.isBoth)
       log(s"Warning resolving operation input variables types [$vars]: [${inputs.left}]]")
     val inputValues = inputs.right.get
-    (enums ++ inputClasses) :+
-      CaseClass("Variables", inputValues.map(iv => ClassParam(iv.name, iv.tpe)))
-  }
 
-  /**
-   * Parse the schema file.
-   */
-  private[this] def retrieveSchema(resourceDirs: List[JFile], schemaName: String): Schema = {
-    val fileName = s"$schemaName.graphql"
-    resourceDirs.view.map(dir => new JFile(dir, fileName)).find(_.exists) match {
-      case None             => abort(s"No schema [$fileName] found in paths [${resourceDirs.mkString(", ")}]")
-      case Some(schemaFile) =>
-        val schemaString = new File(schemaFile).slurp()
-        val schema       = Schema(schemaString)
-        if (schema.isLeft)
-          abort(
-            s"Could not parse schema at [${schemaFile.getAbsolutePath}]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
-          )
-        if (schema.isBoth)
-          log(
-            s"Warning when parsing schema [${schemaFile.getAbsolutePath}]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
-          )
-        schema.right.get
-    }
-  }
-
-  /**
-   * Parse the schema meta file, if any.
-   */
-  private[this] def retrieveSchemaMeta(
-    resourceDirs: List[JFile],
-    schemaName:   String
-  ): SchemaMeta = {
-    val fileName = s"$schemaName.meta.json"
-    resourceDirs.view.map(dir => new JFile(dir, fileName)).find(_.exists) match {
-      case None           => SchemaMeta.Default
-      case Some(metaFile) =>
-        val json = new File(metaFile).slurp()
-        SchemaMeta.fromJson(json) match {
-          case Success(schemaMeta) => SchemaMeta.Default.combine(schemaMeta)
-          case Failure(failure)    =>
-            abort(s"Could not parse schema metadata at [${metaFile.getAbsolutePath}]:\n $failure")
-        }
-    }
+    CaseClass("Variables", inputValues.map(iv => ClassParam(iv.name, iv.tpe)))
   }
 
   // We cannot fully resolve types since we cannot evaluate in the current annotated context.
   // Therefore, the schema name is always treated as unqualified, and therefore must be unique
   // across the whole compilation unit.
   // See: https://stackoverflow.com/questions/19379436/cant-access-parents-members-while-dealing-with-macro-annotations
-  private[this] def schemaType(list: List[c.Tree]): Option[c.Tree] =
+  private[this] def schemaType(list: List[Tree]): Option[Tree] =
     list.collect {
       case tq"GraphQLOperation[$schema]"      => schema
       case tq"clue.GraphQLOperation[$schema]" => schema
@@ -378,20 +326,16 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                   else EmptyTree
 
                 // Build AST to define case classe to hold Variables.
-                val variablesClasses    = resolveVariables(schema, operation.variables)
-                val variablesDefs       =
+                val variablesClass      = resolveVariables(schema, operation.variables)
+                val variablesDef        =
                   if (!hasVariablesClass)
-                    variablesClasses
-                      .map(
-                        _.toTree(schemaMeta.mappings,
-                                 params.eq,
-                                 params.show,
-                                 params.lenses,
-                                 params.reuse,
-                                 encoder = true
-                        )
-                      )
-                      .flatten
+                    variablesClass.toTree(schemaMeta.mappings,
+                                          params.eq,
+                                          params.show,
+                                          params.lenses,
+                                          params.reuse,
+                                          encoder = true
+                    )
                   else if (!hasVariablesModule)
                     List(
                       moduleDef("Variables", params.eq, params.show, reuse = false, encoder = true)
@@ -406,7 +350,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 // Build convenience method.
                 val variablesParams      =
                   varParams.getOrElse(
-                    List(variablesClasses.last.params.map(_.toTree(schemaMeta.mappings)))
+                    List(variablesClass.params.map(_.toTree(schemaMeta.mappings)))
                   )
                 val variablesNames       = variablesParams
                   .map(_.map { case q"$mods val $name: $tpt = $rhs" => name })
@@ -432,19 +376,19 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
                 val result =
                   q"""
-                $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
-                  ..$objDefs
+                    $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
+                      ..$objDefs
 
-                  ..$variablesDefs
+                      ..$variablesDef
 
-                  ..$dataDefs
+                      ..$dataDefs
 
-                  $variablesEncoderDef
-                  $dataDecoderDef
+                      $variablesEncoderDef
+                      $dataDecoderDef
 
-                  $convenienceMethodDef
-                }
-              """
+                      $convenienceMethodDef
+                    }
+                  """
 
                 if (params.debug) log(result)
 
