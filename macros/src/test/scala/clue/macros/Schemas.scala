@@ -2,7 +2,7 @@ package clue.macros
 
 object Schemas {
   type Explore
-  @GraphQLSchema
+  @GraphQLSchema(debug = true)
   object Explore {
     // Scalars
     type Cloudcover       = String
@@ -11,11 +11,12 @@ object Schemas {
     type Watervapor       = String
     type Obsstatus        = String
     type Targetobjecttype = String
+
     // Enums
     // type Order_by               = String
     // type Constraints_constraint = String
+
     // Mappings
-    type Uuid             = java.util.UUID
   }
 
   type StarWars

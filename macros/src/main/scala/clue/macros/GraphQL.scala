@@ -22,7 +22,6 @@ import cats.data.Ior
 import shapeless.PolyDefns.Case
 
 class GraphQL(
-  schema:   String,
   mappings: Map[String, String] = Map.empty,
   eq:       Boolean = false,
   show:     Boolean = false,
@@ -32,36 +31,6 @@ class GraphQL(
 ) extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro GraphQLImpl.expand
 }
-
-// Parameter order and names must match exactly between this class and annotation class.
-case class GraphQLOptionalParams(
-  val mappings: Some[Map[String, String]] = Some(Map.empty),
-  val eq:       Option[Boolean] = None,
-  val show:     Option[Boolean] = None,
-  val lenses:   Option[Boolean] = None,
-  val reuse:    Option[Boolean] = None,
-  val debug:    Some[Boolean] = Some(false)
-) {
-  def resolve(settings: MacroSettings): GraphQLParams =
-    GraphQLParams(
-      mappings.get,
-      eq.getOrElse(settings.catsEq),
-      show.getOrElse(settings.catsShow),
-      lenses.getOrElse(settings.monocleLenses),
-      reuse.getOrElse(settings.scalajsReactReusability),
-      debug.get
-    )
-}
-
-case class GraphQLParams(
-  mappings: Map[String, String],
-  eq:       Boolean,
-  show:     Boolean,
-  lenses:   Boolean,
-  reuse:    Boolean,
-  debug:    Boolean
-)
-
 private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMacro {
   import c.universe._
 
@@ -223,34 +192,17 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
 
               case Some(document) =>
                 // Get macro settings passed thru -Xmacro-settings.
-                val settings = MacroSettings.fromCtxSettings(c.settings)
-
+                val settings       = MacroSettings.fromCtxSettings(c.settings)
                 // Get annotation parameters.
-                // TODO Can we generalize this and move to Macro trait?
-                val optionalParams = c.prefix.tree match {
-                  case q"new ${macroName}(..$params)" =>
-                    val Ident(TypeName(macroClassName)) = macroName
+                val optionalParams = buildOptionalParams[GraphQLOptionalParams]
+                val params         = optionalParams.resolve(settings)
 
-                    val paramsClassName =
-                      parseType(s"clue.macros.${macroClassName}OptionalParams")
-
-                    // Convert parameters to Some(...).
-                    val optionalParams = params.map {
-                      case value @ Literal(Constant(_)) =>
-                        Apply(Ident(TermName("Some")), List(value))
-                      case NamedArg(name, value)        =>
-                        NamedArg(name, Apply(Ident(TermName("Some")), List(value)))
-                    }
-
-                    c.eval(
-                      c.Expr[GraphQLOptionalParams](
-                        q"new $paramsClassName(..$optionalParams)"
-                      )
-                    )
-                  case q"new ${macroName}"            => GraphQLOptionalParams()
-                }
-
-                val params = optionalParams.resolve(settings)
+                // Wildcard import from schema object.
+                val schemaImportDef =
+                  Import(
+                    typeNameToTermName(schemaType),
+                    List(ImportSelector(termNames.WILDCARD, -1, null, -1))
+                  )
 
                 // Parse schema and metadata.
                 val schemaTypeName = unqualifiedType(schemaType) match {
@@ -259,10 +211,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                   case Some(name) => name
                 }
                 val schema         = retrieveSchema(settings.schemaDirs, schemaTypeName)
-                val schemaMeta     =
-                  retrieveSchemaMeta(settings.schemaDirs, schemaTypeName).addMappings(
-                    params.mappings
-                  )
 
                 // Check if a Data class and module are already defined.
                 val hasDataClass  = objDefs.exists {
@@ -307,7 +255,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                     val dataClasses = resolveData(operation.query, schema.queryType)
                     dataClasses
                       .map(
-                        _.toTree(schemaMeta.mappings,
+                        _.toTree(params.mappings,
                                  params.eq,
                                  params.show,
                                  params.lenses,
@@ -329,7 +277,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 val variablesClass      = resolveVariables(schema, operation.variables)
                 val variablesDef        =
                   if (!hasVariablesClass)
-                    variablesClass.toTree(schemaMeta.mappings,
+                    variablesClass.toTree(params.mappings,
                                           params.eq,
                                           params.show,
                                           params.lenses,
@@ -350,7 +298,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 // Build convenience method.
                 val variablesParams      =
                   varParams.getOrElse(
-                    List(variablesClass.params.map(_.toTree(schemaMeta.mappings)))
+                    List(variablesClass.params.map(_.toTree(params.mappings)))
                   )
                 val variablesNames       = variablesParams
                   .map(_.map { case q"$mods val $name: $tpt = $rhs" => name })
@@ -363,7 +311,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                       """
                     case _: UntypedMutation     =>
                       q"""
-                        def mutate[F[_]](...$variablesParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                        def execute[F[_]](...$variablesParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
                           client.request(this)(Variables(...$variablesNames))
                       """
                     case _: UntypedSubscription =>
@@ -377,6 +325,8 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 val result =
                   q"""
                     $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
+                      $schemaImportDef
+
                       ..$objDefs
 
                       ..$variablesDef

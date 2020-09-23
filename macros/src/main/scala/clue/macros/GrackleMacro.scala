@@ -108,24 +108,4 @@ protected[macros] trait GrackleMacro extends Macro {
         schema.right.get
     }
   }
-
-  /**
-   * Parse the schema meta file, if any.
-   */
-  protected[this] def retrieveSchemaMeta(
-    resourceDirs: List[JFile],
-    schemaName:   String
-  ): SchemaMeta = {
-    val fileName = s"$schemaName.meta.json"
-    resourceDirs.view.map(dir => new JFile(dir, fileName)).find(_.exists) match {
-      case None           => SchemaMeta.Default
-      case Some(metaFile) =>
-        val json = new File(metaFile).slurp()
-        SchemaMeta.fromJson(json) match {
-          case Success(schemaMeta) => SchemaMeta.Default.combine(schemaMeta)
-          case Failure(failure)    =>
-            abort(s"Could not parse schema metadata at [${metaFile.getAbsolutePath}]:\n $failure")
-        }
-    }
-  }
 }

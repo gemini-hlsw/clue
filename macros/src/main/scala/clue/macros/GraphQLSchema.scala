@@ -4,7 +4,14 @@ import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import edu.gemini.grackle._
 
-class GraphQLSchema extends StaticAnnotation {
+class GraphQLSchema(
+  mappings: Map[String, String] = Map.empty,
+  eq:       Boolean = false,
+  show:     Boolean = false,
+  lenses:   Boolean = false,
+  reuse:    Boolean = false,
+  debug:    Boolean = false
+) extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro GraphQLSchemaImpl.expand
 }
 
@@ -17,7 +24,10 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
             q"$objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf => ..$objDefs }"
           ) =>
         // Get macro settings passed thru -Xmacro-settings.
-        val settings = MacroSettings.fromCtxSettings(c.settings)
+        val settings       = MacroSettings.fromCtxSettings(c.settings)
+        // Get annotation parameters.
+        val optionalParams = buildOptionalParams[GraphQLOptionalParams]
+        val params         = optionalParams.resolve(settings)
 
         val TermName(schemaName) = objName
         val schema               = retrieveSchema(settings.schemaDirs, schemaName)
@@ -27,7 +37,14 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
           CaseClass(name.capitalize, List.empty)
         }
         val enumDefs = enums.flatMap(
-          _.toTree(Map.empty, true, true, true, false, encoder = true, decoder = true)
+          _.toTree(params.mappings,
+                   params.eq,
+                   params.show,
+                   params.lenses,
+                   params.reuse,
+                   encoder = true,
+                   decoder = true
+          )
         )
 
         val inputClasses = schema.types
@@ -35,7 +52,15 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
             CaseClass(name.capitalize, fields.map(iv => ClassParam(iv.name, iv.tpe)))
           }
         val inputDefs    =
-          inputClasses.flatMap(_.toTree(Map.empty, true, true, true, false, encoder = true))
+          inputClasses.flatMap(
+            _.toTree(params.mappings,
+                     params.eq,
+                     params.show,
+                     params.lenses,
+                     params.reuse,
+                     encoder = true
+            )
+          )
 
         // Congratulations! You got a full-fledged schema (hopefully).
         val result =
@@ -48,8 +73,7 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
             }
           """
 
-        // if (params.debug)
-        // log(result)
+        if (params.debug) log(result)
 
         result
     }

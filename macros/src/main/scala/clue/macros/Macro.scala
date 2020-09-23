@@ -3,6 +3,7 @@ package clue.macros
 import cats.syntax.all._
 import scala.reflect.macros.blackbox
 import scala.reflect.macros.Universe
+import scala.reflect.ClassTag
 
 protected[macros] trait Macro {
   val c: blackbox.Context
@@ -55,6 +56,36 @@ protected[macros] trait Macro {
     c.prefix.tree match {
       case Apply(Select(New(name), _), _) => name
       case _                              => abort("Unexpected macro application")
+    }
+
+  protected[this] def buildOptionalParams[T](implicit tag: ClassTag[T]): T = {
+    val paramsClassName = parseType(tag.runtimeClass.getName)
+
+    val tree =
+      c.prefix.tree match {
+        case q"new ${macroName}(..$params)" =>
+          val Ident(TypeName(macroClassName)) = macroName
+
+          // Convert parameters to Some(...).
+          val optionalParams = params.map {
+            case value @ Literal(Constant(_)) =>
+              Apply(Ident(TermName("Some")), List(value))
+            case NamedArg(name, value)        =>
+              NamedArg(name, Apply(Ident(TermName("Some")), List(value)))
+          }
+
+          q"new $paramsClassName(..$optionalParams)"
+        case q"new ${macroName}"            => q"new $paramsClassName()"
+      }
+
+    c.eval(c.Expr[T](tree))
+  }
+
+  protected[this] def typeNameToTermName(tree: Tree): Tree =
+    tree match {
+      case Ident(name)             => Ident(name.toTermName)
+      case Select(qualifier, name) => Select(typeNameToTermName(qualifier), name.toTermName)
+      case _                       => tree
     }
 
   /**
