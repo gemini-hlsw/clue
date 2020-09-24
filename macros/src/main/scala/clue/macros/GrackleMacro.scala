@@ -25,7 +25,10 @@ protected[macros] trait GrackleMacro extends Macro {
   protected[this] case class ClassParam(name: String, tpe: Tree) {
     def toTree: ValDef = {
       val n = TermName(name)
-      val d = EmptyTree
+      val d = tpe match {
+        case tq"Option[$inner]" => q"None"
+        case _                  => EmptyTree
+      }
       q"val $n: $tpe = $d"
     }
   }
