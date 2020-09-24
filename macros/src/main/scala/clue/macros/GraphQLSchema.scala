@@ -29,6 +29,9 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
         val optionalParams = buildOptionalParams[GraphQLOptionalParams]
         val params         = optionalParams.resolve(settings)
 
+        val typeName = objName.toTypeName
+        val typeDef  = q"type $typeName"
+
         val TermName(schemaName) = objName
         val schema               = retrieveSchema(settings.schemaDirs, schemaName)
 
@@ -60,6 +63,7 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
         // Congratulations! You got a full-fledged schema (hopefully).
         val result =
           q"""
+            $typeDef
             $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
               ..$objDefs
 
