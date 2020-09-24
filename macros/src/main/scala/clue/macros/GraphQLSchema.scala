@@ -33,33 +33,28 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
         val schema               = retrieveSchema(settings.schemaDirs, schemaName)
 
         // Actually define a sum type here.
-        val enums    = schema.types.collect { case EnumType(name, _, _) =>
-          CaseClass(name.capitalize, List.empty)
+        val enums    = schema.types.collect { case EnumType(name, _, values) =>
+          Enum(name.capitalize, values.map(_.name.capitalize))
         }
         val enumDefs = enums.flatMap(
-          _.toTree(params.mappings,
-                   params.eq,
-                   params.show,
-                   params.lenses,
-                   params.reuse,
-                   encoder = true,
-                   decoder = true
+          _.toTree(
+            params.eq,
+            params.show,
+            params.reuse,
+            encoder = true,
+            decoder = true
           )
         )
 
         val inputClasses = schema.types
           .collect { case InputObjectType(name, _, fields) =>
-            CaseClass(name.capitalize, fields.map(iv => ClassParam(iv.name, iv.tpe)))
+            CaseClass(name.capitalize,
+                      fields.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, params.mappings))
+            )
           }
         val inputDefs    =
           inputClasses.flatMap(
-            _.toTree(params.mappings,
-                     params.eq,
-                     params.show,
-                     params.lenses,
-                     params.reuse,
-                     encoder = true
-            )
+            _.toTree(params.eq, params.show, params.lenses, params.reuse, encoder = true)
           )
 
         // Congratulations! You got a full-fledged schema (hopefully).

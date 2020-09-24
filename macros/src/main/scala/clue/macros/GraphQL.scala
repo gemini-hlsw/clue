@@ -52,7 +52,8 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
    */
   private[this] def resolveData(
     algebra:  Query,
-    rootType: GType
+    rootType: GType,
+    mappings: Map[String, String]
   ): List[CaseClass] = {
     import Query._
 
@@ -76,7 +77,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
             }
           ClassAccumulator(
             classes = newClasses,
-            parAccum = List(ClassParam(nameOverride.getOrElse(name), nextType.dealias))
+            parAccum = List(
+              ClassParam.fromGrackleType(nameOverride.getOrElse(name), nextType.dealias, mappings)
+            )
           )
         case Rename(name, child)       =>
           go(child, currentType, name.some)
@@ -113,8 +116,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
    * Resolve the types of the operation's variable arguments.
    */
   private[this] def resolveVariables(
-    schema: Schema,
-    vars:   List[Query.UntypedVarDef]
+    schema:   Schema,
+    vars:     List[Query.UntypedVarDef],
+    mappings: Map[String, String]
   ): CaseClass = {
     val inputs = compileVarDefs(schema, vars)
 
@@ -124,7 +128,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
       log(s"Warning resolving operation input variables types [$vars]: [${inputs.left}]]")
     val inputValues = inputs.right.get
 
-    CaseClass("Variables", inputValues.map(iv => ClassParam(iv.name, iv.tpe)))
+    CaseClass("Variables",
+              inputValues.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, mappings))
+    )
   }
 
   // We cannot fully resolve types since we cannot evaluate in the current annotated context.
@@ -217,11 +223,11 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 val dataDefs: List[Tree] =
                   if (!hasDataClass) {
                     // Resolve types needed for the query result and its variables.
-                    val dataClasses = resolveData(operation.query, schema.queryType)
+                    val dataClasses =
+                      resolveData(operation.query, schema.queryType, params.mappings)
                     dataClasses
                       .map(
-                        _.toTree(params.mappings,
-                                 params.eq,
+                        _.toTree(params.eq,
                                  params.show,
                                  params.lenses,
                                  params.reuse,
@@ -239,11 +245,10 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                   else EmptyTree
 
                 // Build AST to define case classe to hold Variables.
-                val variablesClass      = resolveVariables(schema, operation.variables)
+                val variablesClass      = resolveVariables(schema, operation.variables, params.mappings)
                 val variablesDef        =
                   if (!hasVariablesClass)
-                    variablesClass.toTree(params.mappings,
-                                          params.eq,
+                    variablesClass.toTree(params.eq,
                                           params.show,
                                           params.lenses,
                                           params.reuse,
@@ -263,7 +268,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 // Build convenience method.
                 val variablesParams      =
                   varParams.getOrElse(
-                    List(variablesClass.params.map(_.toTree(params.mappings)))
+                    List(variablesClass.params.map(_.toTree))
                   )
                 val variablesNames       = variablesParams
                   .map(_.map { case q"$mods val $name: $tpt = $rhs" => name })

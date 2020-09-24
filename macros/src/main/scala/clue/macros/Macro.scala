@@ -104,12 +104,13 @@ protected[macros] trait Macro {
    * Compute a companion object with typeclasses.
    */
   protected[this] def moduleDef(
-    name:    String,
-    eq:      Boolean,
-    show:    Boolean,
-    reuse:   Boolean,
-    encoder: Boolean = false,
-    decoder: Boolean = false
+    name:       String,
+    eq:         Boolean,
+    show:       Boolean,
+    reuse:      Boolean,
+    encoder:    Boolean = false,
+    decoder:    Boolean = false,
+    statements: List[Tree] = List.empty
   ): c.Tree = {
     val n = TypeName(name)
 
@@ -141,6 +142,7 @@ protected[macros] trait Macro {
       else EmptyTree
 
     q"""object ${TermName(name)} {
+          ..$statements
           $eqDef
           $showDef
           $reuseDef
