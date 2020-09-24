@@ -251,7 +251,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                     variablesClass.toTree(params.eq,
                                           params.show,
                                           params.lenses,
-                                          params.reuse,
+                                          reuse = false,
                                           encoder = true
                     )
                   else if (!hasVariablesModule)

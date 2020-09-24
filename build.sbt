@@ -100,21 +100,7 @@ lazy val macros =
           Settings.Libraries.Grackle.value ++
           Settings.Libraries.Jawn.value ++
           Settings.Libraries.Monocle.value,
-      scalacOptions ~= (_.filterNot(
-        Set(
-          // Disabling these to explore macros.
-          // "-Wdead-code",
-          // "-Wunused:params"
-          // "-Wunused:explicits",
-          // "-Wunused:implicits",
-          // "-Wunused:locals",
-          // "-Wunused:imports",
-          "-Wunused:patvars"
-          // "-Wunused:privates",
-          // "-Yno-predef",
-          // "-Ywarn-unused-import"
-        )
-      )),
+      scalacOptions ~= (_.filterNot(Set("-Wunused:patvars"))), // Needed for quasiquote matching.
       scalacOptions += {
         val thisProject    = thisProjectRef.value
         val projects       = buildDependencies.value.classpathTransitiveRefs(thisProject) :+ thisProject

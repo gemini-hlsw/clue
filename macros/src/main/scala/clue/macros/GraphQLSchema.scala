@@ -57,7 +57,7 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
           }
         val inputDefs    =
           inputClasses.flatMap(
-            _.toTree(params.eq, params.show, params.lenses, params.reuse, encoder = true)
+            _.toTree(params.eq, params.show, params.lenses, reuse = false, encoder = true)
           )
 
         // Congratulations! You got a full-fledged schema (hopefully).
