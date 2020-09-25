@@ -8,9 +8,7 @@ import edu.gemini.grackle._
 import edu.gemini.grackle.{ Type => GType }
 import edu.gemini.grackle.{ NoType => GNoType }
 import edu.gemini.grackle.{ TypeRef => GTypeRef }
-import edu.gemini.grackle.UntypedOperation.UntypedQuery
-import edu.gemini.grackle.UntypedOperation.UntypedMutation
-import edu.gemini.grackle.UntypedOperation.UntypedSubscription
+import edu.gemini.grackle.UntypedOperation._
 
 class GraphQL(
   val mappings: Map[String, String] = Map.empty,
@@ -29,7 +27,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
    * Extract the `document` contents from the `GraphQLQuery` the marcro was applied to.
    */
   @tailrec
-  private[this] def documentDef(tree: List[c.Tree]): Option[String] =
+  private[this] def documentDef(tree: List[Tree]): Option[String] =
     tree match {
       case Nil                                          => none
       case q"$mods val document: $tpe = $document" :: _ =>
@@ -115,6 +113,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
   /**
    * Resolve the types of the operation's variable arguments.
    */
+  @scala.annotation.unused
   private[this] def resolveVariables(
     schema:   Schema,
     vars:     List[Query.UntypedVarDef],
@@ -132,6 +131,108 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
               inputValues.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, mappings))
     )
   }
+
+  private[this] def addVars(
+    schema:    Schema,
+    operation: UntypedOperation,
+    params:    GraphQLParams
+  ): List[Tree] => List[Tree] =
+    parentBody =>
+      if (isTypeDefined("Variables")(parentBody))
+        addModuleDefs("Variables", params.eq, params.show, reuse = false, encoder = true)(
+          parentBody
+        )
+      else
+        resolveVariables(schema, operation.variables, params.mappings).addToParentBody(
+          params.eq,
+          params.show,
+          params.lenses,
+          reuse = false,
+          encoder = true
+        )(parentBody)
+
+  private[this] def addData(
+    schema:    Schema,
+    operation: UntypedOperation,
+    params:    GraphQLParams
+  ): List[Tree] => List[Tree] =
+    parentBody =>
+      if (isTypeDefined("Data")(parentBody))
+        addModuleDefs("Data", params.eq, params.show, params.reuse, decoder = true)(parentBody)
+      else
+        scala.Function.chain(
+          resolveData(operation.query, schema.queryType, params.mappings)
+            .map(
+              _.addToParentBody(params.eq, params.show, params.lenses, params.reuse, decoder = true)
+            )
+        )(parentBody)
+
+  private[this] def addValRefIntoModule(
+    valName:       String,
+    moduleName:    String,
+    moduleValName: String,
+    tpe:           Tree
+  ): List[Tree] => List[
+    Tree
+  ] =
+    parentBody =>
+      parentBody
+        .collectFirst {
+          case q"$_ object $tname extends { ..$_ } with ..$_ { $_ => ..$dataBody }"
+              if tname == TermName(moduleName) =>
+            dataBody
+        }
+        .filter(isTermDefined(moduleValName))
+        .map(_ =>
+          addValDef(valName, tpe, Select(Ident(TermName(moduleName)), TermName(moduleValName)))(
+            parentBody
+          )
+        )
+        .getOrElse(parentBody)
+
+  private[this] val addVarEncoder: List[Tree] => List[Tree] =
+    addValRefIntoModule("varEncoder",
+                        "Variables",
+                        "jsonEncoderVariables",
+                        tq"io.circe.Encoder[Variables]"
+    )
+
+  private[this] val addDataDecoder: List[Tree] => List[Tree] =
+    addValRefIntoModule("dataDecoder", "Data", "jsonDecoderData", tq"io.circe.Decoder[Data]")
+
+  @scala.annotation.unused
+  private[this] def addConvenienceMethod(
+    schemaType: Tree,
+    operation:  UntypedOperation
+  ): List[Tree] => List[Tree] =
+    parentBody =>
+      parentBody
+        .collectFirst {
+          case q"$_ class Variables $_(...$paramss) extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
+            paramss
+        }
+        .map { paramss =>
+          val variablesNames = paramss.map(_.map { case q"$_ val $name: $_ = $_" => name })
+          parentBody :+
+            (operation match {
+              case _: UntypedQuery        =>
+                q"""
+                        def query[F[_]](...$paramss)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                          client.request(this)(Variables(...$variablesNames))
+                      """
+              case _: UntypedMutation     =>
+                q"""
+                        def execute[F[_]](...$paramss)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                          client.request(this)(Variables(...$variablesNames))
+                      """
+              case _: UntypedSubscription =>
+                q"""
+                        def subscribe[F[_]](...$paramss)(implicit client: _root_.clue.GraphQLStreamingClient[F, $schemaType]) =
+                          client.subscribe(this)(Variables(...$variablesNames))
+                      """
+            })
+        }
+        .getOrElse(parentBody)
 
   // We cannot fully resolve types since we cannot evaluate in the current annotated context.
   // Therefore, the schema name is always treated as unqualified, and therefore must be unique
@@ -173,7 +274,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
 
                 // Extend Types from schema object.
                 val objParentsWithTypes =
-                  objParents :+ Select(typeNameToTermName(schemaType), TypeName("Types"))
+                  objParents :+ Select(TypeNamesToTermNames.transform(schemaType),
+                                       TypeName("Types")
+                  )
 
                 // Parse schema and metadata.
                 val schemaTypeName = unqualifiedType(schemaType) match {
@@ -182,30 +285,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                   case Some(name) => name
                 }
                 val schema         = retrieveSchema(settings.schemaDirs, schemaTypeName)
-
-                // Check if a Data class and module are already defined.
-                val hasDataClass  = objDefs.exists {
-                  case q"$mods class Data $ctorMods(...$paramss) extends { ..$earlyDefs } with ..$parents { $self => ..$stats }" =>
-                    true
-                  case _                                                                                                         => false
-                }
-                val hasDataModule = objDefs.exists {
-                  case q"$mods object Data extends { ..$earlyDefs } with ..$parents { $self => ..$stats }" =>
-                    true
-                  case _                                                                                   => false
-                }
-
-                // Check if a Variables class and module are already defined.
-                val varParams          = objDefs.collect {
-                  case q"$mods class Variables $ctorMods(...$paramss) extends { ..$earlyDefs } with ..$parents { $self => ..$stats }" =>
-                    paramss
-                }.headOption
-                val hasVariablesClass  = varParams.isDefined
-                val hasVariablesModule = objDefs.exists {
-                  case q"$mods object Variables extends { ..$earlyDefs } with ..$parents { $self => ..$stats }" =>
-                    true
-                  case _                                                                                        => false
-                }
 
                 // Parse the operation.
                 val queryResult = QueryParser.parseText(document)
@@ -219,92 +298,21 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                   )
                 val operation   = queryResult.toOption.get
 
-                // Build AST to define case classes to hold Data.
-                val dataDefs: List[Tree] =
-                  if (!hasDataClass) {
-                    // Resolve types needed for the query result and its variables.
-                    val dataClasses =
-                      resolveData(operation.query, schema.queryType, params.mappings)
-                    dataClasses
-                      .map(
-                        _.toTree(params.eq,
-                                 params.show,
-                                 params.lenses,
-                                 params.reuse,
-                                 decoder = true
-                        )
-                      )
-                      .flatten
-                  } else if (!hasDataModule)
-                    List(moduleDef("Data", params.eq, params.show, params.reuse, decoder = true))
-                  else
-                    List.empty
-                val dataDecoderDef       =
-                  if (!hasDataModule)
-                    q"override val dataDecoder: io.circe.Decoder[Data]     = Data.jsonDecoderData"
-                  else EmptyTree
-
-                // Build AST to define case classe to hold Variables.
-                val variablesClass      = resolveVariables(schema, operation.variables, params.mappings)
-                val variablesDef        =
-                  if (!hasVariablesClass)
-                    variablesClass.toTree(params.eq,
-                                          params.show,
-                                          params.lenses,
-                                          reuse = false,
-                                          encoder = true
-                    )
-                  else if (!hasVariablesModule)
-                    List(
-                      moduleDef("Variables", params.eq, params.show, reuse = false, encoder = true)
-                    )
-                  else
-                    List.empty
-                val variablesEncoderDef =
-                  if (!hasVariablesModule)
-                    q"override val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables"
-                  else EmptyTree
-
-                // Build convenience method.
-                val variablesParams      =
-                  varParams.getOrElse(
-                    List(variablesClass.params.map(_.toTree))
+                // Modifications to add the missing definitions.
+                val modObjDefs = scala.Function.chain(
+                  List(addVars(schema, operation, params),
+                       addData(schema, operation, params),
+                       addVarEncoder,
+                       addDataDecoder,
+                       addConvenienceMethod(schemaType, operation)
                   )
-                val variablesNames       = variablesParams
-                  .map(_.map { case q"$mods val $name: $tpt = $rhs" => name })
-                val convenienceMethodDef =
-                  operation match {
-                    case _: UntypedQuery        =>
-                      q"""
-                        def query[F[_]](...$variablesParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
-                          client.request(this)(Variables(...$variablesNames))
-                      """
-                    case _: UntypedMutation     =>
-                      q"""
-                        def execute[F[_]](...$variablesParams)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
-                          client.request(this)(Variables(...$variablesNames))
-                      """
-                    case _: UntypedSubscription =>
-                      q"""
-                        def subscribe[F[_]](...$variablesParams)(implicit client: _root_.clue.GraphQLStreamingClient[F, $schemaType]) =
-                          client.subscribe(this)(Variables(...$variablesNames))
-                      """
-                  }
+                )
 
                 // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
                 val result =
                   q"""
                     $objMods object $objName extends { ..$objEarlyDefs } with ..$objParentsWithTypes { $objSelf =>
-                      ..$objDefs
-
-                      ..$variablesDef
-
-                      ..$dataDefs
-
-                      $variablesEncoderDef
-                      $dataDecoderDef
-
-                      $convenienceMethodDef
+                      ..${modObjDefs(objDefs)}
                     }
                   """
 

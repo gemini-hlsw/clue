@@ -78,76 +78,195 @@ protected[macros] trait Macro {
     c.eval(c.Expr[T](tree))
   }
 
-  protected[this] def typeNameToTermName(tree: Tree): Tree =
-    tree match {
+  protected[this] object TypeNamesToTermNames extends Transformer {
+    override def transform(tree: Tree): Tree = tree match {
       case Ident(name)             => Ident(name.toTermName)
-      case Select(qualifier, name) => Select(typeNameToTermName(qualifier), name.toTermName)
-      case _                       => tree
+      case Select(qualifier, name) => Select(super.transform(qualifier), name.toTermName)
+      case _                       => super.transform(tree)
     }
+  }
+
+  protected[this] def isTypeDefined(typeName: String): List[Tree] => Boolean =
+    parentBody => {
+      val tpe = TypeName(typeName)
+      parentBody.exists {
+        case q"$_ type $tpname = $_"                                                 => tpname == tpe
+        case q"$_ class $tpname $_(...$_) extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
+          tpname == tpe
+        case q"$_ trait $tpname extends { ..$_ } with ..$_ { $_ => ..$_ }"           => tpname == tpe
+        case _                                                                       => false
+      }
+    }
+
+  protected[this] def isTermDefined(termName: String): List[Tree] => Boolean =
+    parentBody => {
+      val tpe = TermName(termName)
+      parentBody.exists {
+        // We are not checking in pattern assignments
+        case q"$_ val $tname: $_ = $_" => tname == tpe
+        case q"$_ var $tname: $_ = $_" => tname == tpe
+        case _                         => false
+      }
+    }
+
+  protected[this] def modifyTraitStatements(
+    traitName: String,
+    mod:       List[Tree] => List[Tree]
+  ): List[Tree] => List[Tree] =
+    parentBody => {
+      val tpe = TypeName(traitName)
+
+      val (newStats, modified) =
+        parentBody.foldLeft((List.empty[Tree], false)) { case ((newStats, modified), stat) =>
+          stat match {
+            case q"$mods trait $tpname extends { ..$earlydefns } with ..$parents { $self => ..$body }"
+                if tpname == tpe =>
+              (newStats :+ q"$mods trait $tpname extends { ..$earlydefns } with ..$parents { $self => ..${mod(body)} }",
+               true
+              )
+            case other => (newStats :+ other, modified)
+          }
+        }
+      if (modified)
+        newStats
+      else
+        newStats :+ q"trait ${tpe} { ..${mod(List.empty)} }"
+    }
+
+  protected[this] def addTraitStatements(
+    traitName:  String,
+    statements: List[Tree]
+  ): List[Tree] => List[Tree] =
+    modifyTraitStatements(traitName, _ ++ statements)
+
+  protected[this] def modifyModuleStatements(
+    moduleName: String,
+    mod:        List[Tree] => List[Tree]
+  ): List[Tree] => List[Tree] =
+    parentBody => {
+      val tpe = TermName(moduleName)
+
+      val (newStats, modified) =
+        parentBody.foldLeft((List.empty[Tree], false)) { case ((newStats, modified), stat) =>
+          stat match {
+            case q"$mods object $tname extends { ..$earlydefns } with ..$parents { $self => ..$body }"
+                if tname == tpe =>
+              (newStats :+ q"$mods object $tname extends { ..$earlydefns } with ..$parents { $self => ..${mod(body)} }",
+               true
+              )
+            case other => (newStats :+ other, modified)
+          }
+        }
+      if (modified)
+        newStats
+      else
+        newStats :+ q"object ${tpe} { ..${mod(List.empty)} }"
+    }
+
+  protected[this] def addModuleStatements(
+    moduleName: String,
+    statements: List[Tree]
+  ): List[Tree] => List[Tree] =
+    modifyModuleStatements(moduleName, _ ++ statements)
+
+  protected[this] def addValDef(
+    valName: String,
+    valType: Tree,
+    value:   Tree
+  ): List[Tree] => List[Tree] =
+    parentBody =>
+      if (isTermDefined(valName)(parentBody))
+        parentBody
+      else
+        parentBody :+ q"val ${TermName(valName)}: $valType = $value"
 
   /**
    * Compute a case class definition.
    */
-  protected[this] def caseClassDef(
+  protected[this] def addCaseClassDef(
     name:   String,
     pars:   List[ValDef],
     lenses: Boolean
-  ): Tree = {
-    val n = TypeName(name)
-    if (lenses)
-      q"@monocle.macros.Lenses case class $n(..$pars)"
-    else
-      q"case class $n(..$pars)"
-  }
+  ): List[Tree] => List[Tree] =
+    parentBody =>
+      if (isTypeDefined(name)(parentBody))
+        parentBody
+      else
+        parentBody :+ {
+          val n = TypeName(name)
+          if (lenses)
+            q"@monocle.macros.Lenses case class $n(..$pars)"
+          else
+            q"case class $n(..$pars)"
+        }
+
+  protected[this] def addEnum(
+    name:    String,
+    values:  List[String],
+    eq:      Boolean,
+    show:    Boolean,
+    reuse:   Boolean,
+    encoder: Boolean = false,
+    decoder: Boolean = false
+  ): List[Tree] => List[Tree] =
+    parentBody =>
+      if (isTypeDefined(name)(parentBody))
+        parentBody
+      else
+        addModuleDefs(name,
+                      eq,
+                      show,
+                      reuse,
+                      encoder,
+                      decoder,
+                      values.map { value =>
+                        q"case object ${TermName(value)} extends ${TypeName(name)}"
+                      }
+        )(
+          parentBody :+ q"sealed trait ${TypeName(name)}"
+        )
 
   /**
    * Compute a companion object with typeclasses.
    */
-  protected[this] def moduleDef(
-    name:       String,
-    eq:         Boolean,
-    show:       Boolean,
-    reuse:      Boolean,
-    encoder:    Boolean = false,
-    decoder:    Boolean = false,
-    statements: List[Tree] = List.empty
-  ): c.Tree = {
+  protected[this] def addModuleDefs(
+    name:            String,
+    eq:              Boolean,
+    show:            Boolean,
+    reuse:           Boolean,
+    encoder:         Boolean = false,
+    decoder:         Boolean = false,
+    otherStatements: List[Tree] = List.empty
+  ): List[Tree] => List[Tree] = {
     val n = TypeName(name)
 
-    val eqDef =
-      if (eq) q"implicit val ${TermName(s"eq$name")}: cats.Eq[$n] = cats.Eq.fromUniversalEquals"
-      else EmptyTree
+    val eqDef = Option.when(eq)(
+      q"implicit val ${TermName(s"eq$name")}: cats.Eq[$n] = cats.Eq.fromUniversalEquals"
+    )
 
-    val showDef =
-      if (show) q"implicit val ${TermName(s"show$name")}: cats.Show[$n] = cats.Show.fromToString"
-      else EmptyTree
+    val showDef = Option.when(show)(
+      q"implicit val ${TermName(s"show$name")}: cats.Show[$n] = cats.Show.fromToString"
+    )
 
-    val reuseDef =
-      if (reuse)
-        q"""implicit val ${TermName(s"reuse$name")}: japgolly.scalajs.react.Reusability[$n] = {
+    val reuseDef = Option.when(reuse)(
+      q"""implicit val ${TermName(s"reuse$name")}: japgolly.scalajs.react.Reusability[$n] = {
               import japgolly.scalajs.react.Reusability
               japgolly.scalajs.react.Reusability.derive
             }
           """
-      else EmptyTree
+    )
 
-    val encoderDef =
-      if (encoder)
-        q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n]"
-      else EmptyTree
+    val encoderDef = Option.when(encoder)(
+      q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n]"
+    )
 
-    val decoderDef =
-      if (decoder)
-        q"implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
-      else EmptyTree
+    val decoderDef = Option.when(decoder)(
+      q"implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
+    )
 
-    q"""object ${TermName(name)} {
-          ..$statements
-          $eqDef
-          $showDef
-          $reuseDef
-          $encoderDef
-          $decoderDef
-        }"""
+    addModuleStatements(
+      name,
+      otherStatements ++ List(eqDef, showDef, reuseDef, encoderDef, decoderDef).flatten
+    )
   }
 }

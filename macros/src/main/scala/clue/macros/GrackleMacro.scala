@@ -55,41 +55,27 @@ protected[macros] trait GrackleMacro extends Macro {
   protected[this] case class CaseClass(name: String, params: List[ClassParam]) {
     private val camelName = snakeToCamel(name)
 
-    def toTree(
+    def addToParentBody(
       eq:      Boolean,
       show:    Boolean,
       lenses:  Boolean,
       reuse:   Boolean,
       encoder: Boolean = false,
       decoder: Boolean = false
-    ): List[Tree] =
-      List(
-        caseClassDef(camelName, params.map(_.toTree), lenses),
-        moduleDef(camelName, eq, show, reuse, encoder, decoder)
-      )
+    ): List[Tree] => List[Tree] =
+      addCaseClassDef(camelName, params.map(_.toTree), lenses)
+        .andThen(addModuleDefs(camelName, eq, show, reuse, encoder, decoder))
   }
 
   protected[this] case class Enum(name: String, values: List[String]) {
-    private val camelName = snakeToCamel(name)
-
-    def toTree(
+    def addToParentBody(
       eq:      Boolean,
       show:    Boolean,
       reuse:   Boolean,
       encoder: Boolean = false,
       decoder: Boolean = false
-    ): List[Tree] = {
-      val n         = TypeName(camelName)
-      val traitDef  = q"sealed trait $n"
-      val valuesDef = values.map { value =>
-        val v = TermName(snakeToCamel(value))
-        q"case object $v extends $n"
-      }
-      List(
-        traitDef,
-        moduleDef(camelName, eq, show, reuse, encoder, decoder, statements = valuesDef)
-      )
-    }
+    ): List[Tree] => List[Tree] =
+      addEnum(snakeToCamel(name), values.map(snakeToCamel), eq, show, reuse, encoder, decoder)
   }
 
   //
