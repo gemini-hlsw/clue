@@ -113,7 +113,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
   /**
    * Resolve the types of the operation's variable arguments.
    */
-  @scala.annotation.unused
   private[this] def resolveVariables(
     schema:   Schema,
     vars:     List[Query.UntypedVarDef],
@@ -132,6 +131,15 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
     )
   }
 
+  private[this] def addTypeImport(schemaType: Tree): List[Tree] => List[Tree] =
+    parentBody => {
+      val importDef = Import(
+        Select(TypeNamesToTermNames.transform(schemaType), TermName("Types")),
+        List(ImportSelector(termNames.WILDCARD, -1, null, -1))
+      )
+      List(importDef, q"ignoreUnusedImportTypes()") ++ parentBody
+    }
+
   private[this] def addVars(
     schema:    Schema,
     operation: UntypedOperation,
@@ -148,7 +156,8 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
           params.show,
           params.lenses,
           reuse = false,
-          encoder = true
+          encoder = true,
+          forceModule = true
         )(parentBody)
 
   private[this] def addData(
@@ -163,7 +172,13 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
         scala.Function.chain(
           resolveData(operation.query, schema.queryType, params.mappings)
             .map(
-              _.addToParentBody(params.eq, params.show, params.lenses, params.reuse, decoder = true)
+              _.addToParentBody(params.eq,
+                                params.show,
+                                params.lenses,
+                                params.reuse,
+                                decoder = true,
+                                forceModule = true
+              )
             )
         )(parentBody)
 
@@ -200,7 +215,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
   private[this] val addDataDecoder: List[Tree] => List[Tree] =
     addValRefIntoModule("dataDecoder", "Data", "jsonDecoderData", tq"io.circe.Decoder[Data]")
 
-  @scala.annotation.unused
   private[this] def addConvenienceMethod(
     schemaType: Tree,
     operation:  UntypedOperation
@@ -272,12 +286,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 val optionalParams = buildOptionalParams[GraphQLOptionalParams]
                 val params         = optionalParams.resolve(settings)
 
-                // Extend Types from schema object.
-                val objParentsWithTypes =
-                  objParents :+ Select(TypeNamesToTermNames.transform(schemaType),
-                                       TypeName("Types")
-                  )
-
                 // Parse schema and metadata.
                 val schemaTypeName = unqualifiedType(schemaType) match {
                   case None       =>
@@ -300,18 +308,20 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
 
                 // Modifications to add the missing definitions.
                 val modObjDefs = scala.Function.chain(
-                  List(addVars(schema, operation, params),
-                       addData(schema, operation, params),
-                       addVarEncoder,
-                       addDataDecoder,
-                       addConvenienceMethod(schemaType, operation)
+                  List(
+                    addTypeImport(schemaType),
+                    addVars(schema, operation, params),
+                    addData(schema, operation, params),
+                    addVarEncoder,
+                    addDataDecoder,
+                    addConvenienceMethod(schemaType, operation)
                   )
                 )
 
                 // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
                 val result =
                   q"""
-                    $objMods object $objName extends { ..$objEarlyDefs } with ..$objParentsWithTypes { $objSelf =>
+                    $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
                       ..${modObjDefs(objDefs)}
                     }
                   """

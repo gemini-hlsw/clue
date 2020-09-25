@@ -56,15 +56,22 @@ protected[macros] trait GrackleMacro extends Macro {
     private val camelName = snakeToCamel(name)
 
     def addToParentBody(
-      eq:      Boolean,
-      show:    Boolean,
-      lenses:  Boolean,
-      reuse:   Boolean,
-      encoder: Boolean = false,
-      decoder: Boolean = false
+      eq:          Boolean,
+      show:        Boolean,
+      lenses:      Boolean,
+      reuse:       Boolean,
+      encoder:     Boolean = false,
+      decoder:     Boolean = false,
+      forceModule: Boolean = false
     ): List[Tree] => List[Tree] =
-      addCaseClassDef(camelName, params.map(_.toTree), lenses)
-        .andThen(addModuleDefs(camelName, eq, show, reuse, encoder, decoder))
+      parentBody => {
+        val (newBody, wasMissing) =
+          addCaseClassDef(camelName, params.map(_.toTree), lenses)(parentBody)
+        if (wasMissing || forceModule)
+          addModuleDefs(camelName, eq, show, reuse, encoder, decoder)(newBody)
+        else
+          newBody
+      }
   }
 
   protected[this] case class Enum(name: String, values: List[String]) {

@@ -109,35 +109,37 @@ protected[macros] trait Macro {
       }
     }
 
-  protected[this] def modifyTraitStatements(
-    traitName: String,
-    mod:       List[Tree] => List[Tree]
-  ): List[Tree] => List[Tree] =
-    parentBody => {
-      val tpe = TypeName(traitName)
+  // protected[this] def modifyTraitStatements(
+  //   traitName: String,
+  //   extending: List[Tree],
+  //   mod:       List[Tree] => List[Tree]
+  // ): List[Tree] => List[Tree] =
+  //   parentBody => {
+  //     val tpe = TypeName(traitName)
 
-      val (newStats, modified) =
-        parentBody.foldLeft((List.empty[Tree], false)) { case ((newStats, modified), stat) =>
-          stat match {
-            case q"$mods trait $tpname extends { ..$earlydefns } with ..$parents { $self => ..$body }"
-                if tpname == tpe =>
-              (newStats :+ q"$mods trait $tpname extends { ..$earlydefns } with ..$parents { $self => ..${mod(body)} }",
-               true
-              )
-            case other => (newStats :+ other, modified)
-          }
-        }
-      if (modified)
-        newStats
-      else
-        newStats :+ q"trait ${tpe} { ..${mod(List.empty)} }"
-    }
+  //     val (newStats, modified) =
+  //       parentBody.foldLeft((List.empty[Tree], false)) { case ((newStats, modified), stat) =>
+  //         stat match {
+  //           case q"$mods trait $tpname extends { ..$earlydefns } with ..$parents { $self => ..$body }"
+  //               if tpname == tpe =>
+  //             (newStats :+ q"$mods trait $tpname extends { ..$earlydefns } with ..${(parents ++ extending).distinct} { $self => ..${mod(body)} }",
+  //              true
+  //             )
+  //           case other => (newStats :+ other, modified)
+  //         }
+  //       }
+  //     if (modified)
+  //       newStats
+  //     else
+  //       newStats :+ q"trait ${tpe} extends {..${List.empty[Tree]}} with ..$extending { ..${mod(List.empty)} }"
+  //   }
 
-  protected[this] def addTraitStatements(
-    traitName:  String,
-    statements: List[Tree]
-  ): List[Tree] => List[Tree] =
-    modifyTraitStatements(traitName, _ ++ statements)
+  // protected[this] def addTraitStatements(
+  //   traitName:  String,
+  //   extending:  List[Tree],
+  //   statements: List[Tree]
+  // ): List[Tree] => List[Tree] =
+  //   modifyTraitStatements(traitName, extending, _ ++ statements)
 
   protected[this] def modifyModuleStatements(
     moduleName: String,
@@ -187,18 +189,20 @@ protected[macros] trait Macro {
     name:   String,
     pars:   List[ValDef],
     lenses: Boolean
-  ): List[Tree] => List[Tree] =
+  ): List[Tree] => (List[Tree], Boolean) =
     parentBody =>
       if (isTypeDefined(name)(parentBody))
-        parentBody
+        (parentBody, false)
       else
-        parentBody :+ {
-          val n = TypeName(name)
-          if (lenses)
-            q"@monocle.macros.Lenses case class $n(..$pars)"
-          else
-            q"case class $n(..$pars)"
-        }
+        (parentBody :+ {
+           val n = TypeName(name)
+           if (lenses)
+             q"@monocle.macros.Lenses case class $n(..$pars)"
+           else
+             q"case class $n(..$pars)"
+         },
+         true
+        )
 
   protected[this] def addEnum(
     name:    String,
@@ -219,7 +223,7 @@ protected[macros] trait Macro {
                       reuse,
                       encoder,
                       decoder,
-                      values.map { value =>
+                      _ ++ values.map { value =>
                         q"case object ${TermName(value)} extends ${TypeName(name)}"
                       }
         )(
@@ -230,13 +234,13 @@ protected[macros] trait Macro {
    * Compute a companion object with typeclasses.
    */
   protected[this] def addModuleDefs(
-    name:            String,
-    eq:              Boolean,
-    show:            Boolean,
-    reuse:           Boolean,
-    encoder:         Boolean = false,
-    decoder:         Boolean = false,
-    otherStatements: List[Tree] = List.empty
+    name:          String,
+    eq:            Boolean,
+    show:          Boolean,
+    reuse:         Boolean,
+    encoder:       Boolean = false,
+    decoder:       Boolean = false,
+    modStatements: List[Tree] => List[Tree] = identity
   ): List[Tree] => List[Tree] = {
     val n = TypeName(name)
 
@@ -257,16 +261,17 @@ protected[macros] trait Macro {
     )
 
     val encoderDef = Option.when(encoder)(
-      q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n]"
+      q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJson(_.deepDropNullValues)"
     )
 
     val decoderDef = Option.when(decoder)(
       q"implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
     )
 
-    addModuleStatements(
+    modifyModuleStatements(
       name,
-      otherStatements ++ List(eqDef, showDef, reuseDef, encoderDef, decoderDef).flatten
+      stats =>
+        modStatements(stats) ++ List(eqDef, showDef, reuseDef, encoderDef, decoderDef).flatten
     )
   }
 }

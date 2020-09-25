@@ -18,38 +18,72 @@ class GraphQLSchema(
 private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends GrackleMacro {
   import c.universe._
 
+  // Just make sure "object Scalars" exists.
   private[this] val addScalars: List[Tree] => List[Tree] =
-    addTraitStatements("Scalars", List.empty).andThen(
-      addModuleDefs("Scalars", eq = false, show = false, reuse = false)
+    addModuleDefs("Scalars",
+                  eq = false,
+                  show = false,
+                  reuse = false,
+                  modStatements = _ :+ q"def ignoreUnusedImportScalars(): Unit = ()"
     )
 
   private[this] def addEnums(schema: Schema, params: GraphQLParams): List[Tree] => List[Tree] =
-    modifyTraitStatements(
+    addModuleDefs(
       "Enums",
-      scala.Function.chain(
-        schema.types
-          .collect { case EnumType(name, _, values) => Enum(name, values.map(_.name)) }
-          .map(
-            _.addToParentBody(params.eq, params.show, params.reuse, encoder = true, decoder = true)
-          )
+      eq = false,
+      show = false,
+      reuse = false,
+      modStatements = scala.Function.chain(
+        List((parentBody: List[Tree]) =>
+          q"def ignoreUnusedImportEnums(): Unit = ()" +: parentBody
+        ) ++
+          schema.types
+            .collect { case EnumType(name, _, values) => Enum(name, values.map(_.name)) }
+            .map(
+              _.addToParentBody(params.eq,
+                                params.show,
+                                params.reuse,
+                                encoder = true,
+                                decoder = true
+              )
+            )
       )
-    ).andThen(addModuleDefs("Enums", eq = false, show = false, reuse = false))
+    )
 
   private[this] def addInputs(schema: Schema, params: GraphQLParams): List[Tree] => List[Tree] =
-    modifyTraitStatements(
+    addModuleDefs(
       "Types",
-      scala.Function.chain(
-        schema.types
-          .collect { case InputObjectType(name, _, fields) =>
-            CaseClass(name.capitalize,
-                      fields.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, params.mappings))
+      eq = false,
+      show = false,
+      reuse = false,
+      // TODO Only do imports if not already defined
+      // TODO Reference dummy val to avoid unused
+      modStatements = scala.Function.chain(
+        List((parentBody: List[Tree]) =>
+          List(q"import Scalars._",
+               q"ignoreUnusedImportScalars()",
+               q"import Enums._",
+               q"ignoreUnusedImportEnums()",
+               q"def ignoreUnusedImportTypes(): Unit = ()"
+          ) ++ parentBody
+        ) ++
+          schema.types
+            .collect { case InputObjectType(name, _, fields) =>
+              CaseClass(
+                name.capitalize,
+                fields.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, params.mappings))
+              )
+            }
+            .map(
+              _.addToParentBody(params.eq,
+                                params.show,
+                                params.lenses,
+                                reuse = false,
+                                encoder = true
+              )
             )
-          }
-          .map(
-            _.addToParentBody(params.eq, params.show, params.lenses, reuse = false, encoder = true)
-          )
       )
-    ).andThen(addModuleDefs("Types", eq = false, show = false, reuse = false))
+    )
 
   final def expand(annottees: Tree*): Tree =
     annottees match {
@@ -81,7 +115,7 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
             }
           """
 
-        if (params.debug) log(result)
+        if (params.debug) log(showCode(result))
 
         result
     }
