@@ -23,13 +23,26 @@ protected[macros] trait GrackleMacro extends Macro {
    * Consists of the name of the parameter and its Grackle type.
    */
   protected[this] case class ClassParam(name: String, tpe: Tree) {
-    def toTree: ValDef = {
+    private def nestedTypeTree(nestTree: Tree, tpe: Tree): Tree =
+      tpe match {
+        case Ident(typeName)                  => Select(nestTree, typeName)
+        case AppliedTypeTree(enclosing, list) =>
+          AppliedTypeTree(enclosing, list.map(t => nestedTypeTree(nestTree, t)))
+      }
+
+    def toTree(nestTree: Option[Tree], nestedTypes: List[String]): ValDef = {
       val n = TermName(name)
+      val t = nestTree.fold(tpe) { tree =>
+        if (nestedTypes.contains(name))
+          nestedTypeTree(tree, tpe)
+        else
+          tpe
+      }
       val d = tpe match {
         case tq"Option[$inner]" => q"None"
         case _                  => EmptyTree
       }
-      q"val $n: $tpe = $d"
+      q"val $n: $t = $d"
     }
   }
 
@@ -58,8 +71,13 @@ protected[macros] trait GrackleMacro extends Macro {
    *
    * Consists of the class name and its [[ClassParam]] parameters.
    */
-  protected[this] case class CaseClass(name: String, params: List[ClassParam]) {
+  protected[this] case class CaseClass(
+    name:   String,
+    params: List[ClassParam],
+    nested: List[CaseClass] = List.empty
+  ) {
     private val camelName = snakeToCamel(name)
+    // private val fqn = camelName.tail.foldLeft(Ident(TermName(camelName.head)))( (t, n) =>  Select(t, TermName(n)))
 
     def addToParentBody(
       eq:          Boolean,
@@ -68,13 +86,40 @@ protected[macros] trait GrackleMacro extends Macro {
       reuse:       Boolean,
       encoder:     Boolean = false,
       decoder:     Boolean = false,
-      forceModule: Boolean = false
+      forceModule: Boolean = false,
+      nestTree:    Option[Tree] = None
     ): List[Tree] => List[Tree] =
       parentBody => {
+        val nextTree              = nestTree
+          .fold[Tree](Ident(TermName(camelName)))(t => Select(t, TermName(camelName)))
+          .some
         val (newBody, wasMissing) =
-          addCaseClassDef(camelName, params.map(_.toTree), lenses)(parentBody)
+          addCaseClassDef(camelName, params.map(_.toTree(nextTree, nested.map(_.name))), lenses)(
+            parentBody
+          )
         if (wasMissing || forceModule)
-          addModuleDefs(camelName, eq, show, reuse, encoder, decoder)(newBody)
+          addModuleDefs(
+            camelName,
+            eq,
+            show,
+            reuse,
+            encoder,
+            decoder,
+            modStatements = scala.Function.chain(
+              nested.map(
+                _.addToParentBody(
+                  eq,
+                  show,
+                  lenses,
+                  reuse,
+                  encoder,
+                  decoder,
+                  nestTree = nextTree
+                )
+              )
+            ),
+            nestTree = nestTree
+          )(newBody)
         else
           newBody
       }

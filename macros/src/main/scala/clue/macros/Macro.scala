@@ -240,9 +240,11 @@ protected[macros] trait Macro {
     reuse:         Boolean,
     encoder:       Boolean = false,
     decoder:       Boolean = false,
-    modStatements: List[Tree] => List[Tree] = identity
+    modStatements: List[Tree] => List[Tree] = identity,
+    nestTree:      Option[Tree] = None
   ): List[Tree] => List[Tree] = {
-    val n = TypeName(name)
+    val n =
+      nestTree.fold[Tree](Ident(TypeName(name)))(t => Select(t, TypeName(name)))
 
     val eqDef = Option.when(eq)(
       q"implicit val ${TermName(s"eq$name")}: cats.Eq[$n] = cats.Eq.fromUniversalEquals"

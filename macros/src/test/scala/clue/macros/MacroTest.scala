@@ -32,7 +32,7 @@ class MacroTest extends FunSuite {
     """
   }
 
-  @GraphQL(debug = true, mappings = Map("targetobjecttype" -> "String"))
+  @GraphQL(debug = false, mappings = Map("targetobjecttype" -> "String"))
   object ExploreSubscription extends AnyRef with GraphQLOperation[Explore] {
 
     val document = """
@@ -99,7 +99,7 @@ class MacroTest extends FunSuite {
     )
   }
 
-  @GraphQL(debug = true)
+  @GraphQL(debug = true, lenses = false)
   object BasicQuery extends GraphQLOperation[StarWars] {
     val document = """
         query {
@@ -138,12 +138,10 @@ class MacroTest extends FunSuite {
           ],
           "more_friends": [
             {
-              "id": "002",
-              "name": "R2D2"
+              "name": "Han"
             },
             {
-              "id": "003",
-              "name": "C3P0"
+              "name": "Leia"
             }
           ]
         }

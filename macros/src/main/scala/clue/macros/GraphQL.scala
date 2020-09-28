@@ -52,7 +52,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
     algebra:  Query,
     rootType: GType,
     mappings: Map[String, String]
-  ): List[CaseClass] = {
+  ): CaseClass = {
     import Query._
 
     def go(
@@ -69,7 +69,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
               case GNoType  => (Nil, None)
               case baseType =>
                 val next = go(child, baseType)
-                (next.classes :+ CaseClass(paramName, next.parAccum), paramName.some)
+                (List(CaseClass(paramName, next.parAccum, next.classes)), paramName.some)
             }
           ClassAccumulator(
             classes = newClasses,
@@ -97,7 +97,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
 
     val algebraTypes = go(algebra, rootType.underlyingObject)
 
-    algebraTypes.classes :+ CaseClass("Data", algebraTypes.parAccum)
+    CaseClass("Data", algebraTypes.parAccum, algebraTypes.classes)
   }
 
   // This might be useful in Grackle?
@@ -171,17 +171,14 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
       if (isTypeDefined("Data")(parentBody))
         addModuleDefs("Data", params.eq, params.show, params.reuse, decoder = true)(parentBody)
       else
-        scala.Function.chain(
-          resolveData(operation.query, schema.queryType, params.mappings)
-            .map(
-              _.addToParentBody(params.eq,
-                                params.show,
-                                params.lenses,
-                                params.reuse,
-                                decoder = true,
-                                forceModule = true
-              )
-            )
+        resolveData(operation.query, schema.queryType, params.mappings).addToParentBody(
+          params.eq,
+          params.show,
+          params.lenses,
+          params.reuse,
+          decoder = true,
+          forceModule = true
+          // nestTree = Ident(TermName("Data")).some
         )(parentBody)
 
   private[this] def addValRefIntoModule(
