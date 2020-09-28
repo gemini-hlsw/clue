@@ -62,21 +62,23 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
     ): ClassAccumulator =
       currentAlgebra match {
         case Select(name, args, child) =>
-          val nextType   = currentType.field(name)
-          val newClasses =
+          val paramName                           = nameOverride.getOrElse(name)
+          val nextType                            = currentType.field(name)
+          val (newClasses, paramTypeNameOverride) =
             nextType.underlyingObject match {
-              case GNoType  => Nil
+              case GNoType  => (Nil, None)
               case baseType =>
-                val next          = go(child, baseType)
-                val caseClassName = baseType.asNamed
-                  .map(_.name.capitalize)
-                  .getOrElse(abort(s"Unexpected unnamed underlying type for [$baseType]"))
-                next.classes :+ CaseClass(caseClassName, next.parAccum)
+                val next = go(child, baseType)
+                (next.classes :+ CaseClass(paramName, next.parAccum), paramName.some)
             }
           ClassAccumulator(
             classes = newClasses,
             parAccum = List(
-              ClassParam.fromGrackleType(nameOverride.getOrElse(name), nextType.dealias, mappings)
+              ClassParam.fromGrackleType(paramName,
+                                         nextType.dealias,
+                                         mappings,
+                                         paramTypeNameOverride
+              )
             )
           )
         case Rename(name, child)       =>

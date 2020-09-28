@@ -15,6 +15,7 @@ interface Character {
   id: String!
   name: String
   friends: [Character!]
+  more_friends: [Character!]
   appearsIn: [Episode!]
 }
 

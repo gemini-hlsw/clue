@@ -3,15 +3,12 @@
 
 package clue.js
 
-import scala.scalajs.js
-
 import cats.effect._
 import cats.effect.implicits._
 import clue._
 import clue.model.StreamingMessage
 import clue.model.json._
 import io.chrisdavenport.log4cats.Logger
-import io.circe.parser._
 import io.circe.syntax._
 import org.scalajs.dom.raw.CloseEvent
 import org.scalajs.dom.raw.Event
@@ -56,10 +53,9 @@ final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends Streaming
       }
 
       ws.onerror = { e: Event =>
-        val exception = parse(js.JSON.stringify(e)).map(json => new GraphQLException(List(json)))
-        onError(
-          exception.getOrElse[Throwable](exception.swap.toOption.get)
-        ).toIO.unsafeRunAsyncAndForget()
+        println(e)
+        println(scalajs.js.JSON.stringify(e))
+        onError(new GraphQLException(e.toString)).toIO.unsafeRunAsyncAndForget()
       }
 
       ws.onclose = { e: CloseEvent =>

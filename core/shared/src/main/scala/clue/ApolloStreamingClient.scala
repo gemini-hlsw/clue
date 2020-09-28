@@ -94,7 +94,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
     }
 
     def emitError(json: Json): F[Unit] = {
-      val error = new GraphQLException(List(json))
+      val error = new GraphQLException(json.toString)
       queue.enqueue1(Left(error))
     }
 
@@ -224,6 +224,9 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
                 .evalTap(v => Logger[F].debug(s"$LogPrefix Dequeuing for subscription [$id]: [$v]"))
           ).rethrow.unNoneTerminate
             .onError { case t: Throwable =>
+              println(t)
+              println(t.getMessage)
+
               Stream.eval(Logger[F].error(t)(s"$LogPrefix Error in subscription [$id]: "))
             }
         ),

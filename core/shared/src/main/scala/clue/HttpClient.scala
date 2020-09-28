@@ -44,7 +44,7 @@ class HttpClient[F[_]: Logger: Backend, S](uri: Uri)(implicit me: MonadError[F, 
           val cursor = json.hcursor
           cursor
             .get[List[Json]]("errors")
-            .map(errors => new GraphQLException(errors))
+            .map(errors => new GraphQLException(errors.toString))
             .swap
             .flatMap(_ => cursor.get[D]("data"))
         }

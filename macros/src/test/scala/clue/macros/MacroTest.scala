@@ -22,7 +22,6 @@ class MacroTest extends FunSuite {
   }
 
   @GraphQL(debug = false)
-  @scala.annotation.unused
   object RemoveTarget extends GraphQLOperation[Explore] {
     val document: String = """
       mutation ($id: uuid!) {
@@ -33,7 +32,7 @@ class MacroTest extends FunSuite {
     """
   }
 
-  @GraphQL(debug = false, mappings = Map("targetobjecttype" -> "String"))
+  @GraphQL(debug = true, mappings = Map("targetobjecttype" -> "String"))
   object ExploreSubscription extends AnyRef with GraphQLOperation[Explore] {
 
     val document = """
@@ -100,39 +99,57 @@ class MacroTest extends FunSuite {
     )
   }
 
-  // @GraphQL("starwars", debug = false)
-  // object BasicQuery extends GraphQLOperation {
-  //   val document = """
-  //       query {
-  //         character(id: $charId) {
-  //           id
-  //           name
-  //           friends
-  //         }
-  //       }
-  //     """
-  // }
+  @GraphQL(debug = true)
+  object BasicQuery extends GraphQLOperation[StarWars] {
+    val document = """
+        query {
+          character(id: $charId) {
+            id
+            name
+            friends {
+              name
+              friends {
+                name
+              }
+            }
+            more_friends {
+              name
+            }
+          }
+        }
+      """
+  }
 
-  // test("StarWars") {
-  //   val json = """
-  //     {
-  //       "character": {
-  //         "id": "001",
-  //         "name": "Luke",
-  //         "friends": [
-  //           {
-  //             "id": "002",
-  //             "name": "R2D2"
-  //           },
-  //           {
-  //             "id": "003",
-  //             "name": "C3P0"
-  //           }
-  //         ]
-  //       }
-  //     }
-  //   """
-  //   println(decode[BasicQuery.Data](json))
-  // }
+  test("StarWars") {
+    val json = """
+      {
+        "character": {
+          "id": "001",
+          "name": "Luke",
+          "friends": [
+            {
+              "id": "002",
+              "name": "R2D2"
+            },
+            {
+              "id": "003",
+              "name": "C3P0"
+            }
+          ],
+          "more_friends": [
+            {
+              "id": "002",
+              "name": "R2D2"
+            },
+            {
+              "id": "003",
+              "name": "C3P0"
+            }
+          ]
+        }
+      }
+    """
+    println(decode[BasicQuery.Data](json))
+  }
 
 }

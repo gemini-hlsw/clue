@@ -1,7 +1,7 @@
 package clue.macros
 
 object Schemas {
-  @GraphQLSchema(debug = false)
+  @GraphQLSchema(debug = true)
   object Explore {
     object Scalars {
       type Cloudcover       = String
@@ -15,5 +15,6 @@ object Schemas {
     object Types {}
   }
 
-  type StarWars
+  @GraphQLSchema(debug = false)
+  object StarWars
 }
