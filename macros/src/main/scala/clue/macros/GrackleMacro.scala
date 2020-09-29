@@ -89,11 +89,6 @@ protected[macros] trait GrackleMacro extends Macro {
   ) {
     private val camelName = snakeToCamel(name)
 
-    // private def genLenses(nestTree: Option[Tree], nextTree): List[Tree] =
-    //   params.map { param =>
-    //     q"val ${param.name}: Lens[${qualifiedNestedType(nestTree, TypeName(camelName))}, ${qualifiedNestedType(nextTree, param.tpe)}] = ???"
-    //   }
-
     def addToParentBody(
       eq:          Boolean,
       show:        Boolean,
