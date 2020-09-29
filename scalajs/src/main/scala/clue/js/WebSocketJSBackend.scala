@@ -53,8 +53,6 @@ final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends Streaming
       }
 
       ws.onerror = { e: Event =>
-        println(e)
-        println(scalajs.js.JSON.stringify(e))
         onError(new GraphQLException(e.toString)).toIO.unsafeRunAsyncAndForget()
       }
 

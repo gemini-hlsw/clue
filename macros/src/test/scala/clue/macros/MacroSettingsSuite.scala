@@ -33,8 +33,6 @@ class MacroSettingsSuite extends DisciplineSuite {
         "scalajs-react.reusability=true"
       ).map(s => s"${MacroSettings.OptionPrefix}.$s")
 
-    println(settings)
-
     assertEquals(
       MacroSettings.fromCtxSettings(settings),
       MacroSettings(

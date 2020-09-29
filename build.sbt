@@ -2,11 +2,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 inThisBuild(
   Seq(
-    //
     scalacOptions += "-Ymacro-annotations",
-    // scalaVersion := "2.13.3",
-    scalacOptions += "-language:experimental.macros",
-    //
     homepage := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
     testFrameworks += new TestFramework("munit.Framework")
@@ -100,6 +96,7 @@ lazy val macros =
           Settings.Libraries.Grackle.value ++
           Settings.Libraries.Jawn.value ++
           Settings.Libraries.Monocle.value,
+      scalacOptions += "-language:experimental.macros",
       scalacOptions ~= (_.filterNot(Set("-Wunused:patvars"))), // Needed for quasiquote matching.
       scalacOptions += {
         val thisProject    = thisProjectRef.value

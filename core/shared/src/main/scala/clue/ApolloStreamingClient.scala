@@ -224,9 +224,6 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
                 .evalTap(v => Logger[F].debug(s"$LogPrefix Dequeuing for subscription [$id]: [$v]"))
           ).rethrow.unNoneTerminate
             .onError { case t: Throwable =>
-              println(t)
-              println(t.getMessage)
-
               Stream.eval(Logger[F].error(t)(s"$LogPrefix Error in subscription [$id]: "))
             }
         ),
