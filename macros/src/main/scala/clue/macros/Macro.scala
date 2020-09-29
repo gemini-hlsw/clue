@@ -109,38 +109,6 @@ protected[macros] trait Macro {
       }
     }
 
-  // protected[this] def modifyTraitStatements(
-  //   traitName: String,
-  //   extending: List[Tree],
-  //   mod:       List[Tree] => List[Tree]
-  // ): List[Tree] => List[Tree] =
-  //   parentBody => {
-  //     val tpe = TypeName(traitName)
-
-  //     val (newStats, modified) =
-  //       parentBody.foldLeft((List.empty[Tree], false)) { case ((newStats, modified), stat) =>
-  //         stat match {
-  //           case q"$mods trait $tpname extends { ..$earlydefns } with ..$parents { $self => ..$body }"
-  //               if tpname == tpe =>
-  //             (newStats :+ q"$mods trait $tpname extends { ..$earlydefns } with ..${(parents ++ extending).distinct} { $self => ..${mod(body)} }",
-  //              true
-  //             )
-  //           case other => (newStats :+ other, modified)
-  //         }
-  //       }
-  //     if (modified)
-  //       newStats
-  //     else
-  //       newStats :+ q"trait ${tpe} extends {..${List.empty[Tree]}} with ..$extending { ..${mod(List.empty)} }"
-  //   }
-
-  // protected[this] def addTraitStatements(
-  //   traitName:  String,
-  //   extending:  List[Tree],
-  //   statements: List[Tree]
-  // ): List[Tree] => List[Tree] =
-  //   modifyTraitStatements(traitName, extending, _ ++ statements)
-
   protected[this] def modifyModuleStatements(
     moduleName: String,
     mod:        List[Tree] => List[Tree]

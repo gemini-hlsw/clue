@@ -10,7 +10,7 @@ class MacroTest extends FunSuite {
 
   import Schemas._
 
-  @GraphQL(debug = true)
+  @GraphQL(debug = false)
   object AddTarget extends GraphQLOperation[Schemas.Explore] {
     override val document = """
       query($target: targets_insert_input!) {

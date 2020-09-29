@@ -3,6 +3,7 @@ package clue.macros
 import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import edu.gemini.grackle._
+import cats.effect.IO
 
 class GraphQLSchema(
   val mappings: Map[String, String] = Map.empty,
@@ -12,7 +13,7 @@ class GraphQLSchema(
   val reuse:    Boolean = false,
   val debug:    Boolean = false
 ) extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro GraphQLSchemaImpl.expand
+  def macroTransform(annottees: Any*): Any = macro GraphQLSchemaImpl.resolve
 }
 
 private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends GrackleMacro {
@@ -56,8 +57,7 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
       eq = false,
       show = false,
       reuse = false,
-      // TODO Only do imports if not already defined
-      // TODO Reference dummy val to avoid unused
+      // TODO Only generate imports if not already defined
       modStatements = scala.Function.chain(
         List((parentBody: List[Tree]) =>
           List(q"import Scalars._",
@@ -85,7 +85,10 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
       )
     )
 
-  final def expand(annottees: Tree*): Tree =
+  final def resolve(annottees: Tree*): Tree =
+    expand(annottees: _*).unsafeRunSync()
+
+  private[this] def expand(annottees: Tree*): IO[Tree] = IO(
     annottees match {
       case List(
             q"$objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf => ..$objDefs }"
@@ -119,4 +122,5 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
 
         result
     }
+  )
 }

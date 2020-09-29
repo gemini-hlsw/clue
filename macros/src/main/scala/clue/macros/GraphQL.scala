@@ -9,6 +9,7 @@ import edu.gemini.grackle.{ Type => GType }
 import edu.gemini.grackle.{ NoType => GNoType }
 import edu.gemini.grackle.{ TypeRef => GTypeRef }
 import edu.gemini.grackle.UntypedOperation._
+import cats.effect.IO
 
 class GraphQL(
   val mappings: Map[String, String] = Map.empty,
@@ -18,7 +19,7 @@ class GraphQL(
   val reuse:    Boolean = false,
   val debug:    Boolean = false
 ) extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro GraphQLImpl.expand
+  def macroTransform(annottees: Any*): Any = macro GraphQLImpl.resolve
 }
 private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMacro {
   import c.universe._
@@ -259,7 +260,10 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
   /**
    * Actual macro application, generating case classes to hold the query results and its variables.
    */
-  final def expand(annottees: Tree*): Tree =
+  final def resolve(annottees: Tree*): Tree =
+    expand(annottees: _*).unsafeRunSync()
+
+  private[this] def expand(annottees: Tree*): IO[Tree] = IO(
     annottees match {
       case List(
             q"$objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf => ..$objDefs }"
@@ -335,4 +339,5 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
             )
         }
     }
+  )
 }
