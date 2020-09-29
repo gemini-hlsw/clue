@@ -17,27 +17,38 @@ protected[macros] trait GrackleMacro extends Macro {
     wordPattern.matcher(s).replaceAll(_.group.stripSuffix("_").toLowerCase.capitalize)
   }
 
+  private[this] def nestedTypeTree(nestTree: Tree, tpe: Tree): Tree =
+    tpe match {
+      case Ident(typeName)                  => Select(nestTree, typeName)
+      case AppliedTypeTree(enclosing, list) =>
+        AppliedTypeTree(enclosing, list.map(t => nestedTypeTree(nestTree, t)))
+    }
+
+  private[this] def qualifiedNestedType(nestTree: Option[Tree], tpe: Tree): Tree =
+    nestTree.fold(tpe) { tree =>
+      nestedTypeTree(tree, tpe)
+    }
+
   /**
    * Represents a parameter that will be used for a generated case class or variable.
    *
    * Consists of the name of the parameter and its Grackle type.
    */
   protected[this] case class ClassParam(name: String, tpe: Tree) {
-    private def nestedTypeTree(nestTree: Tree, tpe: Tree): Tree =
-      tpe match {
-        case Ident(typeName)                  => Select(nestTree, typeName)
-        case AppliedTypeTree(enclosing, list) =>
-          AppliedTypeTree(enclosing, list.map(t => nestedTypeTree(nestTree, t)))
+
+    def typeTree(nestTree: Option[Tree], nestedTypes: List[String]): Tree =
+      nestTree match {
+        case None => tpe
+        case _    =>
+          if (nestedTypes.contains(name))
+            qualifiedNestedType(nestTree, tpe)
+          else
+            tpe
       }
 
     def toTree(nestTree: Option[Tree], nestedTypes: List[String]): ValDef = {
       val n = TermName(name)
-      val t = nestTree.fold(tpe) { tree =>
-        if (nestedTypes.contains(name))
-          nestedTypeTree(tree, tpe)
-        else
-          tpe
-      }
+      val t = typeTree(nestTree, nestedTypes)
       val d = tpe match {
         case tq"Option[$inner]" => q"None"
         case _                  => EmptyTree
@@ -77,7 +88,11 @@ protected[macros] trait GrackleMacro extends Macro {
     nested: List[CaseClass] = List.empty
   ) {
     private val camelName = snakeToCamel(name)
-    // private val fqn = camelName.tail.foldLeft(Ident(TermName(camelName.head)))( (t, n) =>  Select(t, TermName(n)))
+
+    // private def genLenses(nestTree: Option[Tree], nextTree): List[Tree] =
+    //   params.map { param =>
+    //     q"val ${param.name}: Lens[${qualifiedNestedType(nestTree, TypeName(camelName))}, ${qualifiedNestedType(nextTree, param.tpe)}] = ???"
+    //   }
 
     def addToParentBody(
       eq:          Boolean,
@@ -93,8 +108,9 @@ protected[macros] trait GrackleMacro extends Macro {
         val nextTree              = nestTree
           .fold[Tree](Ident(TermName(camelName)))(t => Select(t, TermName(camelName)))
           .some
+        val nestedTypeNames       = nested.map(_.name)
         val (newBody, wasMissing) =
-          addCaseClassDef(camelName, params.map(_.toTree(nextTree, nested.map(_.name))), lenses)(
+          addCaseClassDef(camelName, params.map(_.toTree(nextTree, nestedTypeNames)))(
             parentBody
           )
         if (wasMissing || forceModule)
@@ -116,7 +132,15 @@ protected[macros] trait GrackleMacro extends Macro {
                   decoder,
                   nestTree = nextTree
                 )
-              )
+              ) ++
+                Option.when(lenses) { moduleBody =>
+                  val lenses = params.map { param =>
+                    val thisType  = qualifiedNestedType(nestTree, Ident(TypeName(camelName)))
+                    val childType = param.typeTree(nextTree, nestedTypeNames)
+                    q"val ${TermName(param.name)}: monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${TermName(param.name)})"
+                  }
+                  moduleBody ++ lenses
+                }
             ),
             nestTree = nestTree
           )(newBody)

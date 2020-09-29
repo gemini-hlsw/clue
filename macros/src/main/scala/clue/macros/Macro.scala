@@ -186,23 +186,14 @@ protected[macros] trait Macro {
    * Compute a case class definition.
    */
   protected[this] def addCaseClassDef(
-    name:   String,
-    pars:   List[ValDef],
-    lenses: Boolean
+    name: String,
+    pars: List[ValDef]
   ): List[Tree] => (List[Tree], Boolean) =
     parentBody =>
       if (isTypeDefined(name)(parentBody))
         (parentBody, false)
       else
-        (parentBody :+ {
-           val n = TypeName(name)
-           if (lenses)
-             q"@monocle.macros.Lenses case class $n(..$pars)"
-           else
-             q"case class $n(..$pars)"
-         },
-         true
-        )
+        (parentBody :+ q"case class ${TypeName(name)}(..$pars)", true)
 
   protected[this] def addEnum(
     name:    String,

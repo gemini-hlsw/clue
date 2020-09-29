@@ -10,7 +10,7 @@ class MacroTest extends FunSuite {
 
   import Schemas._
 
-  @GraphQL(debug = false)
+  @GraphQL(debug = true)
   object AddTarget extends GraphQLOperation[Schemas.Explore] {
     override val document = """
       query($target: targets_insert_input!) {
@@ -99,7 +99,7 @@ class MacroTest extends FunSuite {
     )
   }
 
-  @GraphQL(debug = true, lenses = false)
+  @GraphQL(debug = false)
   object BasicQuery extends GraphQLOperation[StarWars] {
     val document = """
         query {
@@ -132,7 +132,7 @@ class MacroTest extends FunSuite {
               "name": "R2D2"
             },
             {
-              "id": "003",
+              "id": "003", 
               "name": "C3P0"
             }
           ],

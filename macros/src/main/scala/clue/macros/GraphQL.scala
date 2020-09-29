@@ -178,7 +178,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
           params.reuse,
           decoder = true,
           forceModule = true
-          // nestTree = Ident(TermName("Data")).some
         )(parentBody)
 
   private[this] def addValRefIntoModule(
