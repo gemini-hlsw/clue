@@ -6,6 +6,7 @@ import edu.gemini.grackle._
 import scala.reflect.io.File
 import java.io.{ File => JFile }
 import java.util.regex.Pattern
+import cats.effect.IO
 
 protected[macros] trait GrackleMacro extends Macro {
   val c: blackbox.Context
@@ -188,22 +189,26 @@ protected[macros] trait GrackleMacro extends Macro {
   /**
    * Parse the schema file.
    */
-  protected[this] def retrieveSchema(resourceDirs: List[JFile], schemaName: String): Schema = {
+  protected[this] def retrieveSchema(resourceDirs: List[JFile], schemaName: String): IO[Schema] = {
     val fileName = s"$schemaName.graphql"
     resourceDirs.view.map(dir => new JFile(dir, fileName)).find(_.exists) match {
-      case None             => abort(s"No schema [$fileName] found in paths [${resourceDirs.mkString(", ")}]")
+      case None             =>
+        abort(s"No schema [$fileName] found in paths [${resourceDirs.mkString(", ")}]")
       case Some(schemaFile) =>
-        val schemaString = new File(schemaFile).slurp()
-        val schema       = Schema(schemaString)
-        if (schema.isLeft)
-          abort(
-            s"Could not parse schema at [${schemaFile.getAbsolutePath}]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
-          )
-        if (schema.isBoth)
-          log(
-            s"Warning when parsing schema [${schemaFile.getAbsolutePath}]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
-          )
-        schema.right.get
+        IO(new File(schemaFile).slurp()).flatMap { schemaString =>
+          val schema = Schema(schemaString)
+          if (schema.isLeft)
+            abort(
+              s"Could not parse schema at [${schemaFile.getAbsolutePath}]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+            )
+          else
+            IO.whenA(schema.isBoth)(
+              log(
+                s"Warning when parsing schema [${schemaFile.getAbsolutePath}]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+              )
+            ) >>
+              IO.pure(schema.right.get)
+        }
     }
   }
 }

@@ -24,6 +24,9 @@ class GraphQL(
 private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMacro {
   import c.universe._
 
+  final def resolve(annottees: Tree*): Tree =
+    macroResolve(annottees: _*)
+
   /**
    * Extract the `document` contents from the `GraphQLQuery` the marcro was applied to.
    */
@@ -260,10 +263,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
   /**
    * Actual macro application, generating case classes to hold the query results and its variables.
    */
-  final def resolve(annottees: Tree*): Tree =
-    expand(annottees: _*).unsafeRunSync()
-
-  private[this] def expand(annottees: Tree*): IO[Tree] = IO(
+  protected[this] def expand(annottees: Tree*): IO[Tree] =
     annottees match {
       case List(
             q"$objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf => ..$objDefs }"
@@ -289,48 +289,48 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                 val params         = optionalParams.resolve(settings)
 
                 // Parse schema and metadata.
-                val schemaTypeName = unqualifiedType(schemaType) match {
-                  case None       =>
+                unqualifiedType(schemaType) match {
+                  case None =>
                     abort(s"Could not extract unqualified type from schema type [$schemaType]")
-                  case Some(name) => name
-                }
-                val schema         = retrieveSchema(settings.schemaDirs, schemaTypeName)
 
-                // Parse the operation.
-                val queryResult = QueryParser.parseText(document)
-                if (queryResult.isLeft)
-                  abort(
-                    s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
-                  )
-                if (queryResult.isBoth)
-                  log(
-                    s"Warning parsing document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
-                  )
-                val operation   = queryResult.toOption.get
+                  case Some(schemaTypeName) =>
+                    retrieveSchema(settings.schemaDirs, schemaTypeName).flatMap { schema =>
+                      // Parse the operation.
+                      val queryResult = QueryParser.parseText(document)
+                      if (queryResult.isLeft)
+                        abort(
+                          s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                        )
+                      else {
+                        IO.whenA(queryResult.isBoth)(
+                          log(
+                            s"Warning parsing document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                          )
+                        ) >> IO {
+                          val operation = queryResult.toOption.get
 
-                // Modifications to add the missing definitions.
-                val modObjDefs = scala.Function.chain(
-                  List(
-                    addTypeImport(schemaType),
-                    addVars(schema, operation, params),
-                    addData(schema, operation, params),
-                    addVarEncoder,
-                    addDataDecoder,
-                    addConvenienceMethod(schemaType, operation)
-                  )
-                )
+                          // Modifications to add the missing definitions.
+                          val modObjDefs = scala.Function.chain(
+                            List(
+                              addTypeImport(schemaType),
+                              addVars(schema, operation, params),
+                              addData(schema, operation, params),
+                              addVarEncoder,
+                              addDataDecoder,
+                              addConvenienceMethod(schemaType, operation)
+                            )
+                          )
 
-                // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
-                val result =
-                  q"""
-                    $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
-                      ..${modObjDefs(objDefs)}
+                          // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
+                          q"""
+                            $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
+                              ..${modObjDefs(objDefs)}
+                            }
+                          """
+                        }.flatTap(result => IO.whenA(params.debug)(log(result)))
+                      }
                     }
-                  """
-
-                if (params.debug) log(result)
-
-                result
+                }
             }
 
           case _ =>
@@ -339,5 +339,4 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
             )
         }
     }
-  )
 }

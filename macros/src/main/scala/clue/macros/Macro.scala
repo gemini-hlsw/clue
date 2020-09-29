@@ -3,28 +3,39 @@ package clue.macros
 import cats.syntax.all._
 import scala.reflect.macros.blackbox
 import scala.reflect.ClassTag
+import cats.effect.IO
 
 protected[macros] trait Macro {
   val c: blackbox.Context
 
   import c.universe._
 
+  @inline final def macroResolve(annottees: Tree*): Tree =
+    expand(annottees: _*)
+      .handleError(t => c.abort(c.enclosingPosition, t.getMessage))
+      .unsafeRunSync()
+
+  protected[this] def expand(annottees: Tree*): IO[Tree]
+
+  protected[this] def abort(msg: String): IO[Nothing] =
+    IO.raiseError(new Exception(msg))
+
   /**
    * Abort the macro showing an error message.
    */
-  protected[this] def abort(msg: Any): Nothing =
-    c.abort(c.enclosingPosition, msg.toString)
+  // protected[this] def abort(msg: Any): Nothing =
+  //   c.abort(c.enclosingPosition, msg.toString)
 
   /**
    * Log debug info.
    */
-  protected[this] def log(msg: Any): Unit =
-    c.info(c.enclosingPosition, msg.toString, force = true)
+  protected[this] def log(msg: Any): IO[Unit] =
+    IO(c.info(c.enclosingPosition, msg.toString, force = true))
 
   /**
    * Log an actual Tree AST (not the Scala code equivalent).
    */
-  protected[this] def debugTree(tree: Tree): Unit =
+  protected[this] def debugTree(tree: Tree): IO[Unit] =
     log(c.universe.showRaw(tree))
 
   /**
@@ -34,9 +45,8 @@ protected[macros] trait Macro {
     c.parse(tpe) match {
       case Ident(TermName(name))        => Ident(TypeName(name))
       case Select(tree, TermName(name)) => Select(tree, TypeName(name))
-      case other                        =>
-        debugTree(other)
-        abort(s"Unexpected type [$tpe]")
+      case other                        => // Let it crash (but tell us why)
+        (debugTree(other) >> abort(s"Unexpected type [$tpe]")).unsafeRunSync()
     }
 
   /**
@@ -51,11 +61,11 @@ protected[macros] trait Macro {
   /**
    * Get the annotation name.
    */
-  protected[this] def macroName: Tree =
-    c.prefix.tree match {
-      case Apply(Select(New(name), _), _) => name
-      case _                              => abort("Unexpected macro application")
-    }
+  // protected[this] def macroName: Tree =
+  //   c.prefix.tree match {
+  //     case Apply(Select(New(name), _), _) => name
+  //     case _                              => abort("Unexpected macro application")
+  //   }
 
   protected[this] def buildOptionalParams[T](implicit tag: ClassTag[T]): T = {
     val paramsClassName = parseType(tag.runtimeClass.getName)

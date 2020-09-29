@@ -4,6 +4,7 @@ import scala.annotation.StaticAnnotation
 import scala.reflect.macros.blackbox
 import edu.gemini.grackle._
 import cats.effect.IO
+import cats.syntax.all._
 
 class GraphQLSchema(
   val mappings: Map[String, String] = Map.empty,
@@ -18,6 +19,9 @@ class GraphQLSchema(
 
 private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends GrackleMacro {
   import c.universe._
+
+  final def resolve(annottees: Tree*): Tree =
+    macroResolve(annottees: _*)
 
   // Just make sure "object Scalars" exists.
   private[this] val addScalars: List[Tree] => List[Tree] =
@@ -85,10 +89,7 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
       )
     )
 
-  final def resolve(annottees: Tree*): Tree =
-    expand(annottees: _*).unsafeRunSync()
-
-  private[this] def expand(annottees: Tree*): IO[Tree] = IO(
+  protected[this] def expand(annottees: Tree*): IO[Tree] =
     annottees match {
       case List(
             q"$objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf => ..$objDefs }"
@@ -102,25 +103,22 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
         val typeName = objName.toTypeName
 
         val TermName(schemaName) = objName
-        val schema               = retrieveSchema(settings.schemaDirs, schemaName)
+        retrieveSchema(settings.schemaDirs, schemaName)
+          .map { schema =>
+            val modObjDefs = scala.Function.chain(
+              List(addScalars, addEnums(schema, params), addInputs(schema, params))
+            )
 
-        val modObjDefs = scala.Function.chain(
-          List(addScalars, addEnums(schema, params), addInputs(schema, params))
-        )
-
-        // Congratulations! You got a full-fledged schema (hopefully).
-        val result =
-          // We could use a phantom type instead of a sealed trait, but that wouldn't compile outside of an enclosing scope.
-          q"""
-            sealed trait $typeName
-            $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
-              ..${modObjDefs(objDefs)}
-            }
-          """
-
-        if (params.debug) log(showCode(result))
-
-        result
+            // Congratulations! You got a full-fledged schema (hopefully).
+            // We could use a phantom type instead of a sealed trait, but that wouldn't compile outside of an enclosing scope.
+            q"""
+              sealed trait $typeName
+              $objMods object $objName extends { ..$objEarlyDefs } with ..$objParents { $objSelf =>
+                ..${modObjDefs(objDefs)}
+              }
+            """
+          }
+          .flatTap(result => IO.whenA(params.debug)(log(result)))
     }
-  )
+
 }
