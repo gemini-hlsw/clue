@@ -121,14 +121,6 @@ def clueSchemaDirSettingsTask(conf: ConfigKey): sbt.Def.Initialize[sbt.Task[Seq[
   }
 // ***** END: Move to plugin *****
 
-lazy val sbtPlugin =
-  project
-    .in(file("sbt-plugin"))
-    .settings(
-      sbtPlugin := true,
-      moduleName := "sbt-clue-macros"
-    )
-
 lazy val macros =
 // crossProject(JVMPlatform, JSPlatform)
   project
