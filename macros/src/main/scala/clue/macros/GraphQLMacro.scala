@@ -8,7 +8,7 @@ import java.io.{ File => JFile }
 import java.util.regex.Pattern
 import cats.effect.IO
 
-protected[macros] trait GrackleMacro extends Macro {
+protected[macros] trait GraphQLMacro extends Macro {
   val c: blackbox.Context
 
   import c.universe.{ Type => _, NoType => _, _ }

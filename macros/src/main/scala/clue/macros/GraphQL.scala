@@ -21,7 +21,7 @@ class GraphQL(
 ) extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro GraphQLImpl.resolve
 }
-private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMacro {
+private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMacro {
   import c.universe._
 
   final def resolve(annottees: Tree*): Tree =

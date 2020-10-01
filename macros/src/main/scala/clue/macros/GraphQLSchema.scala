@@ -17,7 +17,7 @@ class GraphQLSchema(
   def macroTransform(annottees: Any*): Any = macro GraphQLSchemaImpl.resolve
 }
 
-private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends GrackleMacro {
+private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends GraphQLMacro {
   import c.universe._
 
   final def resolve(annottees: Tree*): Tree =
