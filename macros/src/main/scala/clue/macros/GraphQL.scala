@@ -137,13 +137,24 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
     )
   }
 
-  private[this] def addTypeImport(schemaType: Tree): List[Tree] => List[Tree] =
-    parentBody => {
-      val importDef = Import(
-        Select(TypeNamesToTermNames.transform(schemaType), TermName("Types")),
+  private[this] def schemaImport(schemaType: Tree)(scope: String): List[Tree] =
+    List(
+      Import(
+        Select(TypeNamesToTermNames.transform(schemaType), TermName(scope)),
         List(ImportSelector(termNames.WILDCARD, -1, null, -1))
-      )
-      List(importDef, q"ignoreUnusedImportTypes()") ++ parentBody
+      ),
+      Apply(Ident(TermName(s"ignoreUnusedImport$scope")), List.empty)
+    )
+
+  private[this] def addImports(schemaType: Tree): List[Tree] => List[Tree] =
+    parentBody => {
+      val importDef = schemaImport(schemaType) _
+      // val importDef = Import(
+      //   Select(TypeNamesToTermNames.transform(schemaType), TermName("Types")),
+      //   List(ImportSelector(termNames.WILDCARD, -1, null, -1))
+      // )
+      // List(importDef, q"ignoreUnusedImportTypes()") ++ parentBody
+      List(importDef("Scalars"), importDef("Enums"), importDef("Types")).flatten ++ parentBody
     }
 
   private[this] def addVars(
@@ -312,7 +323,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GrackleMa
                           // Modifications to add the missing definitions.
                           val modObjDefs = scala.Function.chain(
                             List(
-                              addTypeImport(schemaType),
+                              addImports(schemaType),
                               addVars(schema, operation, params),
                               addData(schema, operation, params),
                               addVarEncoder,
