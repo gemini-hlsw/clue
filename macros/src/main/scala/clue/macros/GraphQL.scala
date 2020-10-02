@@ -152,11 +152,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
   private[this] def addImports(schemaType: Tree): List[Tree] => List[Tree] =
     parentBody => {
       val importDef = schemaImport(schemaType) _
-      // val importDef = Import(
-      //   Select(TypeNamesToTermNames.transform(schemaType), TermName("Types")),
-      //   List(ImportSelector(termNames.WILDCARD, -1, null, -1))
-      // )
-      // List(importDef, q"ignoreUnusedImportTypes()") ++ parentBody
       List(importDef("Scalars"), importDef("Enums"), importDef("Types")).flatten ++ parentBody
     }
 
