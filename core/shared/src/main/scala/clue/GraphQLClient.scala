@@ -7,9 +7,9 @@ import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
 
-trait GraphQLClient[F[_], Schema] {
+trait GraphQLClient[F[_], S] {
   def request(
-    operation:     GraphQLOperation[Schema],
+    operation:     GraphQLOperation[S],
     operationName: Option[String] = None
   ): RequestApplied[operation.Variables, operation.Data] = {
     import operation.implicits._
@@ -17,7 +17,7 @@ trait GraphQLClient[F[_], Schema] {
   }
 
   case class RequestApplied[V, D] private (
-    operation:           GraphQLOperation[Schema],
+    operation:           GraphQLOperation[S],
     operationName:       Option[String]
   )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
     def apply(variables: V): F[D] =
