@@ -15,7 +15,12 @@ protected[macros] trait Macro {
 
   @inline final def macroResolve(annottees: Tree*): Tree =
     expand(annottees: _*)
-      .handleError(t => c.abort(c.enclosingPosition, t.getMessage))
+      .handleError(t =>
+        c.abort(
+          c.enclosingPosition,
+          s"${t.getClass.getName}: ${t.getMessage}\n at ${t.getStackTrace.mkString("\n at")}"
+        )
+      )
       .unsafeRunSync()
 
   protected[this] def expand(annottees: Tree*): IO[Tree]

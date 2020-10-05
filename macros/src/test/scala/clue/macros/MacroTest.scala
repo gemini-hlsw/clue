@@ -110,7 +110,7 @@ class MacroTest extends FunSuite {
   @GraphQL(debug = false)
   object BasicQuery extends GraphQLOperation[StarWars] {
     val document = """
-        query {
+        query ($charId: ID!) {
           character(id: $charId) {
             id
             name
