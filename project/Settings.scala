@@ -13,7 +13,7 @@ object Settings {
     val grackle         = "0.0.19"
     val jawn            = "1.0.0"
     val log4Cats        = "1.1.1"
-    val monocle         = "2.0.5"
+    val monocle         = "2.1.0"
     val scalaJSDom      = "1.1.0"
     val sttpModel       = "1.1.4"
   }
