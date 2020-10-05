@@ -7,35 +7,30 @@ import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
 
-trait GraphQLClient[F[_]] {
-  // Query with GraphQLQuery
-  def query(
-    graphQLQuery:  GraphQLQuery,
+trait GraphQLClient[F[_], Schema] {
+  def request(
+    operation:     GraphQLOperation[Schema],
     operationName: Option[String] = None
-  )(variables:     Option[graphQLQuery.Variables] = None): F[graphQLQuery.Data] = {
-    import graphQLQuery._
-
-    queryInternal(graphQLQuery.document, operationName, variables.map(_.asJson))
+  ): RequestApplied[operation.Variables, operation.Data] = {
+    import operation.implicits._
+    RequestApplied(operation, operationName)
   }
 
-  // Queries with String
-  def query[V: Encoder, D: Decoder](
-    document:      String,
-    variables:     V,
-    operationName: String
-  ): F[D] =
-    queryInternal[D](document, operationName.some, variables.asJson.some)
+  case class RequestApplied[V, D] private (
+    operation:           GraphQLOperation[Schema],
+    operationName:       Option[String]
+  )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
+    def apply(variables: V): F[D] =
+      requestInternal[D](operation.document, operationName, variables.asJson.some)
 
-  def query[D: Decoder](document: String, operationName: String): F[D] =
-    queryInternal[D](document, operationName.some)
+    def apply: F[D] =
+      requestInternal(operation.document, operationName, none)
+  }
+  object RequestApplied {
+    implicit def withoutVariables[V, D](applied: RequestApplied[V, D]): F[D] = applied.apply
+  }
 
-  def query[V: Encoder, D: Decoder](document: String, variables: V): F[D] =
-    queryInternal[D](document, None, variables.asJson.some)
-
-  def query[D: Decoder](document: String): F[D] =
-    queryInternal[D](document)
-
-  protected def queryInternal[D: Decoder](
+  protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
