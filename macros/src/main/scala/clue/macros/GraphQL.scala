@@ -183,8 +183,26 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
     parentBody =>
       if (isTypeDefined("Data")(parentBody))
         addModuleDefs("Data", params.eq, params.show, params.reuse, decoder = true)(parentBody)
-      else
-        resolveData(operation.query, schema.queryType, params.mappings).addToParentBody(
+      else {
+        // For some reason, schema.schemaType only returns the Query type.
+        val schemaType = schema.definition("Schema").getOrElse(schema.defaultSchemaType)
+
+        // Leaving this comment in order to reproduce the issue.
+        // log(schema.schemaType.asInstanceOf[ObjectType].fields).unsafeRunSync()
+        // log(schema.definition("Schema").getOrElse(schema.defaultSchemaType)
+        //     .asInstanceOf[ObjectType].fields).unsafeRunSync()
+
+        val rootType = operation match {
+          // This is how things should look like.
+          // case _: UntypedQuery        => schema.queryType
+          // case _: UntypedMutation     => schema.mutationType.getOrElse(GNoType)
+          // case _: UntypedSubscription => schema.subscriptionType.getOrElse(GNoType)
+          case _: UntypedQuery        => schemaType.field("query").asNamed.get
+          case _: UntypedMutation     => schemaType.field("mutation").asNamed.getOrElse(GNoType)
+          case _: UntypedSubscription => schemaType.field("subscription").asNamed.getOrElse(GNoType)
+        }
+
+        resolveData(operation.query, rootType, params.mappings).addToParentBody(
           params.eq,
           params.show,
           params.lenses,
@@ -192,6 +210,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
           decoder = true,
           forceModule = true
         )(parentBody)
+      }
 
   private[this] def addValRefIntoModule(
     valName:       String,

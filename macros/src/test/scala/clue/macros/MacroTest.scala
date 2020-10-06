@@ -15,6 +15,49 @@ class MacroTest extends FunSuite {
   import Schemas._
 
   @GraphQL(debug = false)
+  object LucumaTestSubscription extends GraphQLOperation[LucumaODB] {
+    val document = """
+      |subscription {
+      |  targetEdited {
+      |    id
+      |    oldValue {
+      |      name
+      |    }
+      |    newValue {
+      |      name
+      |    }
+      |  }
+      |}""".stripMargin
+  }
+
+  test("Lucuma ODB subscription macro") {
+    val json         = """
+      {
+        "targetEdited": {
+          "id": 6,
+          "oldValue": {
+            "name": "M51"
+          },
+          "newValue": {
+            "name": "Betelgeuse"
+          }
+        }
+      }
+      """
+    val data         = decode[LucumaTestSubscription.Data](json)
+    import LucumaTestSubscription._
+    val expectedData = Right(
+      Data(
+        Data.TargetEdited(6,
+                          Data.TargetEdited.OldValue("M51"),
+                          Data.TargetEdited.NewValue("Betelgeuse")
+        )
+      )
+    )
+    assertEquals(data, expectedData)
+  }
+
+  @GraphQL(debug = false)
   object ExploreQuery extends AnyRef with GraphQLOperation[Explore] {
 
     val document = """

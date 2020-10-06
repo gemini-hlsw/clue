@@ -18,7 +18,8 @@ protected[macros] trait GraphQLMacro extends Macro {
 
   protected[this] def snakeToCamel(s: String): String = {
     val wordPattern: Pattern = Pattern.compile("[a-zA-Z0-9]+(_|$)")
-    wordPattern.matcher(s).replaceAll(_.group.stripSuffix("_").toLowerCase.capitalize)
+    val unscream             = if (!s.exists(_.isLower)) s.toLowerCase else s
+    wordPattern.matcher(unscream).replaceAll(_.group.stripSuffix("_").capitalize)
   }
 
   private[this] def nestedTypeTree(nestTree: Tree, tpe: Tree): Tree =
@@ -76,6 +77,8 @@ protected[macros] trait GraphQLMacro extends Macro {
             parseType(mappings.getOrElse(nt.name, snakeToCamel(nameOverride.getOrElse(nt.name))))
           case NoType            => tq"io.circe.Json"
         }
+
+      // log(s"Resolving Grackle type: [$tpe]").unsafeRunSync()
 
       ClassParam(name, resolveType(tpe))
     }

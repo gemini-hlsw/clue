@@ -12,7 +12,7 @@ src_managed/
 project/boot/
 project/plugins/project/
 
-# Scala-IDE specific
+# IDE specific
 .scala_dependencies
 .worksheet
 .idea/
@@ -21,6 +21,7 @@ project/plugins/project/
 .metals/
 metals.sbt
 /out/
+.bsp/
 
 # Mac OS
 .DS_Store
