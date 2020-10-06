@@ -20,7 +20,7 @@ Either:
   import cats.effect.IO
   import io.chrisdavenport.log4cats.Logger
 
-  sealed type StarWars
+  sealed trait StarWars
 
   implicit val backend: Backend[IO] = AjaxJSBackend[IO]
   val oneShotClient: GraphQLClient[IO, StarWars] = HttpClient.of[IO, Schema]("https://starwars.com/graphql")
