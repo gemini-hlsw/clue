@@ -7,6 +7,7 @@ import cats.syntax.all._
 import scala.reflect.macros.blackbox
 import scala.reflect.ClassTag
 import cats.effect.IO
+import java.util.regex.Pattern
 
 protected[macros] trait Macro {
   val c: blackbox.Context
@@ -57,6 +58,12 @@ protected[macros] trait Macro {
         (debugTree(other) >> abort(s"Unexpected type [$tpe]")).unsafeRunSync()
     }
 
+  protected[this] def snakeToCamel(s: String): String = {
+    val wordPattern: Pattern = Pattern.compile("[a-zA-Z0-9]+(_|$)")
+    val unscream             = if (!s.exists(_.isLower)) s.toLowerCase else s
+    wordPattern.matcher(unscream).replaceAll(_.group.stripSuffix("_").capitalize)
+  }
+
   /**
    * Extract the unqualified type name from a type.
    */
@@ -65,15 +72,6 @@ protected[macros] trait Macro {
     case Select(_, TypeName(tpe)) => tpe.some
     case _                        => none
   }
-
-  /**
-   * Get the annotation name.
-   */
-  // protected[this] def macroName: Tree =
-  //   c.prefix.tree match {
-  //     case Apply(Select(New(name), _), _) => name
-  //     case _                              => abort("Unexpected macro application")
-  //   }
 
   protected[this] def buildOptionalParams[T](implicit tag: ClassTag[T]): T = {
     val paramsClassName = parseType(tag.runtimeClass.getName)
@@ -172,18 +170,24 @@ protected[macros] trait Macro {
    * Compute a case class definition.
    */
   protected[this] def addCaseClassDef(
-    name: String,
-    pars: List[ValDef]
+    name:      String,
+    pars:      List[ValDef],
+    extending: Option[String] = None
   ): List[Tree] => (List[Tree], Boolean) =
     parentBody =>
       if (isTypeDefined(name)(parentBody))
         (parentBody, false)
       else
-        (parentBody :+ q"case class ${TypeName(name)}(..$pars)", true)
+        (parentBody :+
+           extending.fold(q"case class ${TypeName(name)}(..$pars)")(extending =>
+             q"case class ${TypeName(name)}(..$pars) extends ${TypeName(extending)}"
+           ),
+         true
+        )
 
   protected[this] def addEnum(
     name:    String,
-    values:  List[String],
+    values:  List[String], // (StringRepresentation, ClassName)
     eq:      Boolean,
     show:    Boolean,
     reuse:   Boolean,
@@ -193,19 +197,51 @@ protected[macros] trait Macro {
     parentBody =>
       if (isTypeDefined(name)(parentBody))
         parentBody
-      else
-        addModuleDefs(name,
-                      eq,
-                      show,
-                      reuse,
-                      encoder,
-                      decoder,
-                      _ ++ values.map { value =>
-                        q"case object ${TermName(value)} extends ${TypeName(name)}"
-                      }
+      else {
+        val enumValues = values.map(EnumValue.fromString)
+        addModuleDefs(
+          name,
+          eq,
+          show,
+          reuse,
+          encoder,
+          decoder,
+          TypeType.Enum(enumValues),
+          _ ++ enumValues.map { enumValue =>
+            q"case object ${TermName(enumValue.className)} extends ${TypeName(name)}"
+          }
         )(
           parentBody :+ q"sealed trait ${TypeName(name)}"
         )
+      }
+
+  protected[this] def addSumTrait(
+    name:      String,
+    pars:      List[ValDef],
+    extending: Option[String] = None
+  ): List[Tree] => (List[Tree], Boolean) = { parentBody =>
+    if (isTypeDefined(name)(parentBody))
+      (parentBody, false)
+    else
+      (parentBody :+
+         extending.fold(q"sealed trait ${TypeName(name)}{..$pars}")(extending =>
+           q"sealed trait ${TypeName(name)} extends ${TypeName(extending)} {..$pars}"
+         ),
+       true
+      )
+  }
+
+  protected[this] case class EnumValue(asString: String, className: String)
+  protected[this] object EnumValue {
+    def fromString(asString: String): EnumValue = EnumValue(asString, snakeToCamel(asString))
+  }
+
+  protected[this] sealed trait TypeType
+  protected[this] object TypeType {
+    case object CaseClass extends TypeType
+    case class Enum(values: List[EnumValue]) extends TypeType
+    case class Sum(discriminator: String) extends TypeType
+  }
 
   /**
    * Compute a companion object with typeclasses.
@@ -217,11 +253,12 @@ protected[macros] trait Macro {
     reuse:         Boolean,
     encoder:       Boolean = false,
     decoder:       Boolean = false,
+    typeType:      TypeType = TypeType.CaseClass,
     modStatements: List[Tree] => List[Tree] = identity,
-    nestTree:      Option[Tree] = None
+    nestPath:      Option[Tree] = None
   ): List[Tree] => List[Tree] = {
     val n =
-      nestTree.fold[Tree](Ident(TypeName(name)))(t => Select(t, TypeName(name)))
+      nestPath.fold[Tree](Ident(TypeName(name)))(t => Select(t, TypeName(name)))
 
     val eqDef = Option.when(eq)(
       q"implicit val ${TermName(s"eq$name")}: cats.Eq[$n] = cats.Eq.fromUniversalEquals"
@@ -239,18 +276,50 @@ protected[macros] trait Macro {
           """
     )
 
-    val encoderDef = Option.when(encoder)(
-      q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJson(_.deepDropNullValues)"
-    )
+    val codecConfDef = Option
+      .when(encoder || decoder)(typeType match {
+        case TypeType.Sum(discriminator) =>
+          q"implicit protected val jsonConfiguration: io.circe.generic.extras.Configuration = io.circe.generic.extras.Configuration.default.withDiscriminator($discriminator)".some
+        case _                           => none
+      })
+      .flatten
 
-    val decoderDef = Option.when(decoder)(
-      q"implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
-    )
+    val encoderDef = Option.when(encoder)(typeType match {
+      case TypeType.CaseClass        =>
+        q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJson(_.deepDropNullValues)"
+      case TypeType.Enum(enumValues) =>
+        val cases =
+          enumValues.map(enumValue =>
+            cq"${Ident(TermName(enumValue.className))} => ${enumValue.asString}"
+          )
+        q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.Encoder.encodeString.contramap[$n]{case ..$cases}"
+      case TypeType.Sum(_)           =>
+        q"implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Encoder[$n] = io.circe.generic.extras.semiauto.deriveConfiguredEncoder[$n]"
+    })
+
+    val decoderDef = Option.when(decoder)(typeType match {
+      case TypeType.CaseClass        =>
+        q"implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
+      case TypeType.Enum(enumValues) =>
+        val cases =
+          enumValues.map(enumValue =>
+            cq"${enumValue.asString} => ${Ident(TermName(enumValue.className))}"
+          )
+        q"implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Decoder[$n] = io.circe.Decoder.decodeString.emapTry(s => scala.util.Try(s match {case ..$cases}))"
+      case TypeType.Sum(_)           =>
+        q"implicit val ${TermName(s"jsonDecoder$name")}: io.circe.Decoder[$n] = io.circe.generic.extras.semiauto.deriveConfiguredDecoder[$n]"
+    })
 
     modifyModuleStatements(
       name,
       stats =>
-        modStatements(stats) ++ List(eqDef, showDef, reuseDef, encoderDef, decoderDef).flatten
+        modStatements(stats) ++ List(eqDef,
+                                     showDef,
+                                     reuseDef,
+                                     codecConfDef,
+                                     encoderDef,
+                                     decoderDef
+        ).flatten
     )
   }
 }

@@ -8,19 +8,12 @@ import scala.reflect.macros.blackbox
 import edu.gemini.grackle._
 import scala.reflect.io.File
 import java.io.{ File => JFile }
-import java.util.regex.Pattern
 import cats.effect.IO
 
 protected[macros] trait GraphQLMacro extends Macro {
   val c: blackbox.Context
 
   import c.universe.{ Type => _, NoType => _, _ }
-
-  protected[this] def snakeToCamel(s: String): String = {
-    val wordPattern: Pattern = Pattern.compile("[a-zA-Z0-9]+(_|$)")
-    val unscream             = if (!s.exists(_.isLower)) s.toLowerCase else s
-    wordPattern.matcher(unscream).replaceAll(_.group.stripSuffix("_").capitalize)
-  }
 
   private[this] def nestedTypeTree(nestTree: Tree, tpe: Tree): Tree =
     tpe match {
@@ -39,26 +32,26 @@ protected[macros] trait GraphQLMacro extends Macro {
    *
    * Consists of the name of the parameter and its Grackle type.
    */
-  protected[this] case class ClassParam(name: String, tpe: Tree) {
+  protected[this] case class ClassParam(name: String, tpe: Tree, overrides: Boolean = false) {
 
-    def typeTree(nestTree: Option[Tree], nestedTypes: List[String]): Tree =
+    def typeTree(nestTree: Option[Tree], nestedTypes: Map[String, Tree]): Tree =
       nestTree match {
         case None => tpe
-        case _    =>
-          if (nestedTypes.contains(name))
-            qualifiedNestedType(nestTree, tpe)
-          else
-            tpe
+        case _    => qualifiedNestedType(nestedTypes.get(name), tpe)
       }
 
-    def toTree(nestTree: Option[Tree], nestedTypes: List[String]): ValDef = {
+    def toTree(
+      nestTree:    Option[Tree],
+      nestedTypes: Map[String, Tree],
+      asVals:      Boolean = false
+    ): ValDef = {
       val n = TermName(name)
       val t = typeTree(nestTree, nestedTypes)
       val d = tpe match {
-        case tq"Option[$inner]" => q"None"
+        case tq"Option[$inner]" => if (!asVals) q"None" else EmptyTree
         case _                  => EmptyTree
       }
-      q"val $n: $t = $d"
+      if (!asVals && overrides) q"override val $n: $t = $d" else q"val $n: $t = $d"
     }
   }
 
@@ -84,6 +77,36 @@ protected[macros] trait GraphQLMacro extends Macro {
     }
   }
 
+  protected[this] sealed trait Class {
+    val name: String
+
+    protected val camelName = snakeToCamel(name)
+
+    protected def nextNestPath(nestPath: Option[Tree]) = nestPath
+      .fold[Tree](Ident(TermName(camelName)))(t => Select(t, TermName(camelName)))
+      .some
+
+    protected def nextNestedTypes(
+      nested:      List[Class],
+      nestPath:    Option[Tree],
+      nestedTypes: Map[String, Tree]
+    ): Map[String, Tree] =
+      nestedTypes ++ nested.flatMap(c => nextNestPath(nestPath).map(path => c.name -> path))
+
+    def addToParentBody(
+      eq: Boolean,
+      show:        Boolean,
+      lenses:      Boolean,
+      reuse:       Boolean,
+      encoder:     Boolean = false,
+      decoder:     Boolean = false,
+      forceModule: Boolean = false,
+      nestPath:    Option[Tree] = None,
+      nestedTypes: Map[String, Tree] = Map.empty,
+      extending:   Option[String] = None
+    ): List[Tree] => List[Tree]
+  }
+
   /**
    * The definition of a case class to contain an object from the query response.
    *
@@ -92,9 +115,8 @@ protected[macros] trait GraphQLMacro extends Macro {
   protected[this] case class CaseClass(
     name:   String,
     params: List[ClassParam],
-    nested: List[CaseClass] = List.empty
-  ) {
-    private val camelName = snakeToCamel(name)
+    nested: List[Class] = List.empty
+  ) extends Class {
 
     def addToParentBody(
       eq:          Boolean,
@@ -104,17 +126,40 @@ protected[macros] trait GraphQLMacro extends Macro {
       encoder:     Boolean = false,
       decoder:     Boolean = false,
       forceModule: Boolean = false,
-      nestTree:    Option[Tree] = None
+      nestPath:    Option[Tree] = None,
+      nestedTypes: Map[String, Tree] = Map.empty,
+      extending:   Option[String] = None
     ): List[Tree] => List[Tree] =
       parentBody => {
-        val nextTree              = nestTree
-          .fold[Tree](Ident(TermName(camelName)))(t => Select(t, TermName(camelName)))
-          .some
-        val nestedTypeNames       = nested.map(_.name)
+        val nextPath  = nextNestPath(nestPath)
+        val nextTypes = nextNestedTypes(nested, nestPath, nestedTypes)
+
         val (newBody, wasMissing) =
-          addCaseClassDef(camelName, params.map(_.toTree(nextTree, nestedTypeNames)))(
+          addCaseClassDef(camelName, params.map(_.toTree(nextPath, nextTypes)), extending)(
             parentBody
           )
+
+        val addNested = nested.map(
+          _.addToParentBody(
+            eq,
+            show,
+            lenses,
+            reuse,
+            encoder,
+            decoder,
+            nestPath = nextPath
+          )
+        )
+
+        val addLenses = Option.when(lenses) { (moduleBody: List[Tree]) =>
+          val lensesDef = params.map { param =>
+            val thisType  = qualifiedNestedType(nestPath, Ident(TypeName(camelName)))
+            val childType = param.typeTree(nextPath, nextTypes)
+            q"val ${TermName(param.name)}: monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${TermName(param.name)})"
+          }
+          moduleBody ++ lensesDef
+        }
+
         if (wasMissing || forceModule)
           addModuleDefs(
             camelName,
@@ -123,28 +168,104 @@ protected[macros] trait GraphQLMacro extends Macro {
             reuse,
             encoder,
             decoder,
-            modStatements = scala.Function.chain(
-              nested.map(
-                _.addToParentBody(
-                  eq,
-                  show,
-                  lenses,
-                  reuse,
-                  encoder,
-                  decoder,
-                  nestTree = nextTree
-                )
-              ) ++
-                Option.when(lenses) { moduleBody =>
-                  val lenses = params.map { param =>
-                    val thisType  = qualifiedNestedType(nestTree, Ident(TypeName(camelName)))
-                    val childType = param.typeTree(nextTree, nestedTypeNames)
-                    q"val ${TermName(param.name)}: monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${TermName(param.name)})"
-                  }
-                  moduleBody ++ lenses
-                }
-            ),
-            nestTree = nestTree
+            modStatements = scala.Function.chain(addNested ++ addLenses),
+            nestPath = nestPath
+          )(newBody)
+        else
+          newBody
+      }
+  }
+
+  protected[this] case class Sum(
+    params:        List[ClassParam],
+    nested:        List[Class] = List.empty,
+    instances:     List[CaseClass],
+    discriminator: String
+  )
+
+  protected[this] case class SumClass(
+    name: String,
+    sum:  Sum
+  ) extends Class {
+
+    override def addToParentBody(
+      eq:          Boolean,
+      show:        Boolean,
+      lenses:      Boolean,
+      reuse:       Boolean,
+      encoder:     Boolean,
+      decoder:     Boolean,
+      forceModule: Boolean,
+      nestPath:    Option[Tree] = None,
+      nestedTypes: Map[String, Tree] = Map.empty,
+      extending:   Option[String] = None
+    ): List[Tree] => List[Tree] =
+      parentBody => {
+        val nextPath              = nextNestPath(nestPath)
+        val nextTypes             = nextNestedTypes(sum.nested, nestPath, nestedTypes)
+        val (newBody, wasMissing) =
+          addSumTrait(camelName,
+                      sum.params.map(_.toTree(nextPath, nextTypes, asVals = true)),
+                      extending
+          )(
+            parentBody
+          )
+
+        val addDefinitions =
+          sum.nested.map(
+            _.addToParentBody(eq,
+                              show,
+                              lenses,
+                              reuse,
+                              encoder,
+                              decoder,
+                              forceModule,
+                              nextPath,
+                              nextTypes
+            )
+          ) ++
+            sum.instances.map(
+              _.addToParentBody(eq,
+                                show,
+                                lenses,
+                                reuse,
+                                encoder,
+                                decoder,
+                                forceModule,
+                                nextPath,
+                                nextTypes,
+                                camelName.some // Extends
+              )
+            )
+
+        val addLenses = Option.when(lenses) { (moduleBody: List[Tree]) =>
+          val lensesDef = sum.params.map { param =>
+            val paramNameDef = TermName(param.name)
+            val thisType     = qualifiedNestedType(nestPath, Ident(TypeName(camelName)))
+            val childType    = param.typeTree(nextPath, nextTypes)
+            val cases        = sum.instances.map { cc =>
+              val caseType = qualifiedNestedType(nextPath, Ident(TypeName(cc.name)))
+              cq"s: $caseType => s.copy($paramNameDef = v)"
+            }
+            q"""val $paramNameDef: monocle.Lens[$thisType, $childType] = 
+                  monocle.Lens[$thisType, $childType](_.$paramNameDef){ v =>
+                    _ match {case ..$cases}
+                  }"""
+          }
+          moduleBody ++ lensesDef
+        }
+
+        if (wasMissing || forceModule)
+          addModuleDefs(
+            camelName,
+            eq,
+            show,
+            reuse,
+            encoder,
+            decoder,
+            TypeType.Sum(sum.discriminator),
+            modStatements = scala.Function.chain(addDefinitions ++ addLenses),
+            nestPath = nestPath
           )(newBody)
         else
           newBody
@@ -159,7 +280,7 @@ protected[macros] trait GraphQLMacro extends Macro {
       encoder: Boolean = false,
       decoder: Boolean = false
     ): List[Tree] => List[Tree] =
-      addEnum(snakeToCamel(name), values.map(snakeToCamel), eq, show, reuse, encoder, decoder)
+      addEnum(snakeToCamel(name), values, eq, show, reuse, encoder, decoder)
   }
 
   //

@@ -13,6 +13,7 @@ import edu.gemini.grackle.{ NoType => GNoType }
 import edu.gemini.grackle.{ TypeRef => GTypeRef }
 import edu.gemini.grackle.UntypedOperation._
 import cats.effect.IO
+import cats.kernel.Monoid
 
 class GraphQL(
   val mappings: Map[String, String] = Map.empty,
@@ -48,19 +49,38 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
    * `parAccum` accumulates parameters until we have a whole case class definition.
    */
   private[this] case class ClassAccumulator(
-    classes:  List[CaseClass] = List.empty,
-    parAccum: List[ClassParam] = List.empty
-  )
+    classes:  List[Class] = List.empty,
+    parAccum: List[ClassParam] = List.empty,
+    sum:      Option[Sum] = None
+  )                                     {
+    def withOverrideParams: ClassAccumulator =
+      copy(parAccum = parAccum.map(_.copy(overrides = true)))
+  }
+  private[this] object ClassAccumulator {
+    implicit val monoidClassAccumulator: Monoid[ClassAccumulator] = new Monoid[ClassAccumulator] {
+      override def empty: ClassAccumulator = ClassAccumulator()
+      override def combine(x: ClassAccumulator, y: ClassAccumulator): ClassAccumulator =
+        ClassAccumulator(x.classes ++ y.classes, x.parAccum ++ y.parAccum)
+    }
+  }
 
   /**
    * Recurse the query AST and collect the necessary [[CaseClass]]es to hold its results.
    */
   private[this] def resolveData(
+    schema:   Schema,
     algebra:  Query,
     rootType: GType,
     mappings: Map[String, String]
   ): CaseClass = {
     import Query._
+
+    def getType(typeName: String): NamedType =
+      schema
+        .definition(typeName)
+        .getOrElse(
+          abort(s"Undefined type [$typeName] in inline fragment").unsafeRunSync()
+        )
 
     def go(
       currentAlgebra: Query,
@@ -68,18 +88,29 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
       nameOverride:   Option[String] = none
     ): ClassAccumulator =
       currentAlgebra match {
-        case Select(name, args, child) =>
-          val paramName                           = nameOverride.getOrElse(name)
-          val nextType                            = currentType.field(name)
-          val (newClasses, paramTypeNameOverride) =
-            nextType.underlyingObject match {
-              case GNoType  => (Nil, None)
-              case baseType =>
-                val next = go(child, baseType)
-                (List(CaseClass(paramName, next.parAccum, next.classes)), paramName.some)
+        case Select(name, args, child)      =>
+          val paramName = nameOverride.getOrElse(name)
+          val nextType  = Constants.MetaTypes.getOrElse(name, currentType.field(name))
+
+          val accumulatorOpt =
+            nextType.dealias match {
+              case union: UnionType => go(child, union).some
+              case _                =>
+                nextType.underlyingObject match {
+                  case GNoType  => none
+                  case baseType => go(child, baseType).some
+                }
             }
+
+          val (newClass, paramTypeNameOverride) =
+            accumulatorOpt.fold[(Option[Class], Option[String])]((none, none))(next =>
+              next.sum.fold[(Option[Class], Option[String])](
+                (CaseClass(paramName, next.parAccum, next.classes).some, paramName.some)
+              )(sum => (SumClass(paramName, sum).some, paramName.some))
+            )
+
           ClassAccumulator(
-            classes = newClasses,
+            classes = newClass.toList,
             parAccum = List(
               ClassParam.fromGrackleType(paramName,
                                          nextType.dealias,
@@ -88,17 +119,84 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
               )
             )
           )
-        case Rename(name, child)       =>
+        case UntypedNarrow(typeName, child) =>
+          // Single element in inline fragment
+          go(child, getType(typeName))
+        case Rename(name, child)            =>
           go(child, currentType, name.some)
-        case Group(selections)         =>
-          selections
-            .map(q => go(q, currentType))
-            .foldLeft(ClassAccumulator())((r1, r2) =>
-              ClassAccumulator(r1.classes ++ r2.classes, r1.parAccum ++ r2.parAccum)
-            )
-        case Empty                     => ClassAccumulator()
-        case _                         =>
-          log(s"Unhandled Algebra: [$algebra]")
+        case Group(selections)              =>
+          // (Also, check what Grackle is returning when there's an interface)
+          val hierarchyAccumulators =
+            selections.zipWithIndex // We want to preserve order of appeareance
+              .groupBy {
+                _._1 match {
+                  case UntypedNarrow(typeName, _) => typeName.some // Selection in inline fragment
+                  case _                          => none          // Selection in base group
+                }
+              }
+              .toList
+              .sortBy(_._2.head._2) // Sort by first appeareance of each subtype
+              .map { // Resolve groups
+                case (Some(typeName), subQueries) =>
+                  (typeName.some, // Unwrap inline fragment selections
+                   subQueries.collect { case (UntypedNarrow(_, child), idx) =>
+                     (go(child, getType(typeName)), idx)
+                   }
+                  )
+                case (None, subQueries)           =>
+                  (none, (subQueries.map { case (q, idx) => (go(q, currentType), idx) }))
+              }
+
+          val baseAccumulators    = hierarchyAccumulators.collectFirst { case (None, accumulators) =>
+            accumulators
+          }.orEmpty
+          val subTypeAccumulators = hierarchyAccumulators.collect {
+            case (Some(typeName), accumulators) =>
+              (typeName,
+               ClassAccumulator(
+                 accumulators.map(_._1).combineAll.classes,
+                 (baseAccumulators.map { case (accumlator, idx) =>
+                   (accumlator.withOverrideParams, idx)
+                 } ++ accumulators).sortBy(_._2).map(_._1).combineAll.parAccum
+               )
+              )
+          }
+          val baseAccumulator     = baseAccumulators.map(_._1).combineAll
+
+          subTypeAccumulators match {
+            case Nil                  => baseAccumulator
+            case singleSubType :: Nil => // Treat single subtype as regular group.
+              ClassAccumulator(baseAccumulator.classes ++ singleSubType._2.classes,
+                               singleSubType._2.parAccum
+              )
+            case _                    =>
+              // Figure out discriminator selection. Could be renamed.
+              val discriminator = selections.collect {
+                case Select(Constants.TypeSelect, _, _)               => Constants.TypeSelect
+                case Rename(name, Select(Constants.TypeSelect, _, _)) => name
+              } match {
+                case field :: Nil => field
+                case _            =>
+                  abort(
+                    s"Multiple inline fragments require (unique) selection of ${Constants.TypeSelect}"
+                  ).unsafeRunSync()
+              }
+              // TODO Add option to filter out __typename from parameters?
+
+              val subTypes = subTypeAccumulators.collect { case (typeName, accumulator) =>
+                CaseClass(typeName, accumulator.parAccum, accumulator.classes)
+              }
+
+              ClassAccumulator(
+                baseAccumulator.classes,
+                baseAccumulator.parAccum,
+                Sum(baseAccumulator.parAccum, baseAccumulator.classes, subTypes, discriminator).some
+              )
+          }
+
+        case Empty => ClassAccumulator()
+        case _     =>
+          log(s"Unhandled Algebra: [$algebra]").unsafeRunSync()
           ClassAccumulator()
       }
 
@@ -202,7 +300,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
           case _: UntypedSubscription => schemaType.field("subscription").asNamed.getOrElse(GNoType)
         }
 
-        resolveData(operation.query, rootType, params.mappings).addToParentBody(
+        resolveData(schema, operation.query, rootType, params.mappings).addToParentBody(
           params.eq,
           params.show,
           params.lenses,
