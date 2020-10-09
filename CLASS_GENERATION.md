@@ -39,7 +39,7 @@ In this approach, we provide two macros: `@GraphQLSchema` and `@GraphQL`.
 
 `@GraphQL` can be applied to any `object` extending `GraphQLOperation[Schema]`. That `Schema` can be any object that was annotated with `@GraphQLSchema`. The `object` just has to provide `val document` and the macro will generate types to hold the result (plus `Decoder` and optionally other typeclass instances + lenses) and to provide operation parameters (plus `Encoder` and optionally other typeclass instances + lenses).
 
-Examples of this approach can be found in the tests of the `macros` subproject.
+An example of this approach can be found in [MACROS](MACROS.md). More examples are available in the tests of the `macros` subproject.
 
 **Pros:**
 - Already done :).
