@@ -6,7 +6,7 @@ package clue.macros
 import cats._
 
 /**
- *  Holds the aggregated [[CaseClass]]es, their [[ClassParam]]s and possible [[Sum]] info as we recurse the query AST.
+ *  Holds the aggregated `CaseClass`es, their `ClassParam`s and possible `Sum` info as we recurse the query AST.
  *
  * `parAccum` accumulates parameters until we have a whole case class definition.
  */
