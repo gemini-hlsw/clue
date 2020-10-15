@@ -70,8 +70,7 @@ class MacroTest extends FunSuite {
             List(
               Data.Character.Friends("R2D2".some),
               Data.Character.Friends("C3P0".some)
-            ).some,
-            "Human"
+            ).some
           )
           .some
       )
@@ -113,8 +112,7 @@ class MacroTest extends FunSuite {
               Data.Character.Friends("Luke".some),
               Data.Character.Friends("C3P0".some)
             ).some,
-            "Astromech".some,
-            "Droid"
+            "Astromech".some
           )
           .some
       )
@@ -174,6 +172,7 @@ class MacroTest extends FunSuite {
         }
       }
       """
+
     val data = decode[LucumaQuery.Data](json)
 
     import LucumaQuery._
@@ -187,13 +186,13 @@ class MacroTest extends FunSuite {
               Data.Program.Targets(
                 "t-1",
                 "Sirius",
-                Data.Program.Targets.Tracking.Sidereal("Sidereal", "J2000.000")
+                Data.Program.Targets.Tracking.Sidereal("J2000.000")
               ),
               Data.Program.Targets(
                 "t-2",
                 "Saturn",
-                Data.Program.Targets.Tracking.Nonsidereal("Nonsidereal",
-                                                          LucumaODB.Enums.EphemerisKeyType.MajorBody
+                Data.Program.Targets.Tracking.Nonsidereal(
+                  LucumaODB.Enums.EphemerisKeyType.MajorBody
                 )
               )
             )

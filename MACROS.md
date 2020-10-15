@@ -58,12 +58,20 @@ object StarWars {
 
       implicit val eqEpisode: cats.Eq[Episode] = cats.Eq.fromUniversalEquals
       implicit val showEpisode: cats.Show[Episode] = cats.Show.fromToString
-      implicit val jsonEncoderEpisode: io.circe.Encoder[Episode] = io.circe.generic.semiauto.deriveEncoder[Episode]
-      implicit val jsonDecoderEpisode: io.circe.Decoder[Episode] = io.circe.generic.semiauto.deriveDecoder[Episode]
+      implicit val jsonEncoderEpisode: io.circe.Encoder[Episode] = io.circe.Encoder.encodeString.contramap[Super]{
+        case NewHope => "NEW_HOPE"
+        case Empire => "EMPIRE"
+        case Jedi => "JEDI"
+      }
+      implicit val jsonDecoderEpisode: io.circe.Decoder[Episode] = io.circe.Decoder.decodeString.emapTry(s => scala.util.Try(s match {
+        case "NEW_HOPE" => NewHope
+        case "EMPIRE"=> Empire
+        case "JEDI"=> Jedi
+      }))
     }
   }
 
-  // This example doesnt have input types.
+  // This example doesn't have input types.
   object Types {}
 }
 ```

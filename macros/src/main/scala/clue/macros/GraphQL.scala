@@ -164,13 +164,14 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
           val baseAccumulator     = baseAccumulators.map(_._1).combineAll
 
           subTypeAccumulators match {
-            case Nil                  => baseAccumulator
-            case singleSubType :: Nil => // Treat single subtype as regular group.
+            case Nil                  => baseAccumulator // No subtypes.
+            case singleSubType :: Nil =>                 // Treat single subtype as regular group.
               ClassAccumulator(baseAccumulator.classes ++ singleSubType._2.classes,
                                singleSubType._2.parAccum
               )
             case _                    =>
-              // Figure out discriminator selection. Could be renamed.
+              // More than one subtype. Needs discriminator.
+              // Figure out discriminator name. Could be renamed.
               val discriminator = selections.collect {
                 case Select(Constants.TypeSelect, _, _)               => Constants.TypeSelect
                 case Rename(name, Select(Constants.TypeSelect, _, _)) => name
@@ -181,16 +182,20 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
                     s"Multiple inline fragments require (unique) selection of ${Constants.TypeSelect}"
                   ).unsafeRunSync()
               }
-              // TODO Add option to filter out __typename from parameters?
+
+              val baseParams = baseAccumulator.parAccum.filterNot(_.name == discriminator)
 
               val subTypes = subTypeAccumulators.collect { case (typeName, accumulator) =>
-                CaseClass(typeName, accumulator.parAccum, accumulator.classes)
+                CaseClass(typeName,
+                          accumulator.parAccum.filterNot(_.name == discriminator),
+                          accumulator.classes
+                )
               }
 
               ClassAccumulator(
                 baseAccumulator.classes,
-                baseAccumulator.parAccum,
-                Sum(baseAccumulator.parAccum, baseAccumulator.classes, subTypes, discriminator).some
+                baseParams,
+                Sum(baseParams, baseAccumulator.classes, subTypes, discriminator).some
               )
           }
 
