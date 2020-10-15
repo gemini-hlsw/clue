@@ -4,6 +4,7 @@
 package clue.macros
 
 import clue._
+import cats.syntax.all._
 import munit._
 import io.circe.parser.decode
 import io.circe.syntax._
@@ -13,6 +14,257 @@ import io.circe.JsonObject
 class MacroTest extends FunSuite {
 
   import Schemas._
+
+  @GraphQL(debug = false)
+  object SumQuery extends GraphQLOperation[StarWars] {
+    val document = """
+        query ($charId: ID!) {
+          character(id: $charId) {
+            id
+            name
+            ... on Human {
+              homePlanet
+            }
+            friends {
+              name
+            }
+            ... on Droid {
+              primaryFunction
+            }
+            __typename
+          }
+        }
+      """
+  }
+
+  test("StarWars query with inline fragments macro - Human") {
+    val json = """
+      {
+        "character": {
+          "id": "001",
+          "name": "Luke",
+          "homePlanet": "Tatooine",
+          "friends": [
+            {
+              "name": "R2D2"
+            },
+            {
+              "name": "C3P0"
+            }
+          ],
+          "__typename": "Human"
+        }
+      }
+    """
+
+    val data = decode[SumQuery.Data](json)
+
+    import SumQuery._
+    val expectedData = Right(
+      Data(
+        Data.Character
+          .Human(
+            "001",
+            "Luke".some,
+            "Tatooine".some,
+            List(
+              Data.Character.Friends("R2D2".some),
+              Data.Character.Friends("C3P0".some)
+            ).some
+          )
+          .some
+      )
+    )
+
+    assertEquals(data, expectedData)
+  }
+
+  test("StarWars query with inline fragments macro - Droid") {
+    val json = """
+      {
+        "character": {
+          "id": "002",
+          "name": "R2D2",
+          "friends": [
+            {
+              "name": "Luke"
+            },
+            {
+              "name": "C3P0"
+            }
+          ],
+          "primaryFunction": "Astromech",
+          "__typename": "Droid"
+        }
+      }
+    """
+
+    val data = decode[SumQuery.Data](json)
+
+    import SumQuery._
+    val expectedData = Right(
+      Data(
+        Data.Character
+          .Droid(
+            "002",
+            "R2D2".some,
+            List(
+              Data.Character.Friends("Luke".some),
+              Data.Character.Friends("C3P0".some)
+            ).some,
+            "Astromech".some
+          )
+          .some
+      )
+    )
+
+    assertEquals(data, expectedData)
+  }
+
+  @GraphQL(debug = false)
+  object LucumaQuery extends GraphQLOperation[LucumaODB] {
+    val document = """
+      query Program {
+        program(id: "p-2") {
+          id
+          name
+          targets(includeDeleted: true) {
+            id
+            name
+            tracking {
+              tracktype: __typename 
+              ... on Sidereal {
+                epoch
+              }
+              ... on Nonsidereal {
+                keyType
+              }
+            }
+          }
+        }
+      }"""
+  }
+
+  test("Lucuma ODB query with inline fragments macro") {
+    val json = """
+      {
+        "program": {
+          "id": "p-1",
+          "name": "Macro program",
+          "targets": [
+            {
+              "id": "t-1",
+              "name": "Sirius",
+              "tracking": {
+                "tracktype": "Sidereal",
+                "epoch": "J2000.000"
+              }
+            },
+            {
+              "id": "t-2",
+              "name": "Saturn",
+              "tracking": {
+                "tracktype": "Nonsidereal",
+                "keyType": "MAJOR_BODY"
+              }
+            }
+          ]
+        }
+      }
+      """
+
+    val data = decode[LucumaQuery.Data](json)
+
+    import LucumaQuery._
+    val expectedData = Right(
+      Data(
+        Data
+          .Program(
+            "p-1",
+            "Macro program".some,
+            List(
+              Data.Program.Targets(
+                "t-1",
+                "Sirius",
+                Data.Program.Targets.Tracking.Sidereal("J2000.000")
+              ),
+              Data.Program.Targets(
+                "t-2",
+                "Saturn",
+                Data.Program.Targets.Tracking.Nonsidereal(
+                  LucumaODB.Enums.EphemerisKeyType.MajorBody
+                )
+              )
+            )
+          )
+          .some
+      )
+    )
+
+    assertEquals(data, expectedData)
+  }
+
+  @GraphQL(debug = false)
+  object LucumaSiderealQuery extends GraphQLOperation[LucumaODB] {
+    val document = """
+      query Program {
+        program(id: "p-2") {
+          id
+          name
+          targets(includeDeleted: true) {
+            id
+            name
+            tracking {
+              ... on Sidereal {
+                epoch
+              }
+            }
+          }
+        }
+      }"""
+  }
+
+  test("Lucuma ODB query with single inline fragment macro") {
+    val json = """
+      {
+        "program": {
+          "id": "p-1",
+          "name": "Macro program",
+          "targets": [
+            {
+              "id": "t-1",
+              "name": "Sirius",
+              "tracking": {
+                "epoch": "J2000.000"
+              }
+            }
+          ]
+        }
+      }
+      """
+    val data = decode[LucumaSiderealQuery.Data](json)
+
+    import LucumaSiderealQuery._
+    val expectedData = Right(
+      Data(
+        Data
+          .Program(
+            "p-1",
+            "Macro program".some,
+            List(
+              Data.Program.Targets(
+                "t-1",
+                "Sirius",
+                Data.Program.Targets.Tracking("J2000.000")
+              )
+            )
+          )
+          .some
+      )
+    )
+
+    assertEquals(data, expectedData)
+  }
 
   @GraphQL(debug = false)
   object LucumaTestSubscription extends GraphQLOperation[LucumaODB] {
@@ -31,7 +283,7 @@ class MacroTest extends FunSuite {
   }
 
   test("Lucuma ODB subscription macro") {
-    val json         = """
+    val json = """
       {
         "targetEdited": {
           "id": 6,
@@ -44,7 +296,8 @@ class MacroTest extends FunSuite {
         }
       }
       """
-    val data         = decode[LucumaTestSubscription.Data](json)
+    val data = decode[LucumaTestSubscription.Data](json)
+
     import LucumaTestSubscription._
     val expectedData = Right(
       Data(
@@ -215,29 +468,25 @@ class MacroTest extends FunSuite {
     import BasicQuery._
     val expectedData = Right(
       Data(
-        Some(
-          Data.Character(
+        Data
+          .Character(
             "001",
-            Some("Luke"),
-            Some(
-              List(
-                Data.Character.Friends("002",
-                                       Some("R2D2"),
-                                       Some(List(Data.Character.Friends.Friends(Some("Rey"))))
-                ),
-                Data.Character.Friends("003",
-                                       Some("C3P0"),
-                                       Some(List(Data.Character.Friends.Friends(Some("Chewie"))))
-                )
+            "Luke".some,
+            List(
+              Data.Character.Friends("002",
+                                     "R2D2".some,
+                                     List(Data.Character.Friends.Friends("Rey".some)).some
+              ),
+              Data.Character.Friends("003",
+                                     "C3P0".some,
+                                     List(Data.Character.Friends.Friends("Chewie".some)).some
               )
-            ),
-            Some(
-              List(Data.Character.MoreFriends(Some("Han")),
-                   Data.Character.MoreFriends(Some("Leia"))
-              )
-            )
+            ).some,
+            List(Data.Character.MoreFriends("Han".some),
+                 Data.Character.MoreFriends("Leia".some)
+            ).some
           )
-        )
+          .some
       )
     )
 

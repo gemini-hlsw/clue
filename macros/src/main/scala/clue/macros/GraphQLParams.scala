@@ -14,7 +14,7 @@ case class GraphQLOptionalParams(
 ) {
   def resolve(settings: MacroSettings): GraphQLParams =
     GraphQLParams(
-      GraphQLParams.DefaultMappings ++ mappings.get,
+      Constants.DefaultMappings ++ mappings.get,
       eq.getOrElse(settings.catsEq),
       show.getOrElse(settings.catsShow),
       lenses.getOrElse(settings.monocleLenses),
@@ -31,6 +31,3 @@ protected[macros] case class GraphQLParams(
   reuse:    Boolean,
   debug:    Boolean
 )
-object GraphQLParams {
-  val DefaultMappings: Map[String, String] = Map("ID" -> "String", "uuid" -> "java.util.UUID")
-}

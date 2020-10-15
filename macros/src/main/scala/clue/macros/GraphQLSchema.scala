@@ -41,21 +41,22 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
       eq = false,
       show = false,
       reuse = false,
-      modStatements = scala.Function.chain(
-        List((parentBody: List[Tree]) =>
-          q"def ignoreUnusedImportEnums(): Unit = ()" +: parentBody
-        ) ++
-          schema.types
-            .collect { case EnumType(name, _, values) => Enum(name, values.map(_.name)) }
-            .map(
-              _.addToParentBody(params.eq,
-                                params.show,
-                                params.reuse,
-                                encoder = true,
-                                decoder = true
+      modStatements = scala.Function
+        .chain(
+          List((parentBody: List[Tree]) =>
+            q"def ignoreUnusedImportEnums(): Unit = ()" +: parentBody
+          ) ++
+            schema.types
+              .collect { case EnumType(name, _, values) => Enum(name, values.map(_.name)) }
+              .map(
+                _.addToParentBody(params.eq,
+                                  params.show,
+                                  params.reuse,
+                                  encoder = true,
+                                  decoder = true
+                )
               )
-            )
-      )
+        )
     )
 
   private[this] def addInputs(schema: Schema, params: GraphQLParams): List[Tree] => List[Tree] =
