@@ -13,7 +13,6 @@ import edu.gemini.grackle.{ NoType => GNoType }
 import edu.gemini.grackle.{ TypeRef => GTypeRef }
 import edu.gemini.grackle.UntypedOperation._
 import cats.effect.IO
-import cats.kernel.Monoid
 
 class GraphQL(
   val mappings: Map[String, String] = Map.empty,
@@ -43,25 +42,22 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
       case _ :: tail                                    => documentDef(tail)
     }
 
-  /**
-   *  Holds the aggregated [[CaseClass]]es and their [[ClassParam]]s as we recurse the query AST.
-   *
-   * `parAccum` accumulates parameters until we have a whole case class definition.
-   */
-  private[this] case class ClassAccumulator(
-    classes:  List[Class] = List.empty,
-    parAccum: List[ClassParam] = List.empty,
-    sum:      Option[Sum] = None
-  )                                     {
-    def withOverrideParams: ClassAccumulator =
-      copy(parAccum = parAccum.map(_.copy(overrides = true)))
-  }
+  private[this] type ClassAccumulator = Accumulator[Class, ClassParam, Sum]
+
   private[this] object ClassAccumulator {
-    implicit val monoidClassAccumulator: Monoid[ClassAccumulator] = new Monoid[ClassAccumulator] {
-      override def empty: ClassAccumulator = ClassAccumulator()
-      override def combine(x: ClassAccumulator, y: ClassAccumulator): ClassAccumulator =
-        ClassAccumulator(x.classes ++ y.classes, x.parAccum ++ y.parAccum)
-    }
+    def apply(
+      classes:  List[Class] = List.empty,
+      parAccum: List[ClassParam] = List.empty,
+      sum:      Option[Sum] = None
+    ): ClassAccumulator = new ClassAccumulator(classes, parAccum, sum)
+  }
+
+  private[this] implicit class ClassAccumulatorOps(classAccumulator: ClassAccumulator) {
+    def withOverrideParams: ClassAccumulator =
+      new ClassAccumulator(classAccumulator.classes,
+                           parAccum = classAccumulator.parAccum.map(_.copy(overrides = true)),
+                           classAccumulator.sum
+      )
   }
 
   /**
