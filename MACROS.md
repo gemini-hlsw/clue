@@ -17,12 +17,27 @@ enum Episode {
 
 scalar Height
 
-type Character {
+interface Character {
   id: String!
   name: String
-  height: Height
   friends: [Character!]
   appearsIn: [Episode!]
+}
+
+type Human implements Character {
+  id: String!
+  name: String
+  friends: [Character!]
+  appearsIn: [Episode!]
+  homePlanet: String
+}
+
+type Droid implements Character {
+  id: String!
+  name: String
+  friends: [Character!]
+  appearsIn: [Episode!]
+  primaryFunction: String
 }
 ```
 
@@ -86,10 +101,17 @@ object BasicQuery extends GraphQLOperation[StarWars] {
       |  hero(episode: $episode) {
       |    id
       |    name
+      |    ... on Human {
+      |      homePlanet
+      |    }      
       |    friends {
       |      id
       |      name
       |    }
+      |    ... on Droid {
+      |      primaryFunction
+      |    }
+      |    __typename      
       |  }
       |}""".stripMargin
 }
@@ -106,51 +128,124 @@ object BasicQuery extends GraphQLOperation[StarWars] {
       |  hero(episode: $episode) {
       |    id
       |    name
+      |    ... on Human {
+      |      homePlanet
+      |    }      
       |    friends {
       |      id
       |      name
       |    }
+      |    ... on Droid {
+      |      primaryFunction
+      |    }
+      |    __typename  
       |  }
       |}""".stripMargin
 
   // Operation parameters.
   case class Variables(episode: Episode)
   object Variables {
+    // Lenses
     val episode: monocle.Lens[Variables, Episode] = monocle.macros.GenLens[Variables](_.episode)
 
+    // Cats typeclasses
     implicit val eqVariables: cats.Eq[Variables] = cats.Eq.fromUniversalEquals
     implicit val showVariables: cats.Show[Variables] = cats.Show.fromToString
-    implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables]
+
+    // Circe typeclasses
+    implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJson(_.deepDropNullValues)
   }
 
   // Operation result.
   case class Data(hero: Data.Hero)
   object Data {
-    // Classes are defined in a nested structure to avoid name clashes.
-    case class Hero(id: String, name: Option[String], friends: Option[List[Data.Hero.Friends]])
+    // Types are defined in a nested structure to avoid name clashes.
+
+    // Sum type
+    sealed trait Hero {
+      val id: String
+      val name: Option[String]
+      val friends: Option[List[Data.Hero.Friends]]
+    }
+
     object Hero {
       case class Friends(id: String, name: Option[String])
       object Friends {
+        // Lenses
         val id: monocle.Lens[Data.Hero.Friends, String] = monocle.macros.GenLens[Data.Hero.Friends](_.id)
         val name: monocle.Lens[Data.Hero.Friends, Option[String]] = monocle.macros.GenLens[Data.Hero.Friends](_.name)
 
+        // Cats typeclasses
         implicit val eqFriends: cats.Eq[Data.Hero.Friends] = cats.Eq.fromUniversalEquals
         implicit val showFriends: cats.Show[Data.Hero.Friends] = cats.Show.fromToString
+
+        // Circe typeclasses
         implicit val jsonDecoderFriends: io.circe.Decoder[Data.Hero.Friends] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Friends]
       }
 
-      val id: monocle.Lens[Data.Hero, String] = monocle.macros.GenLens[Data.Hero](_.id)
-      val name: monocle.Lens[Data.Hero, Option[String]] = monocle.macros.GenLens[Data.Hero](_.name)
-      val friends: monocle.Lens[Data.Hero, Option[List[Data.Hero.Friends]]] = monocle.macros.GenLens[Data.Hero](_.friends)
+      case class Human(override val id: String, override val name: Option[String], homePlanet: Option[String], override val friends: Option[List[Data.Hero.Friends]]) extends Hero
+      object Human {
+        // Lenses
+        val id: monocle.Lens[Data.Hero.Human, String] = monocle.macros.GenLens[Data.Hero.Human](_.id)
+        val name: monocle.Lens[Data.Hero.Human, Option[String]] = monocle.macros.GenLens[Data.Hero.Human](_.name)
+        val homePlanet: monocle.Lens[Data.Hero.Human, Option[String]] = monocle.macros.GenLens[Data.Hero.Human](_.homePlanet)
+        val friends: monocle.Lens[Data.Hero.Human, Option[List[Data.Hero.Friends]]] = monocle.macros.GenLens[Data.Hero.Human](_.friends)
 
+        // Cats typeclasses
+        implicit val eqHuman: cats.Eq[Data.Hero.Human] = cats.Eq.fromUniversalEquals
+        implicit val showHuman: cats.Show[Data.Hero.Human] = cats.Show.fromToString
+
+        // Circe typeclasses
+        implicit val jsonDecoderHuman: io.circe.Decoder[Data.Hero.Human] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Human]        
+      }
+
+      case class Droid(override val id: String, override val name: Option[String], override val friends: Option[List[Data.Hero.Friends]], primaryFunction: Option[String]) extends Hero
+      object Droid {
+        // Lenses
+        val id: monocle.Lens[Data.Hero.Droid, String] = monocle.macros.GenLens[Data.Hero.Droid](_.id)
+        val name: monocle.Lens[Data.Hero.Droid, Option[String]] = monocle.macros.GenLens[Data.Hero.Droid](_.name);
+        val friends: monocle.Lens[Data.Hero.Droid, Option[List[Data.Hero.Friends]]] = monocle.macros.GenLens[Data.Hero.Droid](_.friends)
+        val primaryFunction: monocle.Lens[Data.Hero.Droid, Option[String]] = monocle.macros.GenLens[Data.Hero.Droid](_.primaryFunction)
+
+        // Cats typeclasses
+        implicit val eqDroid: cats.Eq[Data.Hero.Droid] = cats.Eq.fromUniversalEquals
+        implicit val showDroid: cats.Show[Data.Hero.Droid] = cats.Show.fromToString
+
+        // Circe typeclasses
+        implicit val jsonDecoderDroid: io.circe.Decoder[Data.Hero.Droid] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Droid]        
+      }      
+
+      // Lenses (for sum type)
+      val id: monocle.Lens[Data.Hero, String] = monocle.Lens[Data.Hero, String](_.id)(v => _ match {
+        case s: Data.Hero.Human => s.copy(id = v)
+        case s: Data.Hero.Droid => s.copy(id = v)
+      })
+      val name: monocle.Lens[Data.Hero, Option[String]] = monocle.Lens[Data.Hero, Option[String]](_.name)(v => _ match {
+        case s: Data.Hero.Human => s.copy(name = v)
+        case s: Data.Hero.Droid => s.copy(name = v)
+      })
+      val friends: monocle.Lens[Data.Hero, Option[List[Data.Hero.Friends]]] = monocle.Lens[Data.Hero, Option[List[Data.Hero.Friends]]](_.friends)(v => _ match {
+        case s: Data.Hero.Human => s.copy(friends = v)
+        case s: Data.Hero.Droid => s.copy(friends = v)
+      })       
+
+      // Cats typeclasses
       implicit val eqHero: cats.Eq[Data.Hero] = cats.Eq.fromUniversalEquals
       implicit val showHero: cats.Show[Data.Hero] = cats.Show.fromToString
-      implicit val jsonDecoderHero: io.circe.Decoder[Data.Hero] = io.circe.generic.semiauto.deriveDecoder[Data.Hero]
+
+      // Circe typeclasses. For sum types requires circe-generic-extras.
+      implicit private val jsonConfiguration: io.circe.generic.extras.Configuration = io.circe.generic.extras.Configuration.default.withDiscriminator("__typename");
+      implicit val jsonDecoderHero: io.circe.Decoder[Data.Hero] = io.circe.generic.extras.semiauto.deriveConfiguredDecoder[Data.Hero]      
     }
 
+    // Lenses
     val hero: monocle.Lens[Data, Data.Hero] = monocle.macros.GenLens[Data](_.hero)
+
+    // Cats typeclasses
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
+
+    // Circe typeclasses
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]
   }
 

@@ -279,7 +279,7 @@ protected[macros] trait Macro {
     val codecConfDef = Option
       .when(encoder || decoder)(typeType match {
         case TypeType.Sum(discriminator) =>
-          q"implicit protected val jsonConfiguration: io.circe.generic.extras.Configuration = io.circe.generic.extras.Configuration.default.withDiscriminator($discriminator)".some
+          q"implicit private val jsonConfiguration: io.circe.generic.extras.Configuration = io.circe.generic.extras.Configuration.default.withDiscriminator($discriminator)".some
         case _                           => none
       })
       .flatten
