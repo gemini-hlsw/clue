@@ -14,4 +14,4 @@ jobs:
         with:
           java-version: adopt@1.11
       - name: Run compile
-        run: csbt headerCheck scalafmtCheckAll +compile +test
+        run: csbt headerCheck scalafmtCheckAll doc +compile +test
