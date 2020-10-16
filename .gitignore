@@ -32,3 +32,5 @@ metals.sbt
 # Hydra
 .hydra/
 
+# VSCode plugins
+node_modules
