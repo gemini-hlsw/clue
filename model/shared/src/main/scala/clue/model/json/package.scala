@@ -114,14 +114,21 @@ package object json {
 
   implicit val EncoderDataWrapper: Encoder[DataWrapper] =
     (a: DataWrapper) =>
-      Json.obj(
-        "data" -> a.data
-      )
+      Json
+        .obj(
+          "data"   -> a.data,
+          "errors" -> a.errors.getOrElse(Json.Null)
+        )
+        .dropNullValues
 
   implicit val DecoderDataWrapper: Decoder[DataWrapper] =
-    (c: HCursor) => c.downField("data").as[Json].map(DataWrapper(_))
+    (c: HCursor) =>
+      for {
+        data   <- c.downField("data").as[Json]
+        errors <- c.downField("errors").as[Option[Json]]
+      } yield DataWrapper(data, errors)
 
-  implicit val EncoderData: Encoder[Data]               =
+  implicit val EncoderData: Encoder[Data] =
     (a: Data) =>
       Json.obj(
         "type"    -> Json.fromString("data"),

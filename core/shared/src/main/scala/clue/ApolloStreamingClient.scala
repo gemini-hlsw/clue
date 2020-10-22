@@ -123,27 +123,27 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
 
     def processMessage(str: String): F[Unit] =
       decode[StreamingMessage.FromServer](str) match {
-        case Left(e)                                                  =>
+        case Left(e)                                                       =>
           Logger[F].error(e)(s"Exception decoding WebSocket message for [$uri]")
-        case Right(StreamingMessage.FromServer.ConnectionError(json)) =>
+        case Right(StreamingMessage.FromServer.ConnectionError(json))      =>
           Logger[F].error(s"Connection error on WebSocket for [$uri]: $json")
-        case Right(StreamingMessage.FromServer.DataJson(id, json))    =>
+        case Right(StreamingMessage.FromServer.DataJson(id, data, errors)) =>
           subscriptions.get
             .map(_.get(id))
             .flatMap(
               _.fold(
                 Logger[F].error(
-                  s"Received data for non existant subscription id [$id] on WebSocket for [$uri]: $json"
+                  s"Received data for non existant subscription id [$id] on WebSocket for [$uri]: $data"
                 )
-              )(_.emitData(json))
+              )(emitter => errors.fold(emitter.emitData(data))(emitter.emitError))
             )
-        case Right(StreamingMessage.FromServer.Error(id, json))       =>
+        case Right(StreamingMessage.FromServer.Error(id, json))            =>
           Logger[F].error(
             s"Error message received on WebSocket for [$uri] and subscription id [$id]:\n$json"
           )
-        case Right(StreamingMessage.FromServer.Complete(id))          =>
+        case Right(StreamingMessage.FromServer.Complete(id))               =>
           terminateSubscription(id)
-        case _                                                        =>
+        case _                                                             =>
           ().pure[F]
       }
 

@@ -125,7 +125,7 @@ object StreamingMessage {
      */
     final case object ConnectionKeepAlive extends FromServer
 
-    final case class DataWrapper(data: Json)
+    final case class DataWrapper(data: Json, errors: Option[Json])
 
     object DataWrapper {
       implicit val EqDataWrapper: Eq[DataWrapper] =
@@ -151,7 +151,9 @@ object StreamingMessage {
     }
 
     final object DataJson {
-      def unapply(data: Data): Option[(String, Json)] = Some((data.id, data.payload.data))
+      def unapply(data: Data): Option[(String, Json, Option[Json])] = Some(
+        (data.id, data.payload.data, data.payload.errors)
+      )
     }
 
     /**
