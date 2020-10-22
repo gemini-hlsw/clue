@@ -38,6 +38,9 @@ trait ArbFromServer {
       arbitrary[String].map(Json.fromString)
     }
 
+  val genErrosJson: Gen[Json]                                 =
+    arbitrary[String].map(s => Json.arr(Json.obj("message" -> Json.fromString(s))))
+
   implicit val arbConnectionError: Arbitrary[ConnectionError] =
     Arbitrary {
       arbitrary[Json](arbErrorJson).map(ConnectionError(_))
@@ -45,7 +48,10 @@ trait ArbFromServer {
 
   implicit val arbDataWrapper: Arbitrary[DataWrapper] =
     Arbitrary {
-      arbitrary[Json](arbDataJson).map(DataWrapper(_))
+      for {
+        data   <- arbitrary[Json](arbDataJson)
+        errors <- Gen.option(genErrosJson)
+      } yield DataWrapper(data, errors)
     }
 
   implicit val arbData: Arbitrary[Data] =
