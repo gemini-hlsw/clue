@@ -15,6 +15,11 @@ class MacroTest extends FunSuite {
 
   import Schemas._
 
+  trait Person {
+    val id: String
+    val name: Option[String]
+  }
+
   @GraphQL(debug = false)
   object SumQuery extends GraphQLOperation[StarWars] {
     val document = """
@@ -35,6 +40,10 @@ class MacroTest extends FunSuite {
           }
         }
       """
+
+    object Data {
+      trait Character extends Person
+    }
   }
 
   test("StarWars query with inline fragments macro - Human") {

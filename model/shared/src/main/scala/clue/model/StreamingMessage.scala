@@ -130,6 +130,10 @@ object StreamingMessage {
     object DataWrapper {
       implicit val EqDataWrapper: Eq[DataWrapper] =
         Eq.by(_.data)
+
+      def fromData(data: Json): DataWrapper = DataWrapper(data, none)
+
+      def fromErrors(errors: Json): DataWrapper = DataWrapper(Json.Null, errors.some)
     }
 
     /**

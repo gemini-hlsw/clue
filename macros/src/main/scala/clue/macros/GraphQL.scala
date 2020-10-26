@@ -254,25 +254,29 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
       List(importDef("Scalars"), importDef("Enums"), importDef("Types")).flatten ++ parentBody
     }
 
+  import DefineType._
+
   private[this] def addVars(
     schema:    Schema,
     operation: UntypedOperation,
     params:    GraphQLParams
   ): List[Tree] => List[Tree] =
     parentBody =>
-      if (isTypeDefined("Variables")(parentBody))
-        addModuleDefs("Variables", params.eq, params.show, reuse = false, encoder = true)(
-          parentBody
-        )
-      else
-        resolveVariables(schema, operation.variables, params.mappings).addToParentBody(
-          params.eq,
-          params.show,
-          params.lenses,
-          reuse = false,
-          encoder = true,
-          forceModule = true
-        )(parentBody)
+      mustDefineType("Variables")(parentBody) match {
+        case Skip            =>
+          addModuleDefs("Variables", params.eq, params.show, reuse = false, encoder = true)(
+            parentBody
+          )
+        case Define(_, _, _) => // For now, we don't allow specifying Variables class parents.
+          resolveVariables(schema, operation.variables, params.mappings).addToParentBody(
+            params.eq,
+            params.show,
+            params.lenses,
+            reuse = false,
+            encoder = true,
+            forceModule = true
+          )(parentBody)
+      }
 
   private[this] def addData(
     schema:    Schema,
@@ -280,35 +284,37 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
     params:    GraphQLParams
   ): List[Tree] => List[Tree] =
     parentBody =>
-      if (isTypeDefined("Data")(parentBody))
-        addModuleDefs("Data", params.eq, params.show, params.reuse, decoder = true)(parentBody)
-      else {
-        // For some reason, schema.schemaType only returns the Query type.
-        val schemaType = schema.definition("Schema").getOrElse(schema.defaultSchemaType)
+      mustDefineType("Data")(parentBody) match {
+        case Skip            =>
+          addModuleDefs("Data", params.eq, params.show, params.reuse, decoder = true)(parentBody)
+        case Define(_, _, _) => // For now, we don't allow specifying Data class parents.
+          // For some reason, schema.schemaType only returns the Query type.
+          val schemaType = schema.definition("Schema").getOrElse(schema.defaultSchemaType)
 
-        // Leaving this comment in order to reproduce the issue.
-        // log(schema.schemaType.asInstanceOf[ObjectType].fields).unsafeRunSync()
-        // log(schema.definition("Schema").getOrElse(schema.defaultSchemaType)
-        //     .asInstanceOf[ObjectType].fields).unsafeRunSync()
+          // Leaving this comment in order to reproduce the issue.
+          // log(schema.schemaType.asInstanceOf[ObjectType].fields).unsafeRunSync()
+          // log(schema.definition("Schema").getOrElse(schema.defaultSchemaType)
+          //     .asInstanceOf[ObjectType].fields).unsafeRunSync()
 
-        val rootType = operation match {
-          // This is how things should look like.
-          // case _: UntypedQuery        => schema.queryType
-          // case _: UntypedMutation     => schema.mutationType.getOrElse(GNoType)
-          // case _: UntypedSubscription => schema.subscriptionType.getOrElse(GNoType)
-          case _: UntypedQuery        => schemaType.field("query").asNamed.get
-          case _: UntypedMutation     => schemaType.field("mutation").asNamed.getOrElse(GNoType)
-          case _: UntypedSubscription => schemaType.field("subscription").asNamed.getOrElse(GNoType)
-        }
+          val rootType = operation match {
+            // This is how things should look like.
+            // case _: UntypedQuery        => schema.queryType
+            // case _: UntypedMutation     => schema.mutationType.getOrElse(GNoType)
+            // case _: UntypedSubscription => schema.subscriptionType.getOrElse(GNoType)
+            case _: UntypedQuery        => schemaType.field("query").asNamed.get
+            case _: UntypedMutation     => schemaType.field("mutation").asNamed.getOrElse(GNoType)
+            case _: UntypedSubscription =>
+              schemaType.field("subscription").asNamed.getOrElse(GNoType)
+          }
 
-        resolveData(schema, operation.query, rootType, params.mappings).addToParentBody(
-          params.eq,
-          params.show,
-          params.lenses,
-          params.reuse,
-          decoder = true,
-          forceModule = true
-        )(parentBody)
+          resolveData(schema, operation.query, rootType, params.mappings).addToParentBody(
+            params.eq,
+            params.show,
+            params.lenses,
+            params.reuse,
+            decoder = true,
+            forceModule = true
+          )(parentBody)
       }
 
   private[this] def addValRefIntoModule(
