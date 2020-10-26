@@ -102,15 +102,36 @@ protected[macros] trait Macro {
     }
   }
 
-  protected[this] def isTypeDefined(typeName: String): List[Tree] => Boolean =
+  protected[this] sealed trait DefineType
+  protected[this] object DefineType {
+    case object Skip extends DefineType
+    case class Define(newParentBody: List[Tree], earlyDefs: List[Tree], parents: List[Tree])
+        extends DefineType
+  }
+  import DefineType._
+
+  protected[this] def mustDefineType(typeName: String): List[Tree] => DefineType =
     parentBody => {
-      val tpe = TypeName(typeName)
-      parentBody.exists {
-        case q"$_ type $tpname = $_"                                                 => tpname == tpe
-        case q"$_ class $tpname $_(...$_) extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
-          tpname == tpe
-        case q"$_ trait $tpname extends { ..$_ } with ..$_ { $_ => ..$_ }"           => tpname == tpe
-        case _                                                                       => false
+      val tpe                                   = TypeName(typeName)
+      val (extensionDefinitions, newParentBody) =
+        parentBody.partitionMap {
+          case q"$_ trait $tpname extends { ..$earlyDefs } with ..$parents { $_ => ..$_ }"
+              if tpname == tpe =>
+            Left((earlyDefs, parents))
+          case other => Right(other)
+        }
+      extensionDefinitions.headOption match {
+        case None                       =>
+          parentBody
+            .collectFirst {
+              case q"$_ type $tpname = $_" if tpname == tpe => Skip
+              case q"$_ class $tpname $_(...$_) extends { ..$_ } with ..$_ { $_ => ..$_ }"
+                  if tpname == tpe =>
+                Skip
+            }
+            .getOrElse(Define(parentBody, List.empty, List.empty))
+        case Some((earlyDefs, parents)) =>
+          Define(newParentBody, earlyDefs, parents)
       }
     }
 
@@ -175,15 +196,16 @@ protected[macros] trait Macro {
     extending: Option[String] = None
   ): List[Tree] => (List[Tree], Boolean) =
     parentBody =>
-      if (isTypeDefined(name)(parentBody))
-        (parentBody, false)
-      else
-        (parentBody :+
-           extending.fold(q"case class ${TypeName(name)}(..$pars)")(extending =>
-             q"case class ${TypeName(name)}(..$pars) extends ${TypeName(extending)}"
-           ),
-         true
-        )
+      mustDefineType(name)(parentBody) match {
+        case Skip                                      =>
+          (parentBody, false)
+        case Define(newParentBody, earlyDefs, parents) =>
+          val allParents = parents ++ extending.map(t => tq"${TypeName(t)}")
+          (newParentBody :+
+             q"case class ${TypeName(name)}(..$pars) extends ..$earlyDefs with ..$allParents",
+           true
+          )
+      }
 
   protected[this] def addEnum(
     name:    String,
@@ -195,24 +217,26 @@ protected[macros] trait Macro {
     decoder: Boolean = false
   ): List[Tree] => List[Tree] =
     parentBody =>
-      if (isTypeDefined(name)(parentBody))
-        parentBody
-      else {
-        val enumValues = values.map(EnumValue.fromString)
-        addModuleDefs(
-          name,
-          eq,
-          show,
-          reuse,
-          encoder,
-          decoder,
-          TypeType.Enum(enumValues),
-          _ ++ enumValues.map { enumValue =>
-            q"case object ${TermName(enumValue.className)} extends ${TypeName(name)}"
-          }
-        )(
-          parentBody :+ q"sealed trait ${TypeName(name)}"
-        )
+      mustDefineType(name)(parentBody) match {
+        case Skip                                      =>
+          parentBody
+        case Define(newParentBody, earlyDefs, parents) =>
+          val allParents = parents :+ tq"${TypeName(name)}"
+          val enumValues = values.map(EnumValue.fromString)
+          addModuleDefs(
+            name,
+            eq,
+            show,
+            reuse,
+            encoder,
+            decoder,
+            TypeType.Enum(enumValues),
+            _ ++ enumValues.map { enumValue =>
+              q"case object ${TermName(enumValue.className)} extends ..$earlyDefs with ..$allParents"
+            }
+          )(
+            newParentBody :+ q"sealed trait ${TypeName(name)}"
+          )
       }
 
   protected[this] def addSumTrait(
@@ -220,15 +244,16 @@ protected[macros] trait Macro {
     pars:      List[ValDef],
     extending: Option[String] = None
   ): List[Tree] => (List[Tree], Boolean) = { parentBody =>
-    if (isTypeDefined(name)(parentBody))
-      (parentBody, false)
-    else
-      (parentBody :+
-         extending.fold(q"sealed trait ${TypeName(name)}{..$pars}")(extending =>
-           q"sealed trait ${TypeName(name)} extends ${TypeName(extending)} {..$pars}"
-         ),
-       true
-      )
+    mustDefineType(name)(parentBody) match {
+      case Skip                                      =>
+        (parentBody, false)
+      case Define(newParentBody, earlyDefs, parents) =>
+        val allParents = parents ++ extending.map(t => tq"${TypeName(t)}")
+        (newParentBody :+
+           q"sealed trait ${TypeName(name)} extends ..$earlyDefs with ..$allParents {..$pars}",
+         true
+        )
+    }
   }
 
   protected[this] case class EnumValue(asString: String, className: String)
