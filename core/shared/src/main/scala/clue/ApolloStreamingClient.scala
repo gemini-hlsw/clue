@@ -160,7 +160,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       for {
         _ <- connectionMVar.take
         _ <- connectionStatus.set(StreamingClientStatus.Closed)
-        _ <- Timer[F].sleep(10 seconds) // TODO: Backoff.
+        _ <- Timer[F].sleep(60 seconds) // TODO: Backoff.
         // math.min(60000, math.max(200, value.nextAttempt * 2)))
         _ <- connect
       } yield ()
