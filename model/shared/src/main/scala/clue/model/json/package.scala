@@ -78,6 +78,9 @@ package object json {
         i <- c.downField("id").as[String]
       } yield Stop(i)
 
+  implicit val DecoderConnectionTerminate: Decoder[ConnectionTerminate.type] =
+    decodeCaseObject("connection_terminate", ConnectionTerminate)
+
   implicit val EncoderFromClient: Encoder[StreamingMessage.FromClient] =
     Encoder.instance {
       case m @ ConnectionInit(_)  => m.asJson
@@ -87,16 +90,28 @@ package object json {
     }
 
   implicit val DecoderFromClient: Decoder[StreamingMessage.FromClient] =
-    List[Decoder[StreamingMessage.FromClient]](
-      Decoder[ConnectionInit].widen,
-      Decoder[Start].widen,
-      Decoder[Stop].widen,
-      decodeCaseObject("connection_terminate", ConnectionTerminate)
-    ).reduceLeft(_ or _)
+    (c: HCursor) =>
+      c.downField("type")
+        .as[String]
+        .flatMap {
+          case "connection_init"      => Decoder[ConnectionInit].widen(c)
+          case "start"                => Decoder[Start].widen(c)
+          case "stop"                 => Decoder[Stop].widen(c)
+          case "connection_terminate" => Decoder[ConnectionTerminate.type].widen(c)
+          case other                  =>
+            Left(
+              DecodingFailure(s"Unexpected StreamingMessage.FromClient with type [$other]",
+                              c.history
+              )
+            )
+        }
 
   // ---- FromServer
 
   import StreamingMessage.FromServer._
+
+  implicit val DecoderConnectionAck: Decoder[ConnectionAck.type] =
+    decodeCaseObject("connection_ack", ConnectionAck)
 
   implicit val EncoderConnectionError: Encoder[ConnectionError] =
     (a: ConnectionError) =>
@@ -111,6 +126,9 @@ package object json {
         _ <- checkType(c, "connection_error")
         p <- c.downField("payload").as[Json]
       } yield ConnectionError(p)
+
+  implicit val DecoderConnectionKA: Decoder[ConnectionKeepAlive.type] =
+    decodeCaseObject("ka", ConnectionKeepAlive)
 
   implicit val EncoderDataWrapper: Encoder[DataWrapper] =
     (a: DataWrapper) =>
@@ -185,14 +203,23 @@ package object json {
     }
 
   implicit val DecoderFromServer: Decoder[StreamingMessage.FromServer] =
-    List[Decoder[StreamingMessage.FromServer]](
-      decodeCaseObject("connection_ack", ConnectionAck),
-      Decoder[ConnectionError].widen,
-      decodeCaseObject("ka", ConnectionKeepAlive),
-      Decoder[Data].widen,
-      Decoder[Error].widen,
-      Decoder[Complete].widen
-    ).reduceLeft(_ or _)
+    (c: HCursor) =>
+      c.downField("type")
+        .as[String]
+        .flatMap {
+          case "connection_ack"   => Decoder[ConnectionAck.type].widen(c)
+          case "connection_error" => Decoder[ConnectionError].widen(c)
+          case "ka"               => Decoder[ConnectionKeepAlive.type].widen(c)
+          case "data"             => Decoder[Data].widen(c)
+          case "error"            => Decoder[Error].widen(c)
+          case "complete"         => Decoder[Complete].widen.apply(c)
+          case other              =>
+            Left(
+              DecodingFailure(s"Unexpected StreamingMessage.FromServer with type [$other]",
+                              c.history
+              )
+            )
+        }
 
   private def checkType(c: HCursor, expected: String): Decoder.Result[Unit] =
     c.downField("type")

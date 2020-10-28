@@ -57,6 +57,8 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
 ) extends GraphQLStreamingClient[F, S] {
   private val LogPrefix = "[clue.ApolloStreamingClient]"
 
+  private val F = implicitly[ConcurrentEffect[F]]
+
   def status: F[StreamingClientStatus] =
     connectionStatus.get
 
@@ -70,8 +72,10 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
 
   type Subscription[D] = ApolloSubscription[D]
 
-  case class ApolloSubscription[D](stream: Stream[F, D], private val id: String)
-      extends StoppableSubscription[D] {
+  case class ApolloSubscription[D](
+    stream:                                  Stream[F, D],
+    protected[ApolloStreamingClient] val id: String
+  ) extends StoppableSubscription[D] {
 
     def stop(): F[Unit] =
       (for {
@@ -102,13 +106,17 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       queue.enqueue1(Right(None))
   }
 
-  final protected def terminateSubscription(id: String): F[Unit] =
+  final protected def terminateSubscription(id: String, lenient: Boolean = false): F[Unit] =
     for {
-      _       <- Logger[F].debug(s"$LogPrefix Terminating subscription [$id]")
-      subs    <- subscriptions.get
-      _       <- Logger[F].debug(s"$LogPrefix Current subscriptions: [${subs.keySet}]")
-      emitter <- Sync[F].fromOption(subs.get(id), new InvalidSubscriptionIdException(id))
-      _       <- emitter.terminate()
+      _    <- Logger[F].debug(s"$LogPrefix Terminating subscription [$id]")
+      subs <- subscriptions.get
+      _    <- Logger[F].debug(s"$LogPrefix Current subscriptions: [${subs.keySet}]")
+      _    <- subs
+                .get(id)
+                .fold[F[Unit]](
+                  if (lenient) F.unit
+                  else F.raiseError(new InvalidSubscriptionIdException(id))
+                )(_.terminate())
     } yield ()
 
   final protected def terminateAllSubscriptions(): F[Unit] =
@@ -142,9 +150,9 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
             s"Error message received on WebSocket for [$uri] and subscription id [$id]:\n$json"
           )
         case Right(StreamingMessage.FromServer.Complete(id))               =>
-          terminateSubscription(id)
+          terminateSubscription(id, lenient = true)
         case _                                                             =>
-          ().pure[F]
+          F.unit
       }
 
     def processError(t: Throwable): F[Unit] =
@@ -160,7 +168,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       for {
         _ <- connectionMVar.take
         _ <- connectionStatus.set(StreamingClientStatus.Closed)
-        _ <- Timer[F].sleep(10 seconds) // TODO: Backoff.
+        _ <- Timer[F].sleep(60 seconds) // TODO: Backoff.
         // math.min(60000, math.max(200, value.nextAttempt * 2)))
         _ <- connect
       } yield ()
@@ -192,7 +200,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
   ): F[(String, QueueEmitter[D])] =
     for {
       queue  <- Queue.unbounded[F, Either[Throwable, Option[D]]]
-      id     <- Sync[F].delay(UUID.randomUUID().toString)
+      id     <- F.delay(UUID.randomUUID().toString)
       emitter = QueueEmitter(queue, request)
     } yield (id, emitter)
 
@@ -237,11 +245,10 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
     operationName: Option[String] = None,
     variables:     Option[Json] = None
   ): F[D] =
-    // Cleanup happens automatically (as long as the server sends the "Complete" message).
-    Async[F].asyncF[D] { cb =>
+    F.asyncF[D] { cb =>
       subscribeInternal[D](document, operationName, variables).flatMap { subscription =>
         subscription.stream.attempt
-          .evalMap(result => Sync[F].delay(cb(result)))
+          .evalMap(result => F.delay(cb(result)) >> terminateSubscription(subscription.id))
           .compile
           .drain
       }
