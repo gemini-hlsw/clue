@@ -159,19 +159,22 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       connectionMVar
         .tryPut(Left(t))
         .flatMap {
-          // Connection was established. We must cancel all subscriptions. (or not?)
+          // Connection was already established. We must cancel all subscriptions. (or not?)
           case false => terminateAllSubscriptions()
           case true  => connectionStatus.set(StreamingClientStatus.Closed) // Retry?
         }
+        .handleErrorWith(t => Logger[F].error(t)(s"Error processing error on WebSocket for [$uri]"))
 
     val processClose: F[Unit] =
-      for {
+      (for {
         _ <- connectionMVar.take
         _ <- connectionStatus.set(StreamingClientStatus.Closed)
-        _ <- Timer[F].sleep(60 seconds) // TODO: Backoff.
+        _ <- Timer[F].sleep(5 seconds) // TODO: Backoff.
         // math.min(60000, math.max(200, value.nextAttempt * 2)))
         _ <- connect
-      } yield ()
+      } yield ()).handleErrorWith(t =>
+        Logger[F].error(t)(s"Error processing close on WebSocket for [$uri]")
+      )
 
     def restartSubscriptions(sender: BackendConnection[F]): F[Unit] =
       for {
