@@ -3,6 +3,7 @@
 
 package clue.js
 
+import cats.syntax.all._
 import cats.effect._
 import cats.effect.implicits._
 import clue._
@@ -19,13 +20,14 @@ import sttp.model.Uri
 // This implementation follows the Apollo protocol, specified in:
 // https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
 // Also see: https://medium.com/@rob.blackbourn/writing-a-graphql-websocket-subscriber-in-javascript-4451abb9cd60
-final class WebSocketJSConnection[F[_]: Sync](private val ws: WebSocket)
+final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
     extends BackendConnection[F] {
   override def send(msg: StreamingMessage.FromClient): F[Unit] =
     Sync[F].delay(ws.send(msg.asJson.toString))
 
   override def close(): F[Unit] =
-    Sync[F].delay(ws.close())
+    Logger[F].trace("Disconnecting WebSocket...") >>
+      Sync[F].delay(ws.close())
 }
 
 final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends StreamingBackend[F] {
@@ -41,6 +43,7 @@ final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends Streaming
       val ws = new WebSocket(uri.toString, Protocol)
 
       ws.onopen = { _: Event =>
+        Logger[F].trace("WebSocket open").toIO.unsafeRunAsyncAndForget()
         cb(Right(new WebSocketJSConnection(ws)))
       }
 
@@ -53,11 +56,15 @@ final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends Streaming
       }
 
       ws.onerror = { e: Event =>
+        Logger[F].error(s"Error on WebSocket for [$uri]: $e")
         onError(new GraphQLException(e.toString)).toIO.unsafeRunAsyncAndForget()
       }
 
       ws.onclose = { e: CloseEvent =>
-        onClose(e.wasClean).toIO.unsafeRunAsyncAndForget()
+        (
+          Logger[F].trace("WebSocket closed") >>
+            onClose(e.wasClean)
+        ).toIO.unsafeRunAsyncAndForget()
       }
     }
 }
