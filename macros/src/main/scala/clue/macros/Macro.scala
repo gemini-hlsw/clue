@@ -311,7 +311,7 @@ protected[macros] trait Macro {
 
     val encoderDef = Option.when(encoder)(typeType match {
       case TypeType.CaseClass        =>
-        q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJson(_.foldWith(clue.data.Input.dropUndefinedFolder))"
+        q"implicit val ${TermName(s"jsonEncoder$name")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJson(_.foldWith(_root_.clue.data.Input.dropUndefinedFolder))"
       case TypeType.Enum(enumValues) =>
         val cases =
           enumValues.map(enumValue =>
