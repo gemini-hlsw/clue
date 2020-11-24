@@ -79,7 +79,9 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
             .collect { case InputObjectType(name, _, fields) =>
               CaseClass(
                 name.capitalize,
-                fields.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, params.mappings))
+                fields.map(iv =>
+                  ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true, params.mappings)
+                )
               )
             }
             .map(

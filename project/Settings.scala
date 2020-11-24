@@ -11,7 +11,7 @@ object Settings {
     val disciplineMUnit = "1.0.2"
     val fs2             = "2.4.5"
     val grackle         = "0.0.19"
-    val jawn            = "1.0.0"
+    val jawn            = "1.0.1"
     val log4Cats        = "1.1.1"
     val monocle         = "2.1.0"
     val scalaJSDom      = "1.1.0"

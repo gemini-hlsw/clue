@@ -153,7 +153,7 @@ object BasicQuery extends GraphQLOperation[StarWars] {
     implicit val showVariables: cats.Show[Variables] = cats.Show.fromToString
 
     // Circe typeclasses
-    implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJson(_.deepDropNullValues)
+    implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJson(_.foldWith(clue.data.Input.dropUndefinedFolder))
   }
 
   // Operation result.

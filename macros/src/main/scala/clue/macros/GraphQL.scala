@@ -110,6 +110,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
             parAccum = List(
               ClassParam.fromGrackleType(paramName,
                                          nextType.dealias,
+                                         isInput = false,
                                          mappings,
                                          paramTypeNameOverride
               )
@@ -234,8 +235,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
       log(s"Warning resolving operation input variables types [$vars]: [${inputs.left}]]")
     val inputValues = inputs.right.get
 
-    CaseClass("Variables",
-              inputValues.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, mappings))
+    CaseClass(
+      "Variables",
+      inputValues.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true, mappings))
     )
   }
 
