@@ -9,7 +9,7 @@ object Settings {
     val catsEffect      = "2.2.0"
     val circe           = "0.13.0"
     val disciplineMUnit = "1.0.2"
-    val fs2             = "2.4.5"
+    val fs2             = "2.4.6"
     val grackle         = "0.0.19"
     val jawn            = "1.0.0"
     val log4Cats        = "1.1.1"
