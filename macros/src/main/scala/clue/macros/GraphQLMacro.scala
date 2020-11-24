@@ -48,10 +48,10 @@ protected[macros] trait GraphQLMacro extends Macro {
       val n = TermName(name)
       val t = typeTree(nestTree, nestedTypes)
       val d = tpe match {
-        case tq"Option[$inner]"                 => if (!asVals) q"None" else EmptyTree
-        case tq"_root_.clue.data.Input[$inner]" =>
+        case tq"Option[$inner]"          => if (!asVals) q"None" else EmptyTree
+        case tq"clue.data.Input[$inner]" =>
           if (!asVals) q"_root_.clue.data.Undefined" else EmptyTree
-        case _                                  => EmptyTree
+        case _                           => EmptyTree
       }
       if (!asVals && overrides) q"override val $n: $t = $d" else q"val $n: $t = $d"
     }
