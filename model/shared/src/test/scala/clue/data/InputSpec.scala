@@ -12,7 +12,7 @@ import org.scalacheck.Prop.forAll
 import cats.laws.discipline._
 import cats.laws.discipline.arbitrary._
 import cats.laws.discipline.SemigroupalTests.Isomorphisms
-import clue.data.implicits._
+import clue.data.syntax._
 import io.circe._
 import io.circe.testing.CodecTests
 import org.scalacheck.Arbitrary
