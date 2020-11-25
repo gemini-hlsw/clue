@@ -48,8 +48,10 @@ protected[macros] trait GraphQLMacro extends Macro {
       val n = TermName(name)
       val t = typeTree(nestTree, nestedTypes)
       val d = tpe match {
-        case tq"Option[$inner]" => if (!asVals) q"None" else EmptyTree
-        case _                  => EmptyTree
+        case tq"Option[$inner]"                 => if (!asVals) q"None" else EmptyTree
+        case tq"_root_.clue.data.Input[$inner]" =>
+          if (!asVals) q"_root_.clue.data.Ignore" else EmptyTree
+        case _                                  => EmptyTree
       }
       if (!asVals && overrides) q"override val $n: $t = $d" else q"val $n: $t = $d"
     }
@@ -59,12 +61,17 @@ protected[macros] trait GraphQLMacro extends Macro {
     def fromGrackleType(
       name:         String,
       tpe:          Type,
+      isInput:      Boolean,
       mappings:     Map[String, String],
       nameOverride: Option[String] = None
     ): ClassParam = {
       def resolveType(tpe: Type): Tree =
         tpe match {
-          case NullableType(tpe) => tq"Option[${resolveType(tpe)}]"
+          case NullableType(tpe) =>
+            if (isInput)
+              tq"_root_.clue.data.Input[${resolveType(tpe)}]"
+            else
+              tq"Option[${resolveType(tpe)}]"
           case ListType(tpe)     => tq"List[${resolveType(tpe)}]"
           case nt: NamedType     =>
             parseType(mappings.getOrElse(nt.name, snakeToCamel(nameOverride.getOrElse(nt.name))))

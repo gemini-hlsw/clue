@@ -8,9 +8,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: coursier/cache-action@v4
+      - uses: coursier/cache-action@v5
       - name: Set up JDK
-        uses: olafurpg/setup-scala@v7
+        uses: olafurpg/setup-scala@v10
         with:
           java-version: adopt@1.11
       - name: Run compile
