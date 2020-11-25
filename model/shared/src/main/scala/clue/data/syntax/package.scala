@@ -7,15 +7,15 @@ import io.circe.Json
 
 package object syntax {
   implicit final class AnyToInputOps[A](private val a: A) extends AnyVal {
-    def set: Input[A] = Set(a)
+    def assign: Input[A] = Assign(a)
   }
 
   implicit final class AnyOptionToInputOps[A](private val a: Option[A]) extends AnyVal {
-    def orUndefined: Input[A] = Input.orUndefined(a)
-    def orUnset: Input[A]     = Input.orUnset(a)
+    def orIgnore: Input[A]   = Input.orIgnore(a)
+    def orUnassign: Input[A] = Input.orUnassign(a)
   }
 
   implicit final class JsonOps(private val json: Json) extends AnyVal {
-    def deepDropUndefined: Json = json.foldWith(Input.dropUndefinedFolder)
+    def deepDropIgnore: Json = json.foldWith(Input.dropIgnoreFolder)
   }
 }

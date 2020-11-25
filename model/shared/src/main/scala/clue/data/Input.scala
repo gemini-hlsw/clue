@@ -21,23 +21,23 @@ import clue.data.syntax._
 sealed trait Input[+A] {
   def map[B](f: A => B): Input[B] =
     this match {
-      case Undefined => Undefined
-      case Unset     => Unset
-      case Set(a)    => Set(f(a))
+      case Ignore    => Ignore
+      case Unassign  => Unassign
+      case Assign(a) => Assign(f(a))
     }
 
   def fold[B](fundef: => B, funset: => B, fset: A => B): B =
     this match {
-      case Undefined => fundef
-      case Unset     => funset
-      case Set(a)    => fset(a)
+      case Ignore    => fundef
+      case Unassign  => funset
+      case Assign(a) => fset(a)
     }
 
   def flatten[B](implicit ev: A <:< Input[B]): Input[B] =
     this match {
-      case Undefined => Undefined
-      case Unset     => Unset
-      case Set(a)    => a
+      case Ignore    => Ignore
+      case Unassign  => Unassign
+      case Assign(a) => a
     }
 
   def flatMap[B](f: A => Input[B]): Input[B] =
@@ -45,52 +45,52 @@ sealed trait Input[+A] {
 
   def toOption: Option[A] =
     this match {
-      case Set(a) => a.some
-      case _      => none
+      case Assign(a) => a.some
+      case _         => none
     }
 }
 
-final case object Undefined extends Input[Nothing]
-final case object Unset     extends Input[Nothing]
-final case class Set[A](value: A) extends Input[A]
+final case object Ignore   extends Input[Nothing]
+final case object Unassign extends Input[Nothing]
+final case class Assign[A](value: A) extends Input[A]
 
 object Input {
-  def apply[A](a: A): Input[A] = Set(a)
+  def apply[A](a: A): Input[A] = Assign(a)
 
-  def unset[A]: Input[A] = Unset
+  def unassign[A]: Input[A] = Unassign
 
-  def undefined[A]: Input[A] = Undefined
+  def ignore[A]: Input[A] = Ignore
 
-  def orUndefined[A](opt: Option[A]): Input[A] =
+  def orIgnore[A](opt: Option[A]): Input[A] =
     opt match {
-      case Some(a) => Set(a)
-      case None    => Undefined
+      case Some(a) => Assign(a)
+      case None    => Ignore
     }
 
-  def orUnset[A](opt: Option[A]): Input[A] =
+  def orUnassign[A](opt: Option[A]): Input[A] =
     opt match {
-      case Some(a) => Set(a)
-      case None    => Unset
+      case Some(a) => Assign(a)
+      case None    => Unassign
     }
 
   implicit def inputEq[A: Eq]: Eq[Input[A]] =
     new Eq[Input[A]] {
       def eqv(x: Input[A], y: Input[A]): Boolean =
         x match {
-          case Undefined =>
+          case Ignore     =>
             y match {
-              case Undefined => true
-              case _         => false
+              case Ignore => true
+              case _      => false
             }
-          case Unset     =>
+          case Unassign   =>
             y match {
-              case Unset => true
-              case _     => false
+              case Unassign => true
+              case _        => false
             }
-          case Set(ax)   =>
+          case Assign(ax) =>
             y match {
-              case Set(ay) => ax === ay
-              case _       => false
+              case Assign(ay) => ax === ay
+              case _          => false
             }
         }
     }
@@ -98,39 +98,39 @@ object Input {
   implicit def inputShow[A: Show]: Show[Input[A]] =
     new Show[Input[A]] {
       override def show(t: Input[A]): String = t match {
-        case Set(a)    => s"Set(${a.show})"
+        case Assign(a) => s"Set(${a.show})"
         case other @ _ => other.toString
       }
     }
 
-  private val UndefinedValue: Json = Json.fromString("clue.data.Undefined")
+  private val IgnoreValue: Json = Json.fromString("clue.data.Ignore")
 
-  val dropUndefinedFolder: Json.Folder[Json] = new Json.Folder[Json] {
+  val dropIgnoreFolder: Json.Folder[Json] = new Json.Folder[Json] {
     def onNull: Json = Json.Null
     def onBoolean(value: Boolean): Json      = Json.fromBoolean(value)
     def onNumber(value:  JsonNumber): Json   = Json.fromJsonNumber(value)
     def onString(value:  String): Json       = Json.fromString(value)
     def onArray(value:   Vector[Json]): Json =
       Json.fromValues(value.collect {
-        case v if v =!= UndefinedValue => v.foldWith(this)
+        case v if v =!= IgnoreValue => v.foldWith(this)
       })
     def onObject(value:  JsonObject): Json   =
       Json.fromJsonObject(
-        value.filter { case (_, v) => v =!= UndefinedValue }.mapValues(_.foldWith(this))
+        value.filter { case (_, v) => v =!= IgnoreValue }.mapValues(_.foldWith(this))
       )
   }
 
   implicit def inputEncoder[A: Encoder]: Encoder[Input[A]] = new Encoder[Input[A]] {
     override def apply(a: Input[A]): Json = a match {
-      case Undefined => UndefinedValue
-      case Unset     => Json.Null
-      case Set(a)    => a.asJson
+      case Ignore    => IgnoreValue
+      case Unassign  => Json.Null
+      case Assign(a) => a.asJson
     }
   }
 
   implicit def inputDecoder[A: Decoder]: Decoder[Input[A]] = new Decoder[Input[A]] {
     override def apply(c: HCursor): Decoder.Result[Input[A]] =
-      c.as[Option[A]].map(_.orUnset)
+      c.as[Option[A]].map(_.orUnassign)
   }
 
   implicit object InputCats extends Monad[Input] with Traverse[Input] with Align[Input] {
@@ -140,10 +140,10 @@ object Input {
     @tailrec
     override def tailRecM[A, B](a: A)(f: A => Input[Either[A, B]]): Input[B] =
       f(a) match {
-        case Undefined     => Undefined
-        case Unset         => Unset
-        case Set(Left(a))  => tailRecM(a)(f)
-        case Set(Right(b)) => Set(b)
+        case Ignore           => Ignore
+        case Unassign         => Unassign
+        case Assign(Left(a))  => tailRecM(a)(f)
+        case Assign(Right(b)) => Assign(b)
       }
 
     override def flatMap[A, B](fa: Input[A])(f: A => Input[B]): Input[B] =
@@ -153,23 +153,23 @@ object Input {
       fa: Input[A]
     )(f:  A => F[B])(implicit F: Applicative[F]): F[Input[B]] =
       fa match {
-        case Undefined => F.pure(Undefined)
-        case Unset     => F.pure(Unset)
-        case Set(a)    => F.map(f(a))(Set(_))
+        case Ignore    => F.pure(Ignore)
+        case Unassign  => F.pure(Unassign)
+        case Assign(a) => F.map(f(a))(Assign(_))
       }
 
     override def foldLeft[A, B](fa: Input[A], b: B)(f: (B, A) => B): B =
       fa match {
-        case Undefined => b
-        case Unset     => b
-        case Set(a)    => f(b, a)
+        case Ignore    => b
+        case Unassign  => b
+        case Assign(a) => f(b, a)
       }
 
     override def foldRight[A, B](fa: Input[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
       fa match {
-        case Undefined => lb
-        case Unset     => lb
-        case Set(a)    => f(a, lb)
+        case Ignore    => lb
+        case Unassign  => lb
+        case Assign(a) => f(a, lb)
       }
 
     override def functor: Functor[Input] = this
@@ -179,23 +179,23 @@ object Input {
 
     override def alignWith[A, B, C](fa: Input[A], fb: Input[B])(f: Ior[A, B] => C): Input[C] =
       fa match {
-        case Undefined =>
+        case Ignore    =>
           fb match {
-            case Undefined => Undefined
-            case Unset     => Unset
-            case Set(b)    => Set(f(Ior.right(b)))
+            case Ignore    => Ignore
+            case Unassign  => Unassign
+            case Assign(b) => Assign(f(Ior.right(b)))
           }
-        case Unset     =>
+        case Unassign  =>
           fb match {
-            case Undefined => Undefined
-            case Unset     => Unset
-            case Set(b)    => Set(f(Ior.right(b)))
+            case Ignore    => Ignore
+            case Unassign  => Unassign
+            case Assign(b) => Assign(f(Ior.right(b)))
           }
-        case Set(a)    =>
+        case Assign(a) =>
           fb match {
-            case Undefined => Set(f(Ior.left(a)))
-            case Unset     => Set(f(Ior.left(a)))
-            case Set(b)    => Set(f(Ior.both(a, b)))
+            case Ignore    => Assign(f(Ior.left(a)))
+            case Unassign  => Assign(f(Ior.left(a)))
+            case Assign(b) => Assign(f(Ior.both(a, b)))
           }
       }
   }

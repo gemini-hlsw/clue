@@ -21,14 +21,14 @@ import io.circe.testing.instances._
 import io.circe.generic.extras.semiauto._
 import io.circe.generic.extras.Configuration
 
-case class SomeInput(value: Input[Int] = Undefined)
+case class SomeInput(value: Input[Int] = Ignore)
 object SomeInput {
   implicit val customConfig: Configuration = Configuration.default.withDefaults
 
   implicit val someInputDecoder: Decoder[SomeInput] =
     deriveConfiguredDecoder[SomeInput]
   implicit val someInputEncoder: Encoder[SomeInput] =
-    deriveConfiguredEncoder[SomeInput].mapJson(_.deepDropUndefined)
+    deriveConfiguredEncoder[SomeInput].mapJson(_.deepDropIgnore)
   implicit val someInputArb: Arbitrary[SomeInput]   =
     Arbitrary(
       arbitrary[Input[Int]].map(SomeInput.apply)
@@ -59,50 +59,50 @@ class InputSpec extends DisciplineSuite {
     TraverseTests[Input].traverse[Int, Int, Int, Int, Option, Option]
   )
 
-  property("Input[Int].toOption: Undefined is None") {
-    Input.undefined[Int].toOption === none
+  property("Input[Int].toOption: Ignore is None") {
+    Input.ignore[Int].toOption === none
   }
 
-  property("Input[Int].toOption: Unset is None") {
-    Input.unset[Int].toOption === none
+  property("Input[Int].toOption: Unassign is None") {
+    Input.unassign[Int].toOption === none
   }
 
-  property("Input[Int].toOption: Set(a) is Some(a)") {
-    forAll((i: Int) => Set(i).toOption === i.some)
+  property("Input[Int].toOption: Assign(a) is Some(a)") {
+    forAll((i: Int) => Assign(i).toOption === i.some)
   }
 
-  property("Input[Int] (Any.set): a.set === Set(a)") {
-    forAll((i: Int) => i.set === Set(i))
+  property("Input[Int] (Any.set): a.assign === Assign(a)") {
+    forAll((i: Int) => i.assign === Assign(i))
   }
 
-  property("Input[Int] (Option.toInput): None.orUndefined === Undefined") {
-    none[Int].orUndefined match {
-      case Undefined => true
-      case _         => false
+  property("Input[Int] (Option.orIgnore): None.orIgnore === Ignore") {
+    none[Int].orIgnore match {
+      case Ignore => true
+      case _      => false
     }
   }
 
-  property("Input[Int] (Option.toInput): Some(a).orUndefined === Set(a)") {
-    forAll((i: Int) => i.some.orUndefined === Set(i))
+  property("Input[Int] (Option.orIgnore): Some(a).orIgnore === Assign(a)") {
+    forAll((i: Int) => i.some.orIgnore === Assign(i))
   }
 
-  property("Input[Int] (Option.toInput): None.orUnset === Undefined") {
-    none[Int].orUnset match {
-      case Unset => true
-      case _     => false
+  property("Input[Int] (Option.orUnassign): None.orUnassign === Unassign") {
+    none[Int].orUnassign match {
+      case Unassign => true
+      case _        => false
     }
   }
 
-  property("Input[Int] (Option.toInput): Some(a).orUnset === Set(a)") {
-    forAll((i: Int) => i.some.orUnset === Set(i))
+  property("Input[Int] (Option.orUnassign): Some(a).orUnassign === Assign(a)") {
+    forAll((i: Int) => i.some.orUnassign === Assign(i))
   }
 
-  property("Input[Input[Int]] (Input.flatten): Set(Set(a)).flatten === Set(a)") {
-    forAll((i: Int) => Set(Set(i)).flatten === Set(i))
+  property("Input[Input[Int]] (Input.flatten): Assign(Assign(a)).flatten === Assign(a)") {
+    forAll((i: Int) => Assign(Assign(i)).flatten === Assign(i))
   }
 
-  property("Input[Input[Int]] (Input.flatten): Set(Undefined).flatten === Undefined") {
-    Input[Input[Int]](Undefined).flatten === Undefined
+  property("Input[Input[Int]] (Input.flatten): Assign(Ignore).flatten === Ignore") {
+    Input[Input[Int]](Ignore).flatten === Ignore
   }
 
   checkAll("SomeInput", CodecTests[SomeInput].codec)

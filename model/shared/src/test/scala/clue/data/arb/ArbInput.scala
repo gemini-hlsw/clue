@@ -12,9 +12,9 @@ trait ArbInput {
   implicit def arbInput[A: Arbitrary]: Arbitrary[Input[A]] =
     Arbitrary(
       oneOf(
-        Gen.const(Undefined),
-        Gen.const(Unset),
-        arbitrary[A].map(Set.apply)
+        Gen.const(Ignore),
+        Gen.const(Unassign),
+        arbitrary[A].map(Assign.apply)
       )
     )
 
