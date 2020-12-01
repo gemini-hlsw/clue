@@ -30,6 +30,7 @@ trait BackendConnection[F[_]] {
 trait StreamingBackend[F[_]] {
   def connect(
     uri:       Uri,
+    authToken: Option[String],
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit] // Boolean = wasClean
@@ -127,7 +128,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       _    <- subscriptions.set(Map.empty)
     } yield ()
 
-  private val connect: F[Unit] = {
+  private def connect(token: Option[String]): F[Unit] = {
 
     def processMessage(str: String): F[Unit] =
       decode[StreamingMessage.FromServer](str) match {
@@ -171,7 +172,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
         _ <- connectionStatus.set(StreamingClientStatus.Closed)
         _ <- Timer[F].sleep(5 seconds) // TODO: Backoff.
         // math.min(60000, math.max(200, value.nextAttempt * 2)))
-        _ <- connect
+        _ <- connect(token)
       } yield ()).handleErrorWith(t =>
         Logger[F].error(t)(s"Error processing close on WebSocket for [$uri]")
       )
@@ -189,9 +190,18 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       for {
         _      <- connectionStatus.set(StreamingClientStatus.Connecting)
         sender <-
-          StreamingBackend[F].connect(uri, processMessage _, processError _, _ => processClose)
+          StreamingBackend[F].connect(uri,
+                                      token,
+                                      processMessage _,
+                                      processError _,
+                                      _ => processClose
+          )
         _      <- connectionStatus.set(StreamingClientStatus.Open)
-        _      <- sender.send(StreamingMessage.FromClient.ConnectionInit())
+        _      <- sender.send(
+                    StreamingMessage.FromClient.ConnectionInit(
+                      token.foldMap(t => Map("Authorization" -> s"Bearer $t"))
+                    )
+                  )
         _      <- restartSubscriptions(sender)
       } yield sender
 
@@ -260,13 +270,15 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
 
 object ApolloStreamingClient {
   def of[F[_]: ConcurrentEffect: Timer: Logger: StreamingBackend, S](
-    uri: Uri
+    uri:   Uri,
+    token: Option[String]
   ): F[ApolloStreamingClient[F, S]] =
     for {
       connectionStatus <- SignallingRef[F, StreamingClientStatus](StreamingClientStatus.Closed)
       subscriptions    <- Ref.of[F, Map[String, Emitter[F]]](Map.empty)
       connectionMVar   <- MVar.empty[F, Either[Throwable, BackendConnection[F]]]
-      client            = new ApolloStreamingClient[F, S](uri)(connectionStatus, subscriptions, connectionMVar)
-      _                <- client.connect
+      client            =
+        new ApolloStreamingClient[F, S](uri)(connectionStatus, subscriptions, connectionMVar)
+      _                <- client.connect(token)
     } yield client
 }

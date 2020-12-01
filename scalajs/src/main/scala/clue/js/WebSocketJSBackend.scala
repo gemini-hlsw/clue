@@ -35,6 +35,7 @@ final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends Streaming
 
   override def connect(
     uri:       Uri,
+    authToken: Option[String],
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit]
