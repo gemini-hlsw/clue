@@ -8,14 +8,15 @@ import clue.model.StreamingMessage.FromClient
 import clue.model.StreamingMessage.FromClient._
 import org.scalacheck.{ Arbitrary, Gen }
 import org.scalacheck.Arbitrary._
+import io.circe.JsonObject
 
 trait ArbFromClient {
-
   import ArbGraphQLRequest._
+  import ArbJson._
 
   implicit val arbConnectionInit: Arbitrary[ConnectionInit] =
     Arbitrary {
-      arbitrary[Map[String, String]].map(ConnectionInit(_))
+      arbitrary[JsonObject](arbJsonObjectOfStrings).map(ConnectionInit(_))
     }
 
   implicit val arbStart: Arbitrary[Start] =

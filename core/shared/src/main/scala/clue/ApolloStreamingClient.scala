@@ -30,7 +30,6 @@ trait BackendConnection[F[_]] {
 trait StreamingBackend[F[_]] {
   def connect(
     uri:       Uri,
-    authToken: Option[String],
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit] // Boolean = wasClean
@@ -55,7 +54,7 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
   val connectionStatus:       SignallingRef[F, StreamingClientStatus],
   private val subscriptions:  Ref[F, Map[String, Emitter[F]]],
   private val connectionMVar: MVar2[F, Either[Throwable, BackendConnection[F]]]
-) extends GraphQLStreamingClient[F, S] {
+) extends GraphQLPersistentStreamingClient[F, S] {
   private val LogPrefix = "[clue.ApolloStreamingClient]"
 
   private val F = implicitly[ConcurrentEffect[F]]
@@ -66,23 +65,22 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
   def statusStream: fs2.Stream[F, StreamingClientStatus] =
     connectionStatus.discrete
 
-  def close(): F[Unit] =
+  def disconnect(): F[Unit] =
     connectionMVar.read.rethrow.flatMap(s =>
-      connectionStatus.set(StreamingClientStatus.Closing) *> s.close()
+      connectionStatus.set(StreamingClientStatus.Disconnecting) >> s.close()
     )
 
-  type Subscription[D] = ApolloSubscription[D]
+  def createSubscription[D](
+    subscriptionStream: Stream[F, D],
+    subscriptionId:     String
+  ): GraphQLSubscription[F, D] = new GraphQLSubscription[F, D] {
+    override val stream: fs2.Stream[F, D] = subscriptionStream
 
-  case class ApolloSubscription[D](
-    stream:                                  Stream[F, D],
-    protected[ApolloStreamingClient] val id: String
-  ) extends StoppableSubscription[D] {
-
-    def stop(): F[Unit] =
+    override def stop(): F[Unit] =
       (for {
         sender <- EitherT(connectionMVar.read)
-        _      <- EitherT(terminateSubscription(id).attempt)
-        _      <- EitherT.right[Throwable](sender.send(StreamingMessage.FromClient.Stop(id)))
+        _      <- EitherT(terminateSubscription(subscriptionId).attempt)
+        _      <- EitherT.right[Throwable](sender.send(StreamingMessage.FromClient.Stop(subscriptionId)))
       } yield ()).value.rethrow
   }
 
@@ -124,11 +122,10 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
     for {
       subs <- subscriptions.get
       _    <- subs.toList.traverse(_._2.terminate())
-      // _ <- subs.toList.parUnorderedTraverse(_._2.terminate()) // In 2.13 we can just subs.parUnorderedTraverse(_.terminate())
       _    <- subscriptions.set(Map.empty)
     } yield ()
 
-  private def connect(token: Option[String]): F[Unit] = {
+  def connect(payload: JsonObject): F[Unit] = {
 
     def processMessage(str: String): F[Unit] =
       decode[StreamingMessage.FromServer](str) match {
@@ -162,17 +159,17 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
         .flatMap {
           // Connection was already established. We must cancel all subscriptions. (or not?)
           case false => terminateAllSubscriptions()
-          case true  => connectionStatus.set(StreamingClientStatus.Closed) // Retry?
+          case true  => connectionStatus.set(StreamingClientStatus.Disconnected) // Retry?
         }
         .handleErrorWith(t => Logger[F].error(t)(s"Error processing error on WebSocket for [$uri]"))
 
     val processClose: F[Unit] =
       (for {
         _ <- connectionMVar.take
-        _ <- connectionStatus.set(StreamingClientStatus.Closed)
-        _ <- Timer[F].sleep(5 seconds) // TODO: Backoff.
+        _ <- connectionStatus.set(StreamingClientStatus.Disconnected)
+        _ <- Timer[F].sleep(5 seconds) // TODO: Backoff. And other reconnection strategies.
         // math.min(60000, math.max(200, value.nextAttempt * 2)))
-        _ <- connect(token)
+        _ <- connect(payload)
       } yield ()).handleErrorWith(t =>
         Logger[F].error(t)(s"Error processing close on WebSocket for [$uri]")
       )
@@ -180,9 +177,8 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
     def restartSubscriptions(sender: BackendConnection[F]): F[Unit] =
       for {
         subs <- subscriptions.get
-        _    <- subs.toList.traverse {
-                  case (id, emitter) => // _ <- subs.toList.parUnorderedTraverse{ case(id, emitter) =>
-                    sender.send(StreamingMessage.FromClient.Start(id, emitter.request))
+        _    <- subs.toList.traverse { case (id, emitter) =>
+                  sender.send(StreamingMessage.FromClient.Start(id, emitter.request))
                 }
       } yield ()
 
@@ -190,18 +186,9 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       for {
         _      <- connectionStatus.set(StreamingClientStatus.Connecting)
         sender <-
-          StreamingBackend[F].connect(uri,
-                                      token,
-                                      processMessage _,
-                                      processError _,
-                                      _ => processClose
-          )
-        _      <- connectionStatus.set(StreamingClientStatus.Open)
-        _      <- sender.send(
-                    StreamingMessage.FromClient.ConnectionInit(
-                      token.foldMap(t => Map("Authorization" -> s"Bearer $t"))
-                    )
-                  )
+          StreamingBackend[F].connect(uri, processMessage _, processError _, _ => processClose)
+        _      <- connectionStatus.set(StreamingClientStatus.Connected)
+        _      <- sender.send(StreamingMessage.FromClient.ConnectionInit(payload))
         _      <- restartSubscriptions(sender)
       } yield sender
 
@@ -217,11 +204,16 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
       emitter = QueueEmitter(queue, request)
     } yield (id, emitter)
 
-  protected def subscribeInternal[D: Decoder](
+  private case class SubscriptionInfo[D](
+    subscription: GraphQLSubscription[F, D],
+    onComplete:   F[Unit]
+  )
+
+  private def startSubscription[D: Decoder](
     subscription:  String,
-    operationName: Option[String] = None,
-    variables:     Option[Json] = None
-  ): F[Subscription[D]] = {
+    operationName: Option[String],
+    variables:     Option[Json]
+  ): F[SubscriptionInfo[D]] = {
     val request = GraphQLRequest(subscription, operationName, variables)
 
     (for {
@@ -237,21 +229,29 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
           Logger[F].debug(s"$LogPrefix Releasing queue for subscription[$id]") >>
             subscriptions.update(_ - id)
         )
-      ApolloSubscription(
-        bracket.flatMap(_ =>
-          (
-            Stream.eval(sender.send(StreamingMessage.FromClient.Start(id, request))) >>
-              emitter.queue.dequeue
-                .evalTap(v => Logger[F].debug(s"$LogPrefix Dequeuing for subscription [$id]: [$v]"))
-          ).rethrow.unNoneTerminate
-            .onError { case t: Throwable =>
-              Stream.eval(Logger[F].error(t)(s"$LogPrefix Error in subscription [$id]: "))
-            }
-        ),
-        id
+
+      val stream = bracket.flatMap(_ =>
+        (
+          Stream.eval(sender.send(StreamingMessage.FromClient.Start(id, request))) >>
+            emitter.queue.dequeue
+              .evalTap(v => Logger[F].debug(s"$LogPrefix Dequeuing for subscription [$id]: [$v]"))
+        ).rethrow.unNoneTerminate
+          .onError { case t: Throwable =>
+            Stream.eval(Logger[F].error(t)(s"$LogPrefix Error in subscription [$id]: "))
+          }
       )
+
+      SubscriptionInfo(createSubscription(stream, id), terminateSubscription(id))
     }).value.rethrow
   }
+
+  override protected def subscribeInternal[D: Decoder](
+    subscription:  String,
+    operationName: Option[String] = None,
+    variables:     Option[Json] = None
+  ): F[GraphQLSubscription[F, D]] =
+    startSubscription(subscription, operationName, variables)(implicitly[Decoder[D]])
+      .map(_.subscription)
 
   protected def requestInternal[D: Decoder](
     document:      String,
@@ -259,9 +259,9 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
     variables:     Option[Json] = None
   ): F[D] =
     F.asyncF[D] { cb =>
-      subscribeInternal[D](document, operationName, variables).flatMap { subscription =>
-        subscription.stream.attempt
-          .evalMap(result => F.delay(cb(result)) >> terminateSubscription(subscription.id))
+      startSubscription[D](document, operationName, variables).flatMap { subscriptionInfo =>
+        subscriptionInfo.subscription.stream.attempt
+          .evalMap(result => F.delay(cb(result)) >> subscriptionInfo.onComplete)
           .compile
           .drain
       }
@@ -270,15 +270,15 @@ class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger: StreamingBack
 
 object ApolloStreamingClient {
   def of[F[_]: ConcurrentEffect: Timer: Logger: StreamingBackend, S](
-    uri:   Uri,
-    token: Option[String]
+    uri: Uri
   ): F[ApolloStreamingClient[F, S]] =
     for {
-      connectionStatus <- SignallingRef[F, StreamingClientStatus](StreamingClientStatus.Closed)
+      connectionStatus <-
+        SignallingRef[F, StreamingClientStatus](StreamingClientStatus.Disconnected)
       subscriptions    <- Ref.of[F, Map[String, Emitter[F]]](Map.empty)
       connectionMVar   <- MVar.empty[F, Either[Throwable, BackendConnection[F]]]
       client            =
         new ApolloStreamingClient[F, S](uri)(connectionStatus, subscriptions, connectionMVar)
-      _                <- client.connect(token)
+      // _                <- client.connect()
     } yield client
 }

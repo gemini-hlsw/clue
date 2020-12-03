@@ -7,20 +7,10 @@ import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
 
+/**
+ * A client that allows subscriptions besides one-shot queries and mutations.
+ */
 trait GraphQLStreamingClient[F[_], S] extends GraphQLClient[F, S] {
-  def status: F[StreamingClientStatus]
-
-  def statusStream: fs2.Stream[F, StreamingClientStatus]
-
-  def close(): F[Unit]
-
-  protected trait StoppableSubscription[D] {
-    val stream: fs2.Stream[F, D]
-    def stop(): F[Unit]
-  }
-
-  type Subscription[D] <: StoppableSubscription[D]
-
   def subscribe(
     subscription:  GraphQLOperation[S],
     operationName: Option[String] = None
@@ -33,14 +23,16 @@ trait GraphQLStreamingClient[F[_], S] extends GraphQLClient[F, S] {
     subscription:        GraphQLOperation[S],
     operationName:       Option[String] = None
   )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
-    def apply(variables: V): F[Subscription[D]] =
+    def apply(variables: V): F[GraphQLSubscription[F, D]] =
       subscribeInternal[D](subscription.document, operationName, variables.asJson.some)
 
-    def apply: F[Subscription[D]] =
+    def apply: F[GraphQLSubscription[F, D]] =
       subscribeInternal[D](subscription.document, operationName)
   }
   object SubscriptionApplied {
-    implicit def withoutVariables[V, D](applied: SubscriptionApplied[V, D]): F[Subscription[D]] =
+    implicit def withoutVariables[V, D](
+      applied: SubscriptionApplied[V, D]
+    ): F[GraphQLSubscription[F, D]] =
       applied.apply
   }
 
@@ -48,5 +40,5 @@ trait GraphQLStreamingClient[F[_], S] extends GraphQLClient[F, S] {
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
-  ): F[Subscription[D]]
+  ): F[GraphQLSubscription[F, D]]
 }

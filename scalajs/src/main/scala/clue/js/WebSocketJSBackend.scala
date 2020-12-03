@@ -17,9 +17,11 @@ import org.scalajs.dom.raw.MessageEvent
 import org.scalajs.dom.raw.WebSocket
 import sttp.model.Uri
 
-// This implementation follows the Apollo protocol, specified in:
-// https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
-// Also see: https://medium.com/@rob.blackbourn/writing-a-graphql-websocket-subscriber-in-javascript-4451abb9cd60
+/**
+ * This implementation follows the Apollo protocol, specified in:
+ * https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
+ * Also see: https://medium.com/@rob.blackbourn/writing-a-graphql-websocket-subscriber-in-javascript-4451abb9cd60
+ */
 final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
     extends BackendConnection[F] {
   override def send(msg: StreamingMessage.FromClient): F[Unit] =
@@ -35,7 +37,6 @@ final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends Streaming
 
   override def connect(
     uri:       Uri,
-    authToken: Option[String],
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
     onClose:   Boolean => F[Unit]
