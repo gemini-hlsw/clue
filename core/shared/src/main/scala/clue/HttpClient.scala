@@ -12,17 +12,6 @@ import io.circe._
 import io.circe.parser._
 import sttp.model.Uri
 
-trait Backend[F[_]] {
-  def request(
-    uri:     Uri,
-    request: GraphQLRequest
-  ): F[String]
-}
-
-object Backend {
-  def apply[F[_]: Backend]: Backend[F] = implicitly
-}
-
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
 // {
 //   "data": { ... }, // Typed

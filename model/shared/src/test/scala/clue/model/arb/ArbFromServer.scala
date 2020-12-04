@@ -9,8 +9,10 @@ import io.circe.Json
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
+import io.circe.JsonObject
 
 trait ArbFromServer {
+  import ArbJson._
 
   val arbErrorJson: Arbitrary[Json] =
     Arbitrary {
@@ -33,23 +35,18 @@ trait ArbFromServer {
       }
     }
 
-  val arbDataJson: Arbitrary[Json] =
-    Arbitrary {
-      arbitrary[String].map(Json.fromString)
-    }
-
   val genErrosJson: Gen[Json]                                 =
     arbitrary[String].map(s => Json.arr(Json.obj("message" -> Json.fromString(s))))
 
   implicit val arbConnectionError: Arbitrary[ConnectionError] =
     Arbitrary {
-      arbitrary[Json](arbErrorJson).map(ConnectionError(_))
+      arbitrary[JsonObject](arbJsonObjectOfStrings).map(ConnectionError(_))
     }
 
   implicit val arbDataWrapper: Arbitrary[DataWrapper] =
     Arbitrary {
       for {
-        data   <- arbitrary[Json](arbDataJson)
+        data   <- arbitrary[Json](arbJsonString)
         errors <- Gen.option(genErrosJson)
       } yield DataWrapper(data, errors)
     }

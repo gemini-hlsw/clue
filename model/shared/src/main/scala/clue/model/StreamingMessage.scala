@@ -6,11 +6,13 @@ package clue.model
 import cats.Eq
 import cats.syntax.all._
 import io.circe.Json
+import io.circe.JsonObject
 
 /**
  * GraphQL web socket protocol streaming messages.  Messages are cleanly
  * divided in those coming `FromClient` and those coming `FromServer`.  See
- * also https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
+ * also https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md.
+ * Also see: https://medium.com/@rob.blackbourn/writing-a-graphql-websocket-subscriber-in-javascript-4451abb9cd60
  */
 object StreamingMessage {
 
@@ -37,14 +39,14 @@ object StreamingMessage {
   object FromClient {
 
     /**
-     * Starts communication with the server.  The client may expect a
+     * Starts communication with the server. The client may expect a
      * `ConnectionAck` or `ConnectionError` in response.
      *
      * @param payload any connection parameters that the client wishes to send
      */
-    final case class ConnectionInit(payload: Map[String, String] = Map.empty)
+    final case class ConnectionInit(payload: JsonObject = JsonObject.empty)
         extends FromClient
-        with Payload[Map[String, String]]
+        with Payload[JsonObject]
 
     object ConnectionInit {
       implicit val EqConnectionInit: Eq[ConnectionInit] =
@@ -113,7 +115,9 @@ object StreamingMessage {
      *
      * @param payload error information
      */
-    final case class ConnectionError(payload: Json) extends FromServer with Payload[Json]
+    final case class ConnectionError(payload: JsonObject)
+        extends FromServer
+        with Payload[JsonObject]
 
     object ConnectionError {
       implicit val EqConnectionError: Eq[ConnectionError] =

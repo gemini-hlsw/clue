@@ -7,6 +7,9 @@ import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
 
+/**
+ * A client that allows one-shot queries and mutations.
+ */
 trait GraphQLClient[F[_], S] {
   def request(
     operation:     GraphQLOperation[S],
