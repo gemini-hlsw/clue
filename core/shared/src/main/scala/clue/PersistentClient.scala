@@ -4,38 +4,42 @@
 package clue
 
 import cats.syntax.all._
-import io.circe.JsonObject
 import cats.effect.Sync
+import scala.concurrent.duration.FiniteDuration
+import io.circe.Json
 
 /**
  * A client that keeps a connection open with the server.
  */
-trait PersistentClient[F[_]] {
-  protected implicit val backend: PersistentBackend[F]
-
-  type CP = backend.CP
-  type CE = backend.CE
+trait PersistentClient[F[_], CP, CE] {
+  protected val backend: PersistentBackend[F, CP, CE]
+  protected val reconnectionStrategy: Option[ReconnectionStrategy[F, CE]] // If None, no reconnect.
 
   def status: F[StreamingClientStatus]
 
   def statusStream: fs2.Stream[F, StreamingClientStatus]
 
-  def connect(
-    payload:              F[JsonObject],
-    reconnectionStrategy: Option[ReconnectionStrategy[F, backend.CE]]
-  ): F[Unit]
+  def connect(payload: F[Map[String, Json]]): F[Unit]
 
-  def connect(
-    payload:              JsonObject = JsonObject.empty,
-    reconnectionStrategy: Option[ReconnectionStrategy[F, backend.CE]] = None
-  )(implicit sync:        Sync[F]): F[Unit] =
-    connect(Sync[F].delay(payload), reconnectionStrategy)
+  final def connect(payload: Map[String, Json] = Map.empty)(implicit sync: Sync[F]): F[Unit] =
+    connect(Sync[F].delay(payload))
 
-  final def disconnect(closeParameters: backend.CP): F[Unit] =
+  final def disconnect(closeParameters: CP): F[Unit] =
     disconnectInternal(closeParameters.some)
 
   final def disconnect(): F[Unit] =
     disconnectInternal(none)
 
-  protected def disconnectInternal(closeParameters: Option[backend.CP]): F[Unit]
+  protected def disconnectInternal(closeParameters: Option[CP]): F[Unit]
+
+  def withReconnectionStrategy(
+    reconnectionStrategy: ReconnectionStrategy[F, CE]
+  ): PersistentClient[F, CP, CE]
+
+  final def withReconnectionStrategy(
+    maxAttempts: Int,
+    backoffFn:   (Int, CE) => Option[FiniteDuration]
+  ): PersistentClient[F, CP, CE] = withReconnectionStrategy(
+    ReconnectionStrategy(maxAttempts, backoffFn)
+  )
 }

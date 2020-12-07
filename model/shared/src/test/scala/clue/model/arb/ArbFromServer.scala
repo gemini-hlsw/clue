@@ -9,7 +9,6 @@ import io.circe.Json
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
-import io.circe.JsonObject
 
 trait ArbFromServer {
   import ArbJson._
@@ -40,7 +39,7 @@ trait ArbFromServer {
 
   implicit val arbConnectionError: Arbitrary[ConnectionError] =
     Arbitrary {
-      arbitrary[JsonObject](arbJsonObjectOfStrings).map(ConnectionError(_))
+      arbitrary[Map[String, Json]](arbJsonStringMap).map(ConnectionError(_))
     }
 
   implicit val arbDataWrapper: Arbitrary[DataWrapper] =

@@ -27,17 +27,15 @@ protected[clue] trait Emitter[F[_]] {
   def terminate(): F[Unit]
 }
 
-abstract class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger, S](uri: Uri)
-    extends GraphQLPersistentStreamingClient[F, S] {
+abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](uri: Uri)
+    extends GraphQLPersistentClient[F, S, CP, CE] {
   private val LogPrefix = "[clue.ApolloStreamingClient]"
 
   private val F = implicitly[ConcurrentEffect[F]]
 
-  override protected implicit val backend: PersistentBackend[F]
-
   val connectionStatus: SignallingRef[F, StreamingClientStatus]
   protected val subscriptions: Ref[F, Map[String, Emitter[F]]]
-  protected val connectionMVar: MVar2[F, Either[Throwable, backend.Connection]]
+  protected val connectionMVar: MVar2[F, Either[Throwable, PersistentConnection[F, CP]]]
   protected val connectionAttempt: Ref[F, Int]
 
   override def status: F[StreamingClientStatus] =
@@ -46,7 +44,7 @@ abstract class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger, S](u
   override def statusStream: fs2.Stream[F, StreamingClientStatus] =
     connectionStatus.discrete
 
-  override def disconnectInternal(closeParameters: Option[backend.CP]): F[Unit] =
+  override protected def disconnectInternal(closeParameters: Option[CP]): F[Unit] =
     connectionMVar.read.rethrow.flatMap(connection =>
       connectionStatus.set(StreamingClientStatus.Disconnecting) >> connection.closeInternal(
         closeParameters
@@ -144,7 +142,7 @@ abstract class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger, S](u
       }
       .handleErrorWith(t => Logger[F].error(t)(s"Error processing error on WebSocket for [$uri]"))
 
-  private def restartSubscriptions(sender: backend.Connection): F[Unit] =
+  private def restartSubscriptions(sender: PersistentConnection[F, CP]): F[Unit] =
     for {
       subs <- subscriptions.get
       _    <- subs.toList.traverse { case (id, emitter) =>
@@ -152,19 +150,16 @@ abstract class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger, S](u
               }
     } yield ()
 
-  def connect(
-    payload:              F[JsonObject],
-    reconnectionStrategy: Option[ReconnectionStrategy[F, backend.CE]] // If None, no reconnect
-  ): F[Unit] = {
+  def connect(payload: F[Map[String, Json]]): F[Unit] = {
 
-    def processClose(closeEvent: backend.CE): F[Unit] =
+    def processClose(closeEvent: CE): F[Unit] =
       (for {
         _         <- connectionMVar.take
         _         <- connectionStatus.set(StreamingClientStatus.Disconnected)
         attempt   <- connectionAttempt.updateAndGet(_ + 1)
         backoffOpt = reconnectionStrategy.flatMap(_.backoffFn(attempt, closeEvent))
-        _         <- backoffOpt.fold(F.unit)(backoff =>
-                       Timer[F].sleep(backoff) >> connect(payload, reconnectionStrategy)
+        _         <- backoffOpt.fold(terminateAllSubscriptions())(backoff =>
+                       Timer[F].sleep(backoff) >> connect(payload)
                      )
       } yield ()).handleErrorWith(t =>
         Logger[F].error(t)(s"Error processing close on WebSocket for [$uri]")
@@ -255,27 +250,4 @@ abstract class ApolloStreamingClient[F[_]: ConcurrentEffect: Timer: Logger, S](u
           .drain
       }
     }
-}
-
-object ApolloStreamingClient {
-  def of[F[_]: ConcurrentEffect: Timer: Logger, S](
-    uri:               Uri
-  )(implicit _backend: PersistentBackend[F]): F[ApolloStreamingClient[F, S]] =
-    for {
-      _connectionStatus  <-
-        SignallingRef[F, StreamingClientStatus](StreamingClientStatus.Disconnected)
-      _subscriptions     <- Ref.of[F, Map[String, Emitter[F]]](Map.empty)
-      _connectionMVar    <- MVar.empty[F, Either[Throwable, _backend.Connection]]
-      _connectionAttempt <- Ref.of[F, Int](0)
-      client              =
-        new ApolloStreamingClient[F, S](uri) {
-          override protected implicit val backend = _backend
-
-          override val connectionStatus            = _connectionStatus
-          override protected val subscriptions     = _subscriptions
-          override protected val connectionMVar    =
-            _connectionMVar.asInstanceOf[MVar2[F, Either[Throwable, backend.Connection]]]
-          override protected val connectionAttempt = _connectionAttempt
-        }
-    } yield client
 }

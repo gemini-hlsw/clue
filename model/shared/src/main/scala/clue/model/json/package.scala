@@ -45,7 +45,7 @@ package object json {
     (c: HCursor) =>
       for {
         _ <- checkType(c, "connection_init")
-        p <- c.downField("payload").as[JsonObject]
+        p <- c.downField("payload").as[Map[String, Json]]
       } yield ConnectionInit(p)
 
   implicit val EncoderStart: Encoder[Start] =
@@ -124,7 +124,7 @@ package object json {
     (c: HCursor) =>
       for {
         _ <- checkType(c, "connection_error")
-        p <- c.downField("payload").as[JsonObject]
+        p <- c.downField("payload").as[Map[String, Json]]
       } yield ConnectionError(p)
 
   implicit val DecoderConnectionKA: Decoder[ConnectionKeepAlive.type] =
