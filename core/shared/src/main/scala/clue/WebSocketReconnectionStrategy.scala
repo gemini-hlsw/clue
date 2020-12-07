@@ -5,7 +5,9 @@ package clue
 
 import scala.concurrent.duration.FiniteDuration
 
-case class ReconnectionStrategy[F[_], CE](
-  maxAttempts: Int,
-  backoffFn:   (Int, CE) => Option[FiniteDuration] // If None is returned, no more reconnect attempts
-)
+object WebSocketReconnectionStrategy {
+  def apply[F[_]](
+    maxAttempts: Int,
+    backoffFn:   (Int, WebSocketCloseEvent) => Option[FiniteDuration]
+  ): WebSocketReconnectionStrategy[F] = ReconnectionStrategy(maxAttempts, backoffFn)
+}

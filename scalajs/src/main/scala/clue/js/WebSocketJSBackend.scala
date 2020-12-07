@@ -16,31 +16,19 @@ import org.scalajs.dom.raw.Event
 import org.scalajs.dom.raw.MessageEvent
 import org.scalajs.dom.raw.WebSocket
 import sttp.model.Uri
-import scalajs.js
-
-// From https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/close
-case class WSJSCloseParams(
-  code:   js.UndefOr[Int] = js.undefined,
-  reason: js.UndefOr[String] = js.undefined
-)
 
 /**
- * This implementation follows the Apollo protocol, specified in:
- * https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
- * Also see: https://medium.com/@rob.blackbourn/writing-a-graphql-websocket-subscriber-in-javascript-4451abb9cd60
+ * Streaming backend for JS WebSocket.
  */
-final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends PersistentBackend[F] {
-  type CE = CloseEvent
-  type CP = WSJSCloseParams
-
+final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends WebSocketBackend[F] {
   private val Protocol = "graphql-ws"
 
   override def connect(
     uri:       Uri,
     onMessage: String => F[Unit],
     onError:   Throwable => F[Unit],
-    onClose:   CloseEvent => F[Unit]
-  ): F[this.Connection] =
+    onClose:   WebSocketCloseEvent => F[Unit]
+  ): F[PersistentConnection[F, WebSocketCloseParams]] =
     Async[F].async { cb =>
       val ws = new WebSocket(uri.toString, Protocol)
 
@@ -64,29 +52,32 @@ final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends Persisten
 
       ws.onclose = { e: CloseEvent =>
         (
-          Logger[F].trace("WebSocket closed") >> onClose(e)
+          Logger[F].trace("WebSocket closed") >> onClose(
+            WebSocketCloseEvent(e.code, e.reason, e.wasClean)
+          )
         ).toIO.unsafeRunAsyncAndForget()
       }
     }
-
-  final class WebSocketJSConnection(private val ws: WebSocket) extends this.Connection {
-    override def send(msg: StreamingMessage.FromClient): F[Unit] =
-      Sync[F].delay(ws.send(msg.asJson.toString))
-
-    override def closeInternal(closeParameters: Option[WSJSCloseParams]): F[Unit] =
-      Logger[F].trace("Disconnecting WebSocket...") >>
-        Sync[F].delay {
-          val params = closeParameters.getOrElse(WSJSCloseParams())
-          // Facade should define parameters as js.Undef, but it doesn't.
-          (params.code.toOption, params.reason.toOption)
-            .mapN { case (code, reason) => ws.close(code, reason) }
-            .orElse(params.code.toOption.map(code => ws.close(code)))
-            .orElse(params.reason.toOption.map(reason => ws.close(reason = reason)))
-            .getOrElse(ws.close())
-        }
-  }
 }
 
 object WebSocketJSBackend {
   def apply[F[_]: ConcurrentEffect: Logger]: WebSocketJSBackend[F] = new WebSocketJSBackend[F]
+}
+
+final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
+    extends WebSocketConnection[F] {
+  override def send(msg: StreamingMessage.FromClient): F[Unit] =
+    Sync[F].delay(ws.send(msg.asJson.toString))
+
+  override def closeInternal(closeParameters: Option[WebSocketCloseParams]): F[Unit] =
+    Logger[F].trace("Disconnecting WebSocket...") >>
+      Sync[F].delay {
+        val params = closeParameters.getOrElse(WebSocketCloseParams())
+        // Facade for "ws.close" should define parameters as js.Undef, but it doesn't.
+        (params.code, params.reason)
+          .mapN { case (code, reason) => ws.close(code, reason) }
+          .orElse(params.code.map(code => ws.close(code)))
+          .orElse(params.reason.map(reason => ws.close(reason = reason)))
+          .getOrElse(ws.close())
+      }
 }

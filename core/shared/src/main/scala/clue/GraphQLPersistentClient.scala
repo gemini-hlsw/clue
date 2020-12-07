@@ -3,6 +3,6 @@
 
 package clue
 
-trait GraphQLPersistentStreamingClient[F[_], S]
+trait GraphQLPersistentClient[F[_], S, CP, CE]
     extends GraphQLStreamingClient[F, S]
-    with PersistentClient[F]
+    with PersistentClient[F, CP, CE]
