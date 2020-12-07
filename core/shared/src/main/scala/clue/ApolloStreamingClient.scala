@@ -157,7 +157,7 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
         _         <- connectionMVar.take
         _         <- connectionStatus.set(StreamingClientStatus.Disconnected)
         attempt   <- connectionAttempt.updateAndGet(_ + 1)
-        backoffOpt = reconnectionStrategy.flatMap(_.backoffFn(attempt, closeEvent))
+        backoffOpt = reconnectionStrategy(attempt, closeEvent)
         _         <- backoffOpt.fold(terminateAllSubscriptions())(backoff =>
                        Timer[F].sleep(backoff) >> connect(payload)
                      )

@@ -12,7 +12,6 @@ import fs2.concurrent.SignallingRef
 import cats.effect.concurrent.Ref
 import cats.effect.concurrent.MVar
 import cats.effect.concurrent.MVar2
-import scala.concurrent.duration.FiniteDuration
 
 case class ApolloWebSocketClient[F[_]: ConcurrentEffect: Timer: Logger, S](
   uri:                                         Uri,
@@ -24,18 +23,14 @@ case class ApolloWebSocketClient[F[_]: ConcurrentEffect: Timer: Logger, S](
     Either[Throwable, PersistentConnection[F, WebSocketCloseParams]]
   ],
   override protected val connectionAttempt:    Ref[F, Int],
-  override protected val reconnectionStrategy: Option[ReconnectionStrategy[F, WebSocketCloseEvent]]
+  override protected val reconnectionStrategy: ReconnectionStrategy[WebSocketCloseEvent]
 ) extends ApolloClient[F, S, WebSocketCloseParams, WebSocketCloseEvent](uri)
-    with GraphQLWebSocketClient[F, S] {
-  def withReconnectionStrategy(
-    reconnectionStrategy: ReconnectionStrategy[F, WebSocketCloseEvent]
-  ): ApolloWebSocketClient[F, S] = copy(reconnectionStrategy = reconnectionStrategy.some)
-}
+    with GraphQLWebSocketClient[F, S]
 
 object ApolloWebSocketClient {
   def of[F[_]: ConcurrentEffect: Timer: Logger, S](
     uri:                  Uri,
-    reconnectionStrategy: Option[ReconnectionStrategy[F, WebSocketCloseEvent]] = none
+    reconnectionStrategy: ReconnectionStrategy[WebSocketCloseEvent] = ReconnectionStrategy.never
   )(implicit backend:     WebSocketBackend[F]): F[ApolloWebSocketClient[F, S]] =
     for {
       connectionStatus  <-
@@ -52,17 +47,4 @@ object ApolloWebSocketClient {
                                             connectionAttempt,
                                             reconnectionStrategy
     )
-
-  def of[F[_]: ConcurrentEffect: Timer: Logger, S](
-    uri:                  Uri,
-    reconnectionStrategy: ReconnectionStrategy[F, WebSocketCloseEvent]
-  )(implicit backend:     WebSocketBackend[F]): F[ApolloWebSocketClient[F, S]] =
-    of(uri, reconnectionStrategy.some)
-
-  def of[F[_]: ConcurrentEffect: Timer: Logger, S](
-    uri:              Uri,
-    maxAttempts:      Int,
-    backoffFn:        (Int, WebSocketCloseEvent) => Option[FiniteDuration]
-  )(implicit backend: WebSocketBackend[F]): F[ApolloWebSocketClient[F, S]] =
-    of(uri, ReconnectionStrategy[F, WebSocketCloseEvent](maxAttempts, backoffFn).some)
 }

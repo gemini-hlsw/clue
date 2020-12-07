@@ -5,7 +5,6 @@ package clue
 
 import cats.syntax.all._
 import cats.effect.Sync
-import scala.concurrent.duration.FiniteDuration
 import io.circe.Json
 
 /**
@@ -13,7 +12,7 @@ import io.circe.Json
  */
 trait PersistentClient[F[_], CP, CE] {
   protected val backend: PersistentBackend[F, CP, CE]
-  protected val reconnectionStrategy: Option[ReconnectionStrategy[F, CE]] // If None, no reconnect.
+  protected val reconnectionStrategy: ReconnectionStrategy[CE]
 
   def status: F[StreamingClientStatus]
 
@@ -31,15 +30,4 @@ trait PersistentClient[F[_], CP, CE] {
     disconnectInternal(none)
 
   protected def disconnectInternal(closeParameters: Option[CP]): F[Unit]
-
-  def withReconnectionStrategy(
-    reconnectionStrategy: ReconnectionStrategy[F, CE]
-  ): PersistentClient[F, CP, CE]
-
-  final def withReconnectionStrategy(
-    maxAttempts: Int,
-    backoffFn:   (Int, CE) => Option[FiniteDuration]
-  ): PersistentClient[F, CP, CE] = withReconnectionStrategy(
-    ReconnectionStrategy(maxAttempts, backoffFn)
-  )
 }
