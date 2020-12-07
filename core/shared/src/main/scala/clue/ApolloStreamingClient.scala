@@ -150,7 +150,7 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
               }
     } yield ()
 
-  def connect(payload: F[JsonObject]): F[Unit] = {
+  def connect(payload: F[Map[String, Json]]): F[Unit] = {
 
     def processClose(closeEvent: CE): F[Unit] =
       (for {

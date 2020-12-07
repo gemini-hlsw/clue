@@ -4,9 +4,9 @@
 package clue
 
 import cats.syntax.all._
-import io.circe.JsonObject
 import cats.effect.Sync
 import scala.concurrent.duration.FiniteDuration
+import io.circe.Json
 
 /**
  * A client that keeps a connection open with the server.
@@ -19,9 +19,9 @@ trait PersistentClient[F[_], CP, CE] {
 
   def statusStream: fs2.Stream[F, StreamingClientStatus]
 
-  def connect(payload: F[JsonObject]): F[Unit]
+  def connect(payload: F[Map[String, Json]]): F[Unit]
 
-  final def connect(payload: JsonObject = JsonObject.empty)(implicit sync: Sync[F]): F[Unit] =
+  final def connect(payload: Map[String, Json] = Map.empty)(implicit sync: Sync[F]): F[Unit] =
     connect(Sync[F].delay(payload))
 
   final def disconnect(closeParameters: CP): F[Unit] =

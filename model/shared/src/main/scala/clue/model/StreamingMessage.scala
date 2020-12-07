@@ -6,7 +6,6 @@ package clue.model
 import cats.Eq
 import cats.syntax.all._
 import io.circe.Json
-import io.circe.JsonObject
 
 /**
  * GraphQL web socket protocol streaming messages.  Messages are cleanly
@@ -44,9 +43,9 @@ object StreamingMessage {
      *
      * @param payload any connection parameters that the client wishes to send
      */
-    final case class ConnectionInit(payload: JsonObject = JsonObject.empty)
+    final case class ConnectionInit(payload: Map[String, Json] = Map.empty)
         extends FromClient
-        with Payload[JsonObject]
+        with Payload[Map[String, Json]]
 
     object ConnectionInit {
       implicit val EqConnectionInit: Eq[ConnectionInit] =
@@ -115,9 +114,9 @@ object StreamingMessage {
      *
      * @param payload error information
      */
-    final case class ConnectionError(payload: JsonObject)
+    final case class ConnectionError(payload: Map[String, Json])
         extends FromServer
-        with Payload[JsonObject]
+        with Payload[Map[String, Json]]
 
     object ConnectionError {
       implicit val EqConnectionError: Eq[ConnectionError] =

@@ -5,7 +5,6 @@ package clue.model.arb
 
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
-import io.circe.JsonObject
 import io.circe.Json
 import org.scalacheck.Gen
 
@@ -21,9 +20,9 @@ trait ArbJson {
       jsonStr <- arbitrary[Json](arbJsonString)
     } yield (str, jsonStr)
 
-  val arbJsonObjectOfStrings: Arbitrary[JsonObject] =
+  val arbJsonStringMap: Arbitrary[Map[String, Json]] =
     Arbitrary {
-      Gen.mapOf[String, Json](genJsonStringJsonTuple).map(JsonObject.fromMap _)
+      Gen.mapOf[String, Json](genJsonStringJsonTuple)
     }
 }
 
