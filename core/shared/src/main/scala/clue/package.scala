@@ -5,7 +5,8 @@ import cats.syntax.all._
 import scala.concurrent.duration.FiniteDuration
 
 package object clue {
-  type ReconnectionStrategy[CE]      = (Int, CE) => Option[FiniteDuration]
+  type CloseReason[CE]               = Either[Throwable, CE]
+  type ReconnectionStrategy[CE]      = (Int, CloseReason[CE]) => Option[FiniteDuration]
   type WebSocketReconnectionStrategy = ReconnectionStrategy[WebSocketCloseEvent]
 }
 

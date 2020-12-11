@@ -5,7 +5,6 @@ package clue
 
 import java.util.UUID
 
-import cats.data.EitherT
 import cats.effect._
 import cats.effect.concurrent._
 import cats.syntax.all._
@@ -27,6 +26,15 @@ protected[clue] trait Emitter[F[_]] {
   def terminate(): F[Unit]
 }
 
+object ApolloClient {
+  type ConnectionDef[F[_], CP] = TryableDeferred[F, PersistentConnection[F, CP]]
+  // Connection =
+  //   - None: Not yet connected or disconnected (either by client or by server and client gave up retrying).
+  //   - Some(incomplete Deferred): Connection requested but not established.
+  //   - Some(complete Deferred): Connection established.
+  type Connection[F[_], CP]    = Option[ConnectionDef[F, CP]]
+}
+
 abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](uri: Uri)
     extends GraphQLPersistentClient[F, S, CP, CE] {
   private val LogPrefix = "[clue.ApolloStreamingClient]"
@@ -35,8 +43,16 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
 
   val connectionStatus: SignallingRef[F, StreamingClientStatus]
   protected val subscriptions: Ref[F, Map[String, Emitter[F]]]
-  protected val connectionMVar: MVar2[F, Either[Throwable, PersistentConnection[F, CP]]]
+  protected val firstInitInvoked: Deferred[F, Unit]
+  protected val connectionRef: Ref[F, ApolloClient.Connection[F, CP]]
   protected val connectionAttempt: Ref[F, Int]
+
+  private val getConnectionDef: F[ApolloClient.ConnectionDef[F, CP]] =
+    firstInitInvoked.get >>
+      connectionRef.get.flatMap(_ match {
+        case None                => F.raiseError(new Exception("Client is disconnected"))
+        case Some(connectionDef) => F.pure(connectionDef)
+      })
 
   override def status: F[StreamingClientStatus] =
     connectionStatus.get
@@ -44,10 +60,39 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
   override def statusStream: fs2.Stream[F, StreamingClientStatus] =
     connectionStatus.discrete
 
-  override protected def disconnectInternal(closeParameters: Option[CP]): F[Unit] =
-    connectionMVar.read.rethrow.flatMap(connection =>
-      connectionStatus.set(StreamingClientStatus.Disconnecting) >> connection.closeInternal(
-        closeParameters
+  protected def terminateInternal(
+    terminateOptions:  TerminateOptions[CP],
+    keepSubscriptions: Boolean
+  ): F[Unit] =
+    getConnectionDef.flatMap(
+      _.tryGet.flatMap(
+        _.fold(F.unit)(connection =>
+          for {
+            _ <- connectionStatus.set(StreamingClientStatus.Terminating)
+            // Tell server to stop active subscriptions.
+            _ <- subscriptions.get.flatMap(
+                   _.keySet.toList.traverse(id =>
+                     connection.send(StreamingMessage.FromClient.Stop(id))
+                   )
+                 )
+            // Cleanup internal subscriptions and notify clients that subscriptions have ended.
+            _ <- terminateAllSubscriptions().whenA(!keepSubscriptions)
+            // Follow end protocol with server.
+            _ <- connection.send(StreamingMessage.FromClient.ConnectionTerminate)
+            _ <- connectionStatus.set(StreamingClientStatus.Terminated)
+            _ <- terminateOptions match {
+                   case TerminateOptions.Disconnect(closeParameters) =>
+                     connectionStatus.set(StreamingClientStatus.Disconnecting) >>
+                       // Clean up so a new connection can be established if `connect` is called again.
+                       connectionRef.set(none) >>
+                       // Actually close connection.
+                       connection.closeInternal(closeParameters) >>
+                       // Update client status.
+                       connectionStatus.set(StreamingClientStatus.Disconnected)
+                   case _                                            => F.unit
+                 }
+          } yield ()
+        )
       )
     )
 
@@ -58,11 +103,12 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
     override val stream: fs2.Stream[F, D] = subscriptionStream
 
     override def stop(): F[Unit] =
-      (for {
-        sender <- EitherT(connectionMVar.read)
-        _      <- EitherT(terminateSubscription(subscriptionId).attempt)
-        _      <- EitherT.right[Throwable](sender.send(StreamingMessage.FromClient.Stop(subscriptionId)))
-      } yield ()).value.rethrow
+      for {
+        connectionDef <- getConnectionDef
+        connection    <- connectionDef.get
+        _             <- terminateSubscription(subscriptionId)
+        _             <- connection.send(StreamingMessage.FromClient.Stop(subscriptionId))
+      } yield ()
   }
 
   type DataQueue[D] = Queue[F, Either[Throwable, Option[D]]]
@@ -132,16 +178,6 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
         F.unit
     }
 
-  private def processError(t: Throwable): F[Unit] =
-    connectionMVar
-      .tryPut(Left(t))
-      .flatMap {
-        // Connection was already established. We must cancel all subscriptions. (or not?)
-        case false => terminateAllSubscriptions()
-        case true  => connectionStatus.set(StreamingClientStatus.Disconnected) // Retry?
-      }
-      .handleErrorWith(t => Logger[F].error(t)(s"Error processing error on WebSocket for [$uri]"))
-
   private def restartSubscriptions(sender: PersistentConnection[F, CP]): F[Unit] =
     for {
       subs <- subscriptions.get
@@ -150,33 +186,74 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
               }
     } yield ()
 
-  def connect(payload: F[Map[String, Json]]): F[Unit] = {
+  def init(payload: F[Map[String, Json]]): F[Unit] = {
 
-    def processClose(closeEvent: CE): F[Unit] =
-      (for {
-        _         <- connectionMVar.take
-        _         <- connectionStatus.set(StreamingClientStatus.Disconnected)
+    def reconnect(closeReason: CloseReason[CE]): F[Unit] =
+      for {
         attempt   <- connectionAttempt.updateAndGet(_ + 1)
-        backoffOpt = reconnectionStrategy(attempt, closeEvent)
-        _         <- backoffOpt.fold(terminateAllSubscriptions())(backoff =>
-                       Timer[F].sleep(backoff) >> connect(payload)
+        backoffOpt = reconnectionStrategy(attempt, closeReason)
+        _         <- backoffOpt.fold(connectionRef.set(none) >> terminateAllSubscriptions())(backoff =>
+                       createConnection() >> Timer[F].sleep(backoff) >> init(payload)
                      )
+      } yield ()
+
+    def processError(t: Throwable): F[Unit] =
+      connectionRef
+        .getAndSet(none)
+        .flatMap(_ match {
+          case Some(connectionDef) =>
+            connectionDef.tryGet.flatMap(_ match {
+              // Connection was already established. We must cancel all subscriptions. (or not?)
+              case Some(connection) =>
+                for {
+                  _ <- terminateAllSubscriptions()
+                  _ <- connectionStatus.set(StreamingClientStatus.Disconnecting)
+                  _ <- connection.close()
+                  _ <- connectionStatus.set(StreamingClientStatus.Disconnected)
+                } yield ()
+              // Connection wasn't established yet.
+              case _                => F.unit
+            })
+          case _                   => F.unit
+        })
+        .handleErrorWith(t => Logger[F].error(t)(s"Error processing error on WebSocket for [$uri]"))
+        .flatMap(_ => reconnect(t.asLeft))
+
+    def processDisconnect(closeEvent: CE): F[Unit] =
+      (for {
+        _ <- connectionStatus.set(StreamingClientStatus.Disconnected)
+        _ <- reconnect(closeEvent.asRight)
       } yield ()).handleErrorWith(t =>
         Logger[F].error(t)(s"Error processing close on WebSocket for [$uri]")
       )
 
-    val initializedSender =
-      for {
-        _      <- connectionStatus.set(StreamingClientStatus.Connecting)
-        sender <- backend.connect(uri, processMessage _, processError _, processClose)
-        _      <- connectionAttempt.set(0)
-        _      <- connectionStatus.set(StreamingClientStatus.Connected)
-        p      <- payload
-        _      <- sender.send(StreamingMessage.FromClient.ConnectionInit(p))
-        _      <- restartSubscriptions(sender)
-      } yield sender
+    def createConnection(): F[ApolloClient.ConnectionDef[F, CP]] =
+      (for {
+        d          <- Deferred.tryable[F, PersistentConnection[F, CP]]
+        _          <- connectionRef.set(d.some)
+        _          <- firstInitInvoked.complete(()).attempt.void
+        _          <- connectionStatus.set(StreamingClientStatus.Connecting)
+        connection <- backend.connect(uri, processMessage _, processError _, processDisconnect)
+        _          <- d.complete(connection)
+        _          <- connectionStatus.set(StreamingClientStatus.Connected)
+      } yield d).onError(_ => connectionRef.set(none))
 
-    initializedSender.attempt.flatMap(connectionMVar.put)
+    def initializeConnection(connection: PersistentConnection[F, CP]): F[Unit] =
+      (for {
+        p <- payload
+        _ <- connectionStatus.set(StreamingClientStatus.Initializing)
+        _ <- connection.send(StreamingMessage.FromClient.ConnectionInit(p))
+        _ <- restartSubscriptions(connection)
+        _ <- connectionStatus.set(StreamingClientStatus.Initialized)
+        _ <- connectionAttempt.set(0)
+      } yield ()).handleErrorWith(t => reconnect(t.asLeft))
+
+    connectionRef.get
+      .flatMap(_ match {
+        case None                => createConnection()
+        case Some(connectionDef) => F.pure(connectionDef)
+      })
+      .flatMap(_.get.flatMap(initializeConnection))
   }
 
   private def buildQueue[D: Decoder](
@@ -200,10 +277,11 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
   ): F[SubscriptionInfo[D]] = {
     val request = GraphQLRequest(subscription, operationName, variables)
 
-    (for {
-      sender       <- EitherT(connectionMVar.read)
-      idEmitter    <- EitherT.right[Throwable](buildQueue[D](request))
-      (id, emitter) = idEmitter
+    for {
+      connectionDef <- getConnectionDef
+      connection    <- connectionDef.get
+      idEmitter     <- buildQueue[D](request)
+      (id, emitter)  = idEmitter
     } yield {
       val bracket =
         Stream.bracket(
@@ -216,7 +294,7 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
 
       val stream = bracket.flatMap(_ =>
         (
-          Stream.eval(sender.send(StreamingMessage.FromClient.Start(id, request))) >>
+          Stream.eval(connection.send(StreamingMessage.FromClient.Start(id, request))) >>
             emitter.queue.dequeue
               .evalTap(v => Logger[F].debug(s"$LogPrefix Dequeuing for subscription [$id]: [$v]"))
         ).rethrow.unNoneTerminate
@@ -226,7 +304,7 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
       )
 
       SubscriptionInfo(createSubscription(stream, id), terminateSubscription(id))
-    }).value.rethrow
+    }
   }
 
   override protected def subscribeInternal[D: Decoder](
