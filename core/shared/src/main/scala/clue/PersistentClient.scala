@@ -7,6 +7,15 @@ import cats.syntax.all._
 import cats.effect.Sync
 import io.circe.Json
 
+sealed trait TerminateOptions[+CP]
+object TerminateOptions {
+  final case object KeepConnection extends TerminateOptions[Nothing]
+  final case class Disconnect[CP](closeParameters: Option[CP] = none) extends TerminateOptions[CP]
+  object Disconnect {
+    def apply[CP](closeParameters: CP): Disconnect[CP] = Disconnect(closeParameters.some)
+  }
+}
+
 /**
  * A client that keeps a connection open with the server.
  */
@@ -18,16 +27,19 @@ trait PersistentClient[F[_], CP, CE] {
 
   def statusStream: fs2.Stream[F, StreamingClientStatus]
 
-  def connect(payload: F[Map[String, Json]]): F[Unit]
+  def init(payload: F[Map[String, Json]]): F[Unit]
 
-  final def connect(payload: Map[String, Json] = Map.empty)(implicit sync: Sync[F]): F[Unit] =
-    connect(Sync[F].delay(payload))
+  final def init(payload: Map[String, Json] = Map.empty)(implicit sync: Sync[F]): F[Unit] =
+    init(Sync[F].delay(payload))
 
-  final def disconnect(closeParameters: CP): F[Unit] =
-    disconnectInternal(closeParameters.some)
+  final def terminate(
+    terminateOptions:  TerminateOptions[CP],
+    keepSubscriptions: Boolean = false
+  ): F[Unit] =
+    terminateInternal(terminateOptions, keepSubscriptions)
 
-  final def disconnect(): F[Unit] =
-    disconnectInternal(none)
-
-  protected def disconnectInternal(closeParameters: Option[CP]): F[Unit]
+  protected def terminateInternal(
+    terminateOptions:  TerminateOptions[CP],
+    keepSubscriptions: Boolean
+  ): F[Unit]
 }

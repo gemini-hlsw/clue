@@ -16,11 +16,12 @@ import org.scalajs.dom.raw.Event
 import org.scalajs.dom.raw.MessageEvent
 import org.scalajs.dom.raw.WebSocket
 import sttp.model.Uri
+import cats.effect.concurrent.Ref
 
 /**
  * Streaming backend for JS WebSocket.
  */
-final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends WebSocketBackend[F] {
+final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F] {
   private val Protocol = "graphql-ws"
 
   override def connect(
@@ -29,39 +30,57 @@ final class WebSocketJSBackend[F[_]: ConcurrentEffect: Logger] extends WebSocket
     onError:   Throwable => F[Unit],
     onClose:   WebSocketCloseEvent => F[Unit]
   ): F[PersistentConnection[F, WebSocketCloseParams]] =
-    Async[F].async { cb =>
-      val ws = new WebSocket(uri.toString, Protocol)
+    Ref[F]
+      .of(false)
+      .flatMap(isOpen =>
+        Async[F].async { cb =>
+          val ws = new WebSocket(uri.toString, Protocol)
 
-      ws.onopen = { _: Event =>
-        Logger[F].trace("WebSocket open").toIO.unsafeRunAsyncAndForget()
-        cb(Right(new WebSocketJSConnection(ws)))
-      }
+          ws.onopen = { _: Event =>
+            (for {
+              _ <- isOpen.set(true)
+              _ <- Logger[F].trace("WebSocket open")
+              _ <- Sync[F].delay(cb((new WebSocketJSConnection(ws)).asRight))
+            } yield ())
+              .runAsync(_ => IO.unit)
+              .unsafeRunSync()
+          }
 
-      ws.onmessage = { e: MessageEvent =>
-        (e.data match {
-          case str: String => onMessage(str)
-          case other       =>
-            Logger[F].error(s"Unexpected event from WebSocket for [$uri]: [$other]")
-        }).toIO.unsafeRunAsyncAndForget()
-      }
+          ws.onmessage = { e: MessageEvent =>
+            (e.data match {
+              case str: String => onMessage(str)
+              case other       =>
+                Logger[F].error(s"Unexpected event from WebSocket for [$uri]: [$other]")
+            }).runAsync(_ => IO.unit).unsafeRunSync()
+          }
 
-      ws.onerror = { e: Event =>
-        Logger[F].error(s"Error on WebSocket for [$uri]: $e")
-        onError(new GraphQLException(e.toString)).toIO.unsafeRunAsyncAndForget()
-      }
+          ws.onerror = { e: Event =>
+            val t = new GraphQLException(e.toString)
+            (for {
+              _    <- Logger[F].error(s"Error on WebSocket for [$uri]: $e")
+              open <- isOpen.get
+              _    <-
+                if (!open)
+                  Sync[F].delay(cb(t.asLeft))
+                else
+                  onError(t)
+            } yield ()).runAsync(_ => IO.unit).unsafeRunSync()
+          }
 
-      ws.onclose = { e: CloseEvent =>
-        (
-          Logger[F].trace("WebSocket closed") >> onClose(
-            WebSocketCloseEvent(e.code, e.reason, e.wasClean)
-          )
-        ).toIO.unsafeRunAsyncAndForget()
-      }
-    }
+          ws.onclose = { e: CloseEvent =>
+            (
+              for {
+                _ <- Logger[F].trace("WebSocket closed")
+                _ <- onClose(WebSocketCloseEvent(e.code, e.reason, e.wasClean))
+              } yield ()
+            ).runAsync(_ => IO.unit).unsafeRunSync()
+          }
+        }
+      )
 }
 
 object WebSocketJSBackend {
-  def apply[F[_]: ConcurrentEffect: Logger]: WebSocketJSBackend[F] = new WebSocketJSBackend[F]
+  def apply[F[_]: Effect: Logger]: WebSocketJSBackend[F] = new WebSocketJSBackend[F]
 }
 
 final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
