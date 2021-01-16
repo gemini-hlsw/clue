@@ -231,13 +231,16 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
 
     if (inputs.isLeft)
       abort(s"Error resolving operation input variables types [$vars]: [${inputs.left}]]")
+        .unsafeRunSync()
     if (inputs.isBoth)
       log(s"Warning resolving operation input variables types [$vars]: [${inputs.left}]]")
-    val inputValues = inputs.right.get
+        .unsafeRunSync()
 
     CaseClass(
       "Variables",
-      inputValues.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true, mappings))
+      inputs.right.get.map(iv =>
+        ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true, mappings)
+      )
     )
   }
 
