@@ -17,6 +17,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.circe._
 import io.circe.parser._
 import sttp.model.Uri
+import scala.concurrent.duration.Duration
 
 protected[clue] trait Emitter[F[_]] {
   val request: GraphQLRequest
@@ -35,9 +36,11 @@ object ApolloClient {
   type Connection[F[_], CP]    = Option[ConnectionDef[F, CP]]
 }
 
-abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](uri: Uri)
-    extends GraphQLPersistentClient[F, S, CP, CE] {
-  private val LogPrefix = "[clue.ApolloStreamingClient]"
+abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
+  uri:  Uri,
+  name: String
+) extends GraphQLPersistentClient[F, S, CP, CE] {
+  private val LogPrefix = s"[clue.ApolloClient:$name]"
 
   private val F = implicitly[ConcurrentEffect[F]]
 
@@ -79,17 +82,18 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
             _ <- terminateAllSubscriptions().whenA(!keepSubscriptions)
             // Follow end protocol with server.
             _ <- connection.send(StreamingMessage.FromClient.ConnectionTerminate)
-            _ <- connectionStatus.set(StreamingClientStatus.Terminated)
             _ <- terminateOptions match {
+                   case TerminateOptions.KeepConnection              =>
+                     connectionStatus.set(StreamingClientStatus.Connected)
                    case TerminateOptions.Disconnect(closeParameters) =>
                      connectionStatus.set(StreamingClientStatus.Disconnecting) >>
                        // Clean up so a new connection can be established if `connect` is called again.
+                       // TODO DO THIS FIRST? SO a new connection can be established if it comes while we are cleaning up.
+                       // Somehow pipe status updates through something that can make the channel obsoletable.
                        connectionRef.set(none) >>
                        // Actually close connection.
-                       connection.closeInternal(closeParameters) >>
-                       // Update client status.
-                       connectionStatus.set(StreamingClientStatus.Disconnected)
-                   case _                                            => F.unit
+                       connection.closeInternal(closeParameters)
+                   // Status.Disconnected is set in "processClose"
                  }
           } yield ()
         )
@@ -193,7 +197,8 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
         attempt   <- connectionAttempt.updateAndGet(_ + 1)
         backoffOpt = reconnectionStrategy(attempt, closeReason)
         _         <- backoffOpt.fold(connectionRef.set(none) >> terminateAllSubscriptions())(backoff =>
-                       createConnection() >> Timer[F].sleep(backoff) >> init(payload)
+                       //createConnection() >>
+                       Timer[F].sleep(backoff).whenA(backoff > Duration.Zero) >> init(payload)
                      )
       } yield ()
 
@@ -206,6 +211,8 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
               // Connection was already established. We must cancel all subscriptions. (or not?)
               case Some(connection) =>
                 for {
+                  // TODO FIX LOGIC BEARING IN MIND THAT CLOSE IS ALWAYS CALLED AFTER AN ERROR:
+                  // https://stackoverflow.com/a/40084550
                   _ <- terminateAllSubscriptions()
                   _ <- connectionStatus.set(StreamingClientStatus.Disconnecting)
                   _ <- connection.close()
@@ -229,8 +236,12 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
 
     def createConnection(): F[ApolloClient.ConnectionDef[F, CP]] =
       (for {
-        d          <- Deferred.tryable[F, PersistentConnection[F, CP]]
-        _          <- connectionRef.set(d.some)
+
+        // DO NOT INTERRUPT - Use Ref.access/tryUpdate/tryModify for atomic access.
+        d <- Deferred.tryable[F, PersistentConnection[F, CP]]
+        _ <- connectionRef.set(d.some)
+        // DO NOT INTERRUPT
+
         _          <- firstInitInvoked.complete(()).attempt.void
         _          <- connectionStatus.set(StreamingClientStatus.Connecting)
         connection <- backend.connect(uri, processMessage _, processError _, processDisconnect)
@@ -250,10 +261,11 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](ur
 
     connectionRef.get
       .flatMap(_ match {
-        case None                => createConnection()
-        case Some(connectionDef) => F.pure(connectionDef)
+        case None => createConnection().flatMap(_.get.flatMap(initializeConnection))
+        // case Some(connectionDef) => F.pure(connectionDef)
+        case _    => F.unit
       })
-      .flatMap(_.get.flatMap(initializeConnection))
+    // .flatMap(_.get.flatMap(initializeConnection))
   }
 
   private def buildQueue[D: Decoder](

@@ -92,7 +92,7 @@ final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
     Logger[F].trace("Disconnecting WebSocket...") >>
       Sync[F].delay {
         val params = closeParameters.getOrElse(WebSocketCloseParams())
-        // Facade for "ws.close" should define parameters as js.Undef, but it doesn't.
+        // Facade for "ws.close" should define parameters as js.Undef, but it doesn't. So we contemplate all cases.
         (params.code, params.reason)
           .mapN { case (code, reason) => ws.close(code, reason) }
           .orElse(params.code.map(code => ws.close(code)))

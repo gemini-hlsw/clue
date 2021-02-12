@@ -14,6 +14,7 @@ import cats.effect.concurrent.Deferred
 
 case class ApolloWebSocketClient[F[_]: ConcurrentEffect: Timer: Logger, S](
   uri:                                         Uri,
+  name:                                        String,
   override protected val backend:              WebSocketBackend[F],
   override val connectionStatus:               SignallingRef[F, StreamingClientStatus],
   override protected val subscriptions:        Ref[F, Map[String, Emitter[F]]],
@@ -21,12 +22,14 @@ case class ApolloWebSocketClient[F[_]: ConcurrentEffect: Timer: Logger, S](
   override protected val connectionRef:        Ref[F, ApolloClient.Connection[F, WebSocketCloseParams]],
   override protected val connectionAttempt:    Ref[F, Int],
   override protected val reconnectionStrategy: ReconnectionStrategy[WebSocketCloseEvent]
-) extends ApolloClient[F, S, WebSocketCloseParams, WebSocketCloseEvent](uri)
+) extends ApolloClient[F, S, WebSocketCloseParams, WebSocketCloseEvent](uri, name)
     with GraphQLWebSocketClient[F, S]
 
 object ApolloWebSocketClient {
   def of[F[_]: ConcurrentEffect: Timer: Logger, S](
     uri:                  Uri,
+    // TODO, make this option with default none, and if absent, use URI
+    name:                 String,
     reconnectionStrategy: ReconnectionStrategy[WebSocketCloseEvent] = ReconnectionStrategy.never
   )(implicit backend:     WebSocketBackend[F]): F[ApolloWebSocketClient[F, S]] =
     for {
@@ -38,6 +41,7 @@ object ApolloWebSocketClient {
         Ref.of[F, ApolloClient.Connection[F, WebSocketCloseParams]](none)
       connectionAttempt <- Ref.of[F, Int](0)
     } yield new ApolloWebSocketClient[F, S](uri,
+                                            name,
                                             backend,
                                             connectionStatus,
                                             subscriptions,

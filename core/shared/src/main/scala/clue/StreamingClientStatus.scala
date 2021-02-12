@@ -13,7 +13,7 @@ object StreamingClientStatus {
   final case object Initializing  extends StreamingClientStatus
   final case object Initialized   extends StreamingClientStatus
   final case object Terminating   extends StreamingClientStatus
-  final case object Terminated    extends StreamingClientStatus
+  // final case object Terminated    extends StreamingClientStatus
   final case object Disconnecting extends StreamingClientStatus
   final case object Disconnected  extends StreamingClientStatus
 
