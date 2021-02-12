@@ -12,8 +12,4 @@ object WebSocketCloseParams {
   def apply(code:   Int, reason: String): WebSocketCloseParams =
     WebSocketCloseParams(code = code.some, reason = reason.some)
 }
-case class WebSocketCloseEvent(code: Int, reason: String, wasClean: Boolean)
-
-trait WebSocketBackend[F[_]] extends PersistentBackend[F, WebSocketCloseParams, WebSocketCloseEvent]
-
-trait WebSocketConnection[F[_]] extends PersistentConnection[F, WebSocketCloseParams]
+case class WebSocketCloseEvent(code: Int, reason: String, wasClean: Boolean, wasErrored: Boolean)

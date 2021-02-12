@@ -253,7 +253,7 @@ object BasicQuery extends GraphQLOperation[StarWars] {
   override val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
 
   // A convenience parametrized method is generated.
-  def query[F[_]](episode: Episode)(implicit client: clue.GraphQLClient[F, StarWars]) = client.request(this)(Variables(episode))
+  def query[F[_]](episode: Episode)(implicit client: clue.TransactionalClient[F, StarWars]) = client.request(this)(Variables(episode))
 }
 ```
 

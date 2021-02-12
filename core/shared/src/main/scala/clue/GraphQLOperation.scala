@@ -6,6 +6,9 @@ package clue
 import io.circe.Decoder
 import io.circe.Encoder
 
+/*
+ * A query, mutation or subscription must extend this trait.
+ */
 trait GraphQLOperation[S] {
   val document: String
   type Variables

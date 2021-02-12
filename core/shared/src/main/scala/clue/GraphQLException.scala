@@ -5,4 +5,9 @@ package clue
 
 class GraphQLException(msg: String) extends Exception(msg)
 
-class InvalidSubscriptionIdException(id: String) extends Exception(s"Invalid subscription id: $id")
+class ConnectionException() extends GraphQLException("Could not establish connection")
+
+class DisconnectedException() extends GraphQLException("Connection was closed")
+
+class InvalidSubscriptionIdException(id: String)
+    extends GraphQLException(s"Invalid subscription id: $id")

@@ -371,17 +371,17 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
             (operation match {
               case _: UntypedQuery        =>
                 q"""
-                        def query[F[_]](...$paramss)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                        def query[F[_]](...$paramss)(implicit client: _root_.clue.TransactionalClient[F, $schemaType]) =
                           client.request(this)(Variables(...$variablesNames))
                       """
               case _: UntypedMutation     =>
                 q"""
-                        def execute[F[_]](...$paramss)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                        def execute[F[_]](...$paramss)(implicit client: _root_.clue.TransactionalClient[F, $schemaType]) =
                           client.request(this)(Variables(...$variablesNames))
                       """
               case _: UntypedSubscription =>
                 q"""
-                        def subscribe[F[_]](...$paramss)(implicit client: _root_.clue.GraphQLStreamingClient[F, $schemaType]) =
+                        def subscribe[F[_]](...$paramss)(implicit client: _root_.clue.StreamingClient[F, $schemaType]) =
                           client.subscribe(this)(Variables(...$variablesNames))
                       """
             })
