@@ -28,8 +28,7 @@ case class ApolloWebSocketClient[F[_]: ConcurrentEffect: Timer: Logger, S](
 object ApolloWebSocketClient {
   def of[F[_]: ConcurrentEffect: Timer: Logger, S](
     uri:                  Uri,
-    // TODO, make this option with default none, and if absent, use URI
-    name:                 String,
+    name:                 String = "",
     reconnectionStrategy: ReconnectionStrategy[WebSocketCloseEvent] = ReconnectionStrategy.never
   )(implicit backend:     WebSocketBackend[F]): F[ApolloWebSocketClient[F, S]] =
     for {

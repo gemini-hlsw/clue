@@ -40,7 +40,7 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
   uri:  Uri,
   name: String
 ) extends GraphQLPersistentClient[F, S, CP, CE] {
-  private val LogPrefix = s"[clue.ApolloClient:$name]"
+  private val LogPrefix = s"[clue.ApolloClient][${if (name.isEmpty) uri else name}]"
 
   private val F = implicitly[ConcurrentEffect[F]]
 
