@@ -197,7 +197,7 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
         attempt   <- connectionAttempt.updateAndGet(_ + 1)
         backoffOpt = reconnectionStrategy(attempt, closeReason)
         _         <- backoffOpt.fold(connectionRef.set(none) >> terminateAllSubscriptions())(backoff =>
-                       //createConnection() >>
+                       //createConnection() >> // TODO WE HAVE TO QUEUE NEW MESSAGES IN NEW CONNECTION, NOT IN OLD ONE
                        Timer[F].sleep(backoff).whenA(backoff > Duration.Zero) >> init(payload)
                      )
       } yield ()
