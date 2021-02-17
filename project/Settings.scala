@@ -8,7 +8,7 @@ object Settings {
     val cats            = "2.4.1"
     val catsEffect      = "2.3.1"
     val circe           = "0.13.0"
-    val disciplineMUnit = "1.0.5"
+    val disciplineMUnit = "1.0.6"
     val fs2             = "2.5.0"
     val grackle         = "0.0.19"
     val jawn            = "1.0.3"
