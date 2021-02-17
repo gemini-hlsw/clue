@@ -93,7 +93,11 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
                        connectionRef.set(none) >>
                        // Actually close connection.
                        connection.closeInternal(closeParameters)
+
                    // Status.Disconnected is set in "processClose"
+
+                   // ACTUALLY NO, processClose is not always CALLED ....
+
                  }
           } yield ()
         )
