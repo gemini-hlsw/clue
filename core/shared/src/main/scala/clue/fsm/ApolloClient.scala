@@ -51,7 +51,10 @@ protected object State {
   )                               extends State[F, CP]
   final case class Initialized[F[_], CP](connection: PersistentConnection[F, CP])
       extends State[F, CP]
-  final case object Terminating   extends State[Nothing, Nothing]
+  final case class Terminating[F[_], CP](
+    connection: PersistentConnection[F, CP],
+    latch:      Deferred[F, Either[Throwable, Unit]]
+  )                               extends State[F, CP]
   final case object Disconnecting extends State[Nothing, Nothing]
   final case object RetryWait     extends State[Nothing, Nothing]
 }
@@ -100,7 +103,23 @@ class ApolloClientImpl[F[_], S, CP, CE](
     }
   }
 
-  override def terminate(): F[Unit] = ???
+  override def terminate(): F[Unit] = {
+    val error =
+      "terminate() called while uninitialized.".raiseError
+
+    val warn =
+      "terminate() called while already terminating or attempting to terminate.".warnF
+
+    Deferred[F, Either[Throwable, Unit]].flatMap { newLatch =>
+      state.modify {
+        case s @ (Disconnected | Connecting(_) | Connected(_) | Initializing(_, _)) => s     -> error
+        case Initialized(connection)                                                =>
+          Terminating(connection, newLatch) -> doTerminate(connection, newLatch)
+        case s @ Terminating(_, latch)                                              => s     -> (warn >> latch.get.rethrow)
+        case state                                                                  => state -> warn
+      }.flatten
+    }
+  }
 
   override def disconnect(): F[Unit] = ???
 
@@ -123,7 +142,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
   override protected def onMessage(msg: String): F[Unit] =
     decode[StreamingMessage.FromServer](msg) match {
       case Left(e)                                          =>
-        e.raiseF(s"Exception decoding WebSocket message for [$uri]")
+        e.raiseF(s"Exception decoding message received from server: [$msg]")
       case Right(StreamingMessage.FromServer.ConnectionAck) =>
         state.modify {
           case Initializing(connection, latch) =>
@@ -169,8 +188,9 @@ class ApolloClientImpl[F[_], S, CP, CE](
           state.modify {
             case s @ Connected(_) => s -> latch.complete(Either.unit).attempt.void
             case Connecting(_)    =>
+              // TODO Cleanup the web socket. We should call .close() on it once it's connected. But we have to keep track of it.
               Disconnected -> latch
-                .complete("connect() was interrupted.".error[Unit])
+                .complete("connect() was canceled.".error[Unit])
                 .attempt
                 .void
             case s                =>
@@ -192,13 +212,33 @@ class ApolloClientImpl[F[_], S, CP, CE](
       state.modify {
         case s @ Initializing(_, _) =>
           s ->
-            (latch
-              .complete("initialize() was interrupted. Disconnecting...".error[Unit])
+            (disconnect().start >> latch
+              .complete("initialize() was canceled. Disconnecting...".error[Unit])
               .attempt
-              .void
-              >> disconnect())
+              .void)
         case s                      =>
-          s -> s"Unexpected state [$s] in canceled initialize(). Cannot recover.".raiseError
+          s -> (disconnect().start >> s"Unexpected state [$s] in canceled initialize(). Cannot recover. Disconnecting...".raiseError)
+      }.flatten
+  }
+
+  private def doTerminate(
+    connection: PersistentConnection[F, CP],
+    latch:      Deferred[F, Either[Throwable, Unit]]
+  ): F[Unit] = (for {
+    _ <- connection.send(StreamingMessage.FromClient.ConnectionTerminate)
+    _ <- latch.get.rethrow
+  } yield ()).guaranteeCase {
+    case ExitCase.Completed | ExitCase.Error(_) => F.unit
+    case ExitCase.Canceled                      => // Attempt recovery.
+      state.modify {
+        case s @ Terminating(_, _) =>
+          s ->
+            (disconnect().start >> latch
+              .complete("terminate() was canceled. Disconnecting...".error[Unit])
+              .attempt
+              .void)
+        case s                     =>
+          s -> (disconnect().start >> s"Unexpected state [$s] in canceled terminate(). Cannot recover. Disconnecting...".raiseError)
       }.flatten
   }
 }
