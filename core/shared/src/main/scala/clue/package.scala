@@ -12,43 +12,24 @@ package object clue {
   type WebSocketReconnectionStrategy = ReconnectionStrategy[WebSocketCloseEvent]
 
   final implicit class StringOps(val str: String) extends AnyVal {
-    private def prefixedMsg(implicit prefix: LogPrefix): String = s"[${prefix.value}] $str"
+    def error[A]: Either[Throwable, A] =
+      new Exception(str).asLeft[A]
 
-    def error[A](implicit prefix: LogPrefix): Either[Throwable, A] =
-      new Exception(prefixedMsg).asLeft[A]
+    def raiseError[F[_]](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[Unit] =
+      logger.error(str) >> F.raiseError(new Exception(str))
 
-    def raiseError[F[_]](implicit
-      F:      MonadError[F, Throwable],
-      logger: Logger[F],
-      prefix: LogPrefix
-    ): F[Unit] = {
-      val msg = prefixedMsg
-      logger.error(msg) >> F.raiseError(new Exception(msg))
-    }
-
-    def warnF[F[_]](implicit
-      logger: Logger[F],
-      prefix: LogPrefix
-    ): F[Unit] =
-      logger.warn(prefixedMsg)
+    def warnF[F[_]](implicit logger: Logger[F]): F[Unit] =
+      logger.warn(str)
   }
 
   final implicit class ThrowableOps(val t: Throwable) extends AnyVal {
-    private def prefixedMsg(msg: String)(implicit prefix: LogPrefix): String =
-      s"[${prefix.value}] $msg"
+    def raiseF[F[_]](
+      msg:        String
+    )(implicit F: MonadError[F, Throwable], logger: Logger[F]): F[Unit] =
+      logger.error(t)(msg) >> F.raiseError(t)
 
-    def raiseF[F[_]](msg: String)(implicit
-      F:                  MonadError[F, Throwable],
-      logger:             Logger[F],
-      prefix:             LogPrefix
-    ): F[Unit] =
-      logger.error(t)(prefixedMsg(msg)) >> F.raiseError(t)
-
-    def warnF[F[_]](msg: String)(implicit
-      logger:            Logger[F],
-      prefix:            LogPrefix
-    ): F[Unit] =
-      logger.warn(t)(prefixedMsg(msg))
+    def warnF[F[_]](msg: String)(implicit logger: Logger[F]): F[Unit] =
+      logger.warn(t)(msg)
 
   }
 
@@ -79,7 +60,6 @@ package object clue {
 }
 
 package clue {
-  final class LogPrefix(val value: String) extends AnyVal
   object ReconnectionStrategy {
     def never[CE]: ReconnectionStrategy[CE] = (_, _) => none
   }

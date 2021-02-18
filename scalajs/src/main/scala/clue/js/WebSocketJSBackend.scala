@@ -46,6 +46,8 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
               .unsafeRunSync()
           }
 
+          // TODO PROCESS ERRORS/INTERRUPTIONS ON CALLBACKS !
+
           ws.onmessage = { e: MessageEvent =>
             (e.data match {
               case str: String => onMessage(str)
