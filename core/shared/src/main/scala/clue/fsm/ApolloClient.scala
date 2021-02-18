@@ -17,6 +17,7 @@ import cats.effect.ConcurrentEffect
 import io.chrisdavenport.log4cats.Logger
 import scala.annotation.unused
 import cats.effect.ExitCase
+import cats.effect.Timer
 
 trait ApolloClient[F[_], S] extends GraphQLStreamingClient[F, S] {
   def connect(): F[Unit]
@@ -40,20 +41,26 @@ trait StreaminClientInternal[F[_]] {
 protected sealed trait State[+F[_]]
 protected object State {
   final case object Disconnected  extends State[Nothing]
-  final case class Connecting[F[_]](latch: Deferred[F, Either[Throwable, Unit]], attempt: Int = 0)
-      extends State[F]
+  final case class Connecting[F[_]](latch: Deferred[F, Either[Throwable, Unit]]) extends State[F]
   final case class Connected[F[_], CP](connection: PersistentConnection[F, CP]) extends State[F]
-  final case object Initializing  extends State[Nothing]
+  final case class Initializing[F[_]](latch: Deferred[F, Either[Throwable, Unit]])
+      extends State[Nothing]
   final case object Initialized   extends State[Nothing]
   final case object Terminating   extends State[Nothing]
   final case object Disconnecting extends State[Nothing]
   final case object RetryWait     extends State[Nothing]
 }
 
-class ApolloClientImpl[F[_], S, CP, CE](uri: Uri, name: String, state: Ref[F, State[F]])(implicit
-  F:                                         ConcurrentEffect[F],
-  backend:                                   PersistentBackend[F, CP, CE],
-  logger:                                    Logger[F]
+class ApolloClientImpl[F[_], S, CP, CE](
+  uri:                  Uri,
+  name:                 String,
+  reconnectionStrategy: ReconnectionStrategy[CE],
+  state:                Ref[F, State[F]]
+)(implicit
+  F:                    ConcurrentEffect[F],
+  backend:              PersistentBackend[F, CP, CE],
+  timer:                Timer[F],
+  logger:               Logger[F]
 ) extends ApolloClient[F, S]
     with WebSocketHandler[F, CE]
     with StreaminClientInternal[F] {
@@ -64,44 +71,57 @@ class ApolloClientImpl[F[_], S, CP, CE](uri: Uri, name: String, state: Ref[F, St
   )
 
   override def connect(): F[Unit] = {
-    val warn = logger.warn("connect() called while already connected or attempting to connect.")
+    val warn = "connect() called while already connected or attempting to connect.".warnF
 
     Deferred[F, Either[Throwable, Unit]].flatMap { newLatch =>
       state.modify {
-        case Disconnected             => Connecting(newLatch) -> openConnection(newLatch).rethrow
-        case s @ Connecting(latch, _) => s                    -> (warn >> latch.get.rethrow)
-        case state                    => state                -> warn
+        case Disconnected          => Connecting(newLatch) -> openConnection(newLatch)
+        case s @ Connecting(latch) => s                    -> (warn >> latch.get.rethrow)
+        case state                 => state                -> warn
       }.flatten
     }
   }
 
   private def openConnection(
-    latch: Deferred[F, Either[Throwable, Unit]]
-  ): F[Either[Throwable, Unit]] = {
-    for {
-      connection <- backend.connect(uri, onMessage, onError, onClose).attempt
-      _          <- state.set { // We could use update/modify here for extra safety, but it seems overkill.
-                      connection match {
-                        case Left(_)  => Disconnected // TODO Retry
-                        case Right(c) => Connected(c)
-                      }
-                    }
-      _          <- latch.complete(connection.void) // TODO Don't release latch when retrying.
-    } yield connection.void
-  }.guaranteeCase {
-    case ExitCase.Completed | ExitCase.Error(_) => F.unit
-    case ExitCase.Canceled                      =>
-      state.modify {
-        case s @ Connected(_) => s -> latch.complete(Either.unit).attempt.void
-        case Connecting(_, _) =>
-          Disconnected -> latch
-            .complete("connect() was interrupted.".error[Unit])
-            .attempt
-            .void
-        case s                =>
-          s -> F.pure(s"Unexpected state [$s] in canceled connect(). Cannot recover.").error[Unit]
-      }.flatten
-  }
+    latch:   Deferred[F, Either[Throwable, Unit]],
+    attempt: Int = 1
+  ): F[Unit] =
+    backend
+      .connect(uri, onMessage, onError, onClose)
+      .attempt
+      .flatMap { connection =>
+        state.modify {
+          case s @ Connecting(_) =>
+            connection match {
+              case Left(t)  =>
+                reconnectionStrategy(attempt, t.asLeft) match {
+                  case None       => Disconnected -> latch.complete(t.asLeft)
+                  case Some(wait) =>
+                    s -> (t.warnF("Error in connect(). Retrying...") >>
+                      timer.sleep(wait) >>
+                      openConnection(latch, attempt + 1))
+                }
+              case Right(c) => Connected(c) -> latch.complete(().asRight)
+            }
+          case s                 =>
+            s -> (latch.complete(connection.void) >>
+              s"Unexpected state [$s] in connect(). Unblocking clients, but state may be inconsistent.".raiseError)
+        }.flatten
+      }
+      .guaranteeCase {
+        case ExitCase.Completed | ExitCase.Error(_) => F.unit
+        case ExitCase.Canceled                      => // Attempt recovery.
+          state.modify {
+            case s @ Connected(_) => s -> latch.complete(Either.unit).attempt.void
+            case Connecting(_)    =>
+              Disconnected -> latch
+                .complete("connect() was interrupted.".error[Unit])
+                .attempt
+                .void
+            case s                =>
+              s -> s"Unexpected state [$s] in canceled connect(). Cannot recover.".raiseError
+          }.flatten
+      }
 
   // override protected def onOpen(): F[Unit] = ???
 
@@ -135,11 +155,12 @@ class ApolloClientImpl[F[_], S, CP, CE](uri: Uri, name: String, state: Ref[F, St
 object ApolloClient {
   type SubscriptionId = UUID
 
-  def apply[F[_]: ConcurrentEffect: Logger, S, CP, CE](
-    uri:              Uri,
-    name:             String
-  )(implicit backend: PersistentBackend[F, CP, CE]): F[ApolloClient[F, S]] =
+  def apply[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
+    uri:                  Uri,
+    name:                 String,
+    reconnectionStrategy: ReconnectionStrategy[CE]
+  )(implicit backend:     PersistentBackend[F, CP, CE]): F[ApolloClient[F, S]] =
     for {
       state <- Ref[F].of[State[F]](State.Disconnected)
-    } yield new ApolloClientImpl(uri, name, state)
+    } yield new ApolloClientImpl(uri, name, reconnectionStrategy, state)
 }
