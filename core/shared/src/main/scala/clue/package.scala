@@ -17,11 +17,14 @@ package object clue {
     def error[A]: Either[Throwable, A] =
       new Exception(str).asLeft[A]
 
-    def raiseError[F[_]](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[Unit] =
+    def raiseError[F[_], A](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[A] =
       logger.error(str) >> F.raiseError(new Exception(str))
 
     def warnF[F[_]](implicit logger: Logger[F]): F[Unit] =
       logger.warn(str)
+
+    def debugF[F[_]](implicit logger: Logger[F]): F[Unit] =
+      logger.debug(str)
   }
 
   final implicit class ThrowableOps(val t: Throwable) extends AnyVal {
@@ -29,6 +32,11 @@ package object clue {
       msg:        String
     )(implicit F: MonadError[F, Throwable], logger: Logger[F]): F[Unit] =
       logger.error(t)(msg) >> F.raiseError(t)
+
+    def logF[F[_]](
+      msg:             String
+    )(implicit logger: Logger[F]): F[Unit] =
+      logger.error(t)(msg)
 
     def warnF[F[_]](msg: String)(implicit logger: Logger[F]): F[Unit] =
       logger.warn(t)(msg)
