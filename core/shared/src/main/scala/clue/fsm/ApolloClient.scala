@@ -159,15 +159,26 @@ class ApolloClientImpl[F[_], S, CP, CE](
 
   override protected def onMessage(msg: String): F[Unit] =
     decode[StreamingMessage.FromServer](msg) match {
-      case Left(e)                                          =>
+      case Left(e)                                                       =>
         e.raiseF(s"Exception decoding message received from server: [$msg]")
-      case Right(StreamingMessage.FromServer.ConnectionAck) =>
+      case Right(StreamingMessage.FromServer.ConnectionAck)              =>
         state.modify {
           case Initializing(connection, latch) =>
             (Initialized(connection) -> latch.complete(().asRight))
           case s                               => s -> s"Unexpected connection_ack received from server.".warnF
         }.flatten
-      case _                                                => F.unit
+      case Right(StreamingMessage.FromServer.ConnectionError(payload))   =>
+        state.modify {
+          case Initializing(connection, latch) =>
+            (Connected(connection) -> latch.complete(
+              s"Initialization rejected by server: [$payload].".error
+            ))
+          case s                               => s -> s"Unexpected connection_error received from server.".warnF
+        }.flatten
+      case Right(StreamingMessage.FromServer.Data(id @ _, payload @ _))  => F.unit
+      case Right(StreamingMessage.FromServer.Error(id @ _, payload @ _)) => F.unit
+      case Right(StreamingMessage.FromServer.Complete(id @ _))           => F.unit
+      case _                                                             => F.unit
     }
 
   override protected def onError(t: Throwable): F[Unit] = ???
