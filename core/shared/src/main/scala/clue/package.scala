@@ -20,6 +20,9 @@ package object clue {
     def raiseError[F[_], A](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[A] =
       logger.error(str) >> F.raiseError(new Exception(str))
 
+    def errorF[F[_]](implicit logger: Logger[F]): F[Unit] =
+      logger.error(str)
+
     def warnF[F[_]](implicit logger: Logger[F]): F[Unit] =
       logger.warn(str)
 

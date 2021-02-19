@@ -186,7 +186,14 @@ class ApolloClientImpl[F[_], S, CP, CE](
     document:      String,
     operationName: Option[String],
     variables:     Option[Json]
-  ): F[D] = ???
+  ): F[D] = F.asyncF[D] { cb =>
+    startSubscription[D](document, operationName, variables).flatMap { subscriptionInfo =>
+      subscriptionInfo.subscription.stream.attempt
+        .evalMap(result => F.delay(cb(result)) >> subscriptionInfo.onComplete)
+        .compile
+        .drain
+    }
+  }
 
   override protected def stopSubscription(id: ApolloClient.SubscriptionId): F[Unit] = ???
 
@@ -208,7 +215,17 @@ class ApolloClientImpl[F[_], S, CP, CE](
             ))
           case s                                  => s -> s"Unexpected connection_error received from server.".warnF
         }.flatten
-      case Right(StreamingMessage.FromServer.Data(id @ _, payload @ _))  => F.unit
+      case Right(StreamingMessage.FromServer.DataJson(id, data, errors)) =>
+        state.get.flatMap {
+          case Initialized(_, _, subscriptions) =>
+            subscriptions.get(id) match {
+              case None          =>
+                s"Received data for non existant subscription id [$id]: $data".errorF
+              case Some(emitter) =>
+                errors.fold(emitter.emitData(data))(emitter.emitError)
+            }
+          case _                                => "UNEXPECTED!".raiseError.void
+        }
       case Right(StreamingMessage.FromServer.Error(id @ _, payload @ _)) => F.unit
       case Right(StreamingMessage.FromServer.Complete(id @ _))           => F.unit
       case _                                                             => F.unit
