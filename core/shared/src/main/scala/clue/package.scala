@@ -8,6 +8,8 @@ import cats.MonadError
 
 package object clue {
   type CloseReason[CE]               = Either[Throwable, CE]
+  // Int = Attempt #. Will only be 0 immediately after a close.
+  // For first connection, it will be called the first time with 1, after 1st connection attempt.
   type ReconnectionStrategy[CE]      = (Int, CloseReason[CE]) => Option[FiniteDuration]
   type WebSocketReconnectionStrategy = ReconnectionStrategy[WebSocketCloseEvent]
 

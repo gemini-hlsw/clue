@@ -180,7 +180,35 @@ class ApolloClientImpl[F[_], S, CP, CE](
       case _                                                             => F.unit
     }
 
-  override protected def onClose(event: CE): F[Unit] = ???
+  override protected def onClose(event: CE): F[Unit] =
+    reconnectionStrategy(0, event.asRight) match {
+      case None       =>
+        state.modify {
+          case s @ Disconnected => s            -> s"onClose() called while disconnected.".warnF
+          case _                => Disconnected -> F.unit
+        }.flatten
+
+        state.set(Disconnected)
+      case Some(wait) =>
+        Deferred[F, Either[Throwable, Unit]].flatMap { newLatch =>
+          state.modify {
+            case s @ Disconnected  =>
+              s -> s"onClose() called while disconnected. Sice this is unexpected, reconnection strategy will not be applied.".warnF
+            // Ignoring following case on purpose. Latch release, error propagation/reconnection should be handled by failed "connect()".
+            case s @ Connecting(_) => s                    -> F.unit
+            case Connected(_)      => Connecting(newLatch) -> doConnect(newLatch)
+            case Initializing(connection @ _,
+                              latch @ _
+                ) => // attempt to get to Initialized, using new connection but old latch
+              ???
+            case _                 =>
+              Disconnected ->
+                (s"Connection closed. Attempting to reconnect...".warnF >>
+                  timer.sleep(wait) >>
+                  connect()) // TODO We actually want to restore the previous stable state here. We need the initialization payload callback. (And the subscriptions)
+          }.flatten
+        }
+    }
 
   private def doConnect(
     latch:   Deferred[F, Either[Throwable, Unit]],
