@@ -27,21 +27,22 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
   override def connect(
     uri:       Uri,
     onMessage: String => F[Unit],
-    onError:   Throwable => F[Unit],
     onClose:   WebSocketCloseEvent => F[Unit]
   ): F[PersistentConnection[F, WebSocketCloseParams]] =
-    Ref[F]
-      .of(false)
-      .flatMap(isOpen =>
-        Async[F].async { cb =>
+    for {
+      isOpen     <- Ref[F].of(false)
+      isErrored  <- Ref[F].of(false)
+      connection <-
+        Async[F].async[PersistentConnection[F, WebSocketCloseParams]] { cb =>
           val ws = new WebSocket(uri.toString, Protocol)
 
           ws.onopen = { _: Event =>
-            (for {
-              _ <- isOpen.set(true)
-              _ <- Logger[F].trace("WebSocket open")
-              _ <- Sync[F].delay(cb((new WebSocketJSConnection(ws)).asRight))
-            } yield ())
+            (
+              for {
+                _ <- isOpen.set(true)
+                _ <- Logger[F].trace("WebSocket open")
+              } yield cb(new WebSocketJSConnection(ws).asRight)
+            ).uncancelable
               .runAsync(_ => IO.unit)
               .unsafeRunSync()
           }
@@ -56,29 +57,31 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
             }).runAsync(_ => IO.unit).unsafeRunSync()
           }
 
-          ws.onerror = { e: Event =>
-            val t = new GraphQLException(e.toString)
-            (for {
-              _    <- Logger[F].error(s"Error on WebSocket for [$uri]: $e")
-              open <- isOpen.get
-              _    <-
-                if (!open)
-                  Sync[F].delay(cb(t.asLeft))
-                else
-                  onError(t)
-            } yield ()).runAsync(_ => IO.unit).unsafeRunSync()
+          // According to spec, onError is only closed prior to a close.
+          // https://html.spec.whatwg.org/multipage/web-sockets.html
+          ws.onerror = { _: Event =>
+            (
+              for {
+                _    <- Logger[F].error(s"Error on WebSocket for [$uri]")
+                _    <- isErrored.set(true)
+                open <- isOpen.get
+              } yield if (!open) cb(new ConnectionException().asLeft)
+            ).uncancelable
+              .runAsync(_ => IO.unit)
+              .unsafeRunSync()
           }
 
           ws.onclose = { e: CloseEvent =>
             (
               for {
-                _ <- Logger[F].trace("WebSocket closed")
-                _ <- onClose(WebSocketCloseEvent(e.code, e.reason, e.wasClean))
+                _       <- Logger[F].trace("WebSocket closed")
+                errored <- isErrored.get
+                _       <- onClose(WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored))
               } yield ()
             ).runAsync(_ => IO.unit).unsafeRunSync()
           }
         }
-      )
+    } yield connection
 }
 
 object WebSocketJSBackend {

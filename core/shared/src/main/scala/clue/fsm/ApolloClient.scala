@@ -33,7 +33,6 @@ trait ApolloClient[F[_], S, CP] extends GraphQLStreamingClient[F, S] {
 // Backend facing interface
 trait WebSocketHandler[F[_], CE] {
   protected def onMessage(msg: String): F[Unit]
-  protected def onError(t:     Throwable): F[Unit]
   protected def onClose(event: CE): F[Unit]
 }
 
@@ -130,7 +129,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
           // We need a wait for the connection to establish and then disconnect it, without blocking the client.
           Disconnected -> latch.complete(
             interruptedError
-          ) // >> wait in background to complete and close
+          ) // >> TODO wait in background to complete and close
         case Connected(connection)           => Disconnected -> connection.closeInternal(closeParameters)
         case Initializing(connection, latch) =>
           Disconnected -> (latch.complete(interruptedError) >> connection.closeInternal(
@@ -181,8 +180,6 @@ class ApolloClientImpl[F[_], S, CP, CE](
       case _                                                             => F.unit
     }
 
-  override protected def onError(t: Throwable): F[Unit] = ???
-
   override protected def onClose(event: CE): F[Unit] = ???
 
   private def doConnect(
@@ -190,7 +187,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
     attempt: Int = 1
   ): F[Unit] =
     backend
-      .connect(uri, onMessage, onError, onClose)
+      .connect(uri, onMessage, onClose)
       .attempt
       .flatMap { connection =>
         state.modify {

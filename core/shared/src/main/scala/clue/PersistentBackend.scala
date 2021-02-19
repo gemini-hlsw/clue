@@ -13,7 +13,6 @@ trait PersistentBackend[F[_], CP, CE] {
   def connect(
     uri:       Uri,
     onMessage: String => F[Unit],
-    onError:   Throwable => F[Unit],
     onClose:   CE => F[Unit]
   ): F[PersistentConnection[F, CP]]
 }

@@ -206,29 +206,29 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
                      )
       } yield ()
 
-    def processError(t: Throwable): F[Unit] =
-      connectionRef
-        .getAndSet(none)
-        .flatMap(_ match {
-          case Some(connectionDef) =>
-            connectionDef.tryGet.flatMap(_ match {
-              // Connection was already established. We must cancel all subscriptions. (or not?)
-              case Some(connection) =>
-                for {
-                  // TODO FIX LOGIC BEARING IN MIND THAT CLOSE IS ALWAYS CALLED AFTER AN ERROR:
-                  // https://stackoverflow.com/a/40084550
-                  _ <- terminateAllSubscriptions()
-                  _ <- connectionStatus.set(StreamingClientStatus.Disconnecting)
-                  _ <- connection.close()
-                  _ <- connectionStatus.set(StreamingClientStatus.Disconnected)
-                } yield ()
-              // Connection wasn't established yet.
-              case _                => F.unit
-            })
-          case _                   => F.unit
-        })
-        .handleErrorWith(t => Logger[F].error(t)(s"Error processing error on WebSocket for [$uri]"))
-        .flatMap(_ => reconnect(t.asLeft))
+    // def processError(t: Throwable): F[Unit] =
+    //   connectionRef
+    //     .getAndSet(none)
+    //     .flatMap(_ match {
+    //       case Some(connectionDef) =>
+    //         connectionDef.tryGet.flatMap(_ match {
+    //           // Connection was already established. We must cancel all subscriptions. (or not?)
+    //           case Some(connection) =>
+    //             for {
+    //               // TODO FIX LOGIC BEARING IN MIND THAT CLOSE IS ALWAYS CALLED AFTER AN ERROR:
+    //               // https://stackoverflow.com/a/40084550
+    //               _ <- terminateAllSubscriptions()
+    //               _ <- connectionStatus.set(StreamingClientStatus.Disconnecting)
+    //               _ <- connection.close()
+    //               _ <- connectionStatus.set(StreamingClientStatus.Disconnected)
+    //             } yield ()
+    //           // Connection wasn't established yet.
+    //           case _                => F.unit
+    //         })
+    //       case _                   => F.unit
+    //     })
+    //     .handleErrorWith(t => Logger[F].error(t)(s"Error processing error on WebSocket for [$uri]"))
+    //     .flatMap(_ => reconnect(t.asLeft))
 
     def processDisconnect(closeEvent: CE): F[Unit] =
       (for {
@@ -248,7 +248,7 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
 
         _          <- firstInitInvoked.complete(()).attempt.void
         _          <- connectionStatus.set(StreamingClientStatus.Connecting)
-        connection <- backend.connect(uri, processMessage _, processError _, processDisconnect)
+        connection <- backend.connect(uri, processMessage _, processDisconnect)
         _          <- d.complete(connection)
         _          <- connectionStatus.set(StreamingClientStatus.Connected)
       } yield d).onError(_ => connectionRef.set(none))
