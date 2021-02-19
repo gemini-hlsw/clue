@@ -54,6 +54,8 @@ trait StreamingClientInternal[F[_]] {
   protected def stopSubscription(id: ApolloClient.SubscriptionId): F[Unit]
 }
 
+// TODO: Reestablish subscriptions
+
 protected sealed trait State[+F[_], +CP]
 protected object State {
   final case object Disconnected extends State[Nothing, Nothing]
@@ -246,7 +248,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
           case _                                             => Disconnected -> F.unit
         }.flatten
       case Some(wait) =>
-        Deferred[F, Either[Throwable, Unit]].flatMap { newConnectionLatch =>
+        Deferred[F, Either[Throwable, Unit]].flatMap { newConnectLatch =>
           Deferred[F, Either[Throwable, Unit]].flatMap { newInitLatch =>
             val waitF = s"Connection closed. Attempting to reconnect...".warnF >> timer.sleep(wait)
 
@@ -255,13 +257,13 @@ class ApolloClientImpl[F[_], S, CP, CE](
                 s -> s"onClose() called while disconnected. Sice this is unexpected, reconnection strategy will not be applied.".warnF
               case s @ (Connecting(_) | Reestablishing(_, _, _)) => s -> warn
               case Connected(_)                                  =>
-                Connecting(newConnectionLatch) -> (waitF >> doConnect(newConnectionLatch))
+                Connecting(newConnectLatch) -> (waitF >> doConnect(newConnectLatch))
               case Initializing(initPayloadF, _, latch)          =>
-                Reestablishing(initPayloadF, newConnectionLatch, latch) ->
-                  (waitF >> doConnect(newConnectionLatch))
+                Reestablishing(initPayloadF, newConnectLatch, latch) ->
+                  (waitF >> doConnect(newConnectLatch))
               case Initialized(initPayloadF, _, _)               =>
-                Reestablishing(initPayloadF, newConnectionLatch, newInitLatch) ->
-                  (waitF >> doConnect(newConnectionLatch))
+                Reestablishing(initPayloadF, newConnectLatch, newInitLatch) ->
+                  (waitF >> doConnect(newConnectLatch))
             }.flatten
           }
         }
@@ -421,39 +423,53 @@ class ApolloClientImpl[F[_], S, CP, CE](
     subscription:  String,
     operationName: Option[String],
     variables:     Option[Json]
-  ): F[SubscriptionInfo[D]] = {
-    val request = GraphQLRequest(subscription, operationName, variables)
-
+  ): F[SubscriptionInfo[D]] =
     state.get.flatMap {
-      case Initialized(_, connection, _) =>
+      case Initialized(_, connection, _)   =>
+        val request = GraphQLRequest(subscription, operationName, variables)
+
         buildQueue[D](request).map { case (id, emitter) =>
+          def acquire: F[Unit] =
+            state.modify {
+              case Initialized(i, c, subscriptions)    =>
+                Initialized(i, c, subscriptions + (id -> emitter)) -> F.unit
+              case s @ Initializing(_, _, latch)       =>
+                s -> (latch.get.rethrow >> acquire)
+              case s @ Reestablishing(_, _, initLatch) =>
+                s -> (initLatch.get.rethrow >> acquire)
+              case s @ _                               => s -> "UNEXPECTED!".raiseError.void
+            }.flatten
+
+          def release: F[Unit] =
+            state.modify {
+              case Initialized(i, c, subscriptions)    =>
+                Initialized(i, c, subscriptions - id) -> F.unit
+              case s @ Initializing(_, _, latch)       =>
+                s -> (latch.get.rethrow >> release)
+              case s @ Reestablishing(_, _, initLatch) =>
+                s -> (initLatch.get.rethrow >> release)
+              case s @ _                               => s -> "UNEXPECTED!".raiseError.void
+            }.flatten
+
+          def sendStart: F[Unit] = state.get.flatMap {
+            // The connection may have changed since we created the subscription, so we re-get it.
+            case Initialized(_, currentConnection, _) =>
+              currentConnection.send(StreamingMessage.FromClient.Start(id, request))
+            case Initializing(_, _, latch)            =>
+              latch.get.rethrow >> sendStart
+            case Reestablishing(_, _, initLatch)      =>
+              initLatch.get.rethrow >> sendStart
+            case _                                    => "UNEXPECTED!".raiseError.void
+          }
+
           val bracket =
             Stream.bracket(
-              s"Acquiring queue for subscription [$id]".debugF >>
-                state.modify {
-                  case Initialized(i, c, subscriptions) =>
-                    Initialized(i, c, subscriptions + (id -> emitter)) -> F.unit
-                  case s @ _                            => s -> "UNEXPECTED!".raiseError.void
-                }.flatten
-            )(_ =>
-              s"Releasing queue for subscription[$id]".debugF >>
-                state.modify {
-                  case Initialized(i, c, subscriptions) =>
-                    Initialized(i, c, subscriptions - id) -> F.unit
-                  case s @ _                            => s -> "UNEXPECTED!".raiseError.void
-                }.flatten
-            )
+              s"Acquiring queue for subscription [$id]".debugF >> acquire
+            )(_ => s"Releasing queue for subscription[$id]".debugF >> release)
 
           val stream = bracket.flatMap(_ =>
             (
-              Stream.eval(
-                // The connection may have changed since we created the subscription, so we re-get it.
-                state.get.flatMap {
-                  case Initialized(_, currentConnection, _) =>
-                    currentConnection.send(StreamingMessage.FromClient.Start(id, request))
-                  case _                                    => "UNEXPECTED!".raiseError.void
-                }
-              ) >>
+              Stream.eval(sendStart) >>
                 emitter.queue.dequeue
                   .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".debugF)
             ).rethrow.unNoneTerminate
@@ -464,9 +480,12 @@ class ApolloClientImpl[F[_], S, CP, CE](
 
           SubscriptionInfo(createSubscription(connection, stream, id), terminateSubscription(id))
         }
-      case _                             => "NOT INITIALIZED".raiseError
+      case Initializing(_, _, latch)       =>
+        latch.get.rethrow >> startSubscription(subscription, operationName, variables)
+      case Reestablishing(_, _, initLatch) =>
+        initLatch.get.rethrow >> startSubscription(subscription, operationName, variables)
+      case _                               => "NOT INITIALIZED".raiseError
     }
-  }
 }
 
 object ApolloClient {
