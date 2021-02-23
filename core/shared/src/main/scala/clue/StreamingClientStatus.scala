@@ -8,14 +8,14 @@ import cats.Show
 
 sealed trait StreamingClientStatus
 object StreamingClientStatus {
-  final case object Connecting    extends StreamingClientStatus
-  final case object Connected     extends StreamingClientStatus
-  final case object Initializing  extends StreamingClientStatus
-  final case object Initialized   extends StreamingClientStatus
-  final case object Terminating   extends StreamingClientStatus
+  final case object Connecting   extends StreamingClientStatus
+  final case object Connected    extends StreamingClientStatus
+  final case object Initializing extends StreamingClientStatus
+  final case object Initialized  extends StreamingClientStatus
+  // final case object Terminating  extends StreamingClientStatus
   // final case object Terminated    extends StreamingClientStatus
-  final case object Disconnecting extends StreamingClientStatus
-  final case object Disconnected  extends StreamingClientStatus
+  // final case object Disconnecting extends StreamingClientStatus
+  final case object Disconnected extends StreamingClientStatus
 
   implicit val eqStreamingClientStatus: Eq[StreamingClientStatus]     = Eq.fromUniversalEquals
   implicit val showStreamingClientStatus: Show[StreamingClientStatus] = Show.fromToString

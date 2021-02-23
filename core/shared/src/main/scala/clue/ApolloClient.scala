@@ -71,7 +71,7 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
       _.tryGet.flatMap(
         _.fold(F.unit)(connection =>
           for {
-            _ <- connectionStatus.set(StreamingClientStatus.Terminating)
+            // _ <- connectionStatus.set(StreamingClientStatus.Terminating)
             // Tell server to stop active subscriptions.
             _ <- subscriptions.get.flatMap(
                    _.keySet.toList.traverse(id =>
@@ -86,11 +86,11 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
                    case TerminateOptions.KeepConnection              =>
                      connectionStatus.set(StreamingClientStatus.Connected)
                    case TerminateOptions.Disconnect(closeParameters) =>
-                     connectionStatus.set(StreamingClientStatus.Disconnecting) >>
-                       // Clean up so a new connection can be established if `connect` is called again.
-                       // TODO DO THIS FIRST? SO a new connection can be established if it comes while we are cleaning up.
-                       // Somehow pipe status updates through something that can make the channel obsoletable.
-                       connectionRef.set(none) >>
+                     //  connectionStatus.set(StreamingClientStatus.Disconnecting) >>
+                     // Clean up so a new connection can be established if `connect` is called again.
+                     // TODO DO THIS FIRST? SO a new connection can be established if it comes while we are cleaning up.
+                     // Somehow pipe status updates through something that can make the channel obsoletable.
+                     connectionRef.set(none) >>
                        // Actually close connection.
                        connection.closeInternal(closeParameters)
 
