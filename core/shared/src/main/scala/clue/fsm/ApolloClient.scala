@@ -31,7 +31,7 @@ protected[clue] trait Emitter[F[_]] {
 
   def emitData(json:  Json): F[Unit]
   def emitError(json: Json): F[Unit]
-  def terminate(): F[Unit]
+  def halt(): F[Unit]
 }
 
 // Client facing interface
@@ -112,6 +112,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
           action
       }
 
+  // <ApolloClient>
   override def status: F[StreamingClientStatus] =
     connectionStatus.get
 
@@ -149,13 +150,6 @@ class ApolloClientImpl[F[_], S, CP, CE](
       }
     }
   }
-
-  private def gracefulTerminate(
-    connection:    PersistentConnection[F, CP],
-    subscriptions: Map[String, Emitter[F]]
-  ): F[Unit] =
-    stopSubscriptions(connection, subscriptions) >>
-      connection.send(StreamingMessage.FromClient.ConnectionTerminate)
 
   override def terminate(): F[Unit] = {
     val error = "terminate() called while uninitialized.".raiseError.void
@@ -206,7 +200,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
 
   // TODO A reinitialize() method?
 
-  // TODO See if we have logic in common with onClose(), after onClose() is fixed.
+  // TODO See if we have logic in common with onClose()
   override def reestablish(): F[Unit] =
     Latch[F].flatMap { newConnectLatch =>
       Latch[F].flatMap { newInitLatch =>
@@ -225,6 +219,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
       }
     }
 
+  // <GraphQLStreamingClient>
   override protected def subscribeInternal[D: Decoder](
     subscription:  String,
     operationName: Option[String],
@@ -233,6 +228,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
     startSubscription(subscription, operationName, variables)(implicitly[Decoder[D]])
       .map(_.subscription)
 
+  // <GraphQLClient>
   override protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String],
@@ -245,30 +241,11 @@ class ApolloClientImpl[F[_], S, CP, CE](
         .drain
     }
   }
+  // </GraphQLClient>
+  // </GraphQLStreamingClient>
+  // </ApolloClient>
 
-  private def startSubscriptions(
-    connection:    PersistentConnection[F, CP],
-    subscriptions: Map[String, Emitter[F]]
-  ): F[Unit] =
-    subscriptions.toList.traverse { case (id, emitter) =>
-      connection.send(StreamingMessage.FromClient.Start(id, emitter.request))
-    }.void
-
-  // Stop = Send stop message to server.
-  private def stopSubscriptions(
-    connection:    PersistentConnection[F, CP],
-    subscriptions: Map[String, Emitter[F]]
-  ): F[Unit] =
-    subscriptions.toList.traverse { case (id, _) =>
-      connection.send(StreamingMessage.FromClient.Stop(id))
-    }.void
-
-  // Halt = Terminate stream sent to client.
-  private def haltSubscriptions(
-    subscriptions: Map[String, Emitter[F]]
-  ): F[Unit] =
-    subscriptions.toList.traverse { case (_, emitter) => emitter.terminate() }.void
-
+  // <WebSocketHandler>
   override protected def onMessage(msg: String): F[Unit] =
     decode[StreamingMessage.FromServer](msg) match {
       case Left(e)                                                       =>
@@ -299,8 +276,10 @@ class ApolloClientImpl[F[_], S, CP, CE](
             }
           case _                                => "UNEXPECTED!".raiseError.void
         }
-      case Right(StreamingMessage.FromServer.Error(id @ _, payload @ _)) => F.unit
-      case Right(StreamingMessage.FromServer.Complete(id @ _))           => F.unit
+      case Right(StreamingMessage.FromServer.Error(id, payload))         =>
+        s"Error message received for subscription id [$id]:\n$payload".errorF
+      case Right(StreamingMessage.FromServer.Complete(id))               =>
+        haltSubscription(id, lenient = true)
       case _                                                             => F.unit
     }
 
@@ -347,7 +326,9 @@ class ApolloClientImpl[F[_], S, CP, CE](
         }
     }
   }
+  // </WebSocketHandler>
 
+  // <ApolloClient Helpers>
   private def doConnect(latch: Latch[F], attempt: Int = 1): F[Unit] =
     backend
       .connect(uri, onMessage, onClose)
@@ -430,7 +411,39 @@ class ApolloClientImpl[F[_], S, CP, CE](
       }
   }
 
-  private def terminateSubscription(id: String, lenient: Boolean = false): F[Unit] =
+  private def gracefulTerminate(
+    connection:    PersistentConnection[F, CP],
+    subscriptions: Map[String, Emitter[F]]
+  ): F[Unit] =
+    (stopSubscriptions(connection, subscriptions) >>
+      connection.send(StreamingMessage.FromClient.ConnectionTerminate)).attempt.void
+  // </ApolloClient Helpers>
+
+  // <GraphQLStreamingClient Helpers>
+  private def startSubscriptions(
+    connection:    PersistentConnection[F, CP],
+    subscriptions: Map[String, Emitter[F]]
+  ): F[Unit] =
+    subscriptions.toList.traverse { case (id, emitter) =>
+      connection.send(StreamingMessage.FromClient.Start(id, emitter.request))
+    }.void
+
+  // Stop = Send stop message to server.
+  private def stopSubscriptions(
+    connection:    PersistentConnection[F, CP],
+    subscriptions: Map[String, Emitter[F]]
+  ): F[Unit] =
+    subscriptions.toList.traverse { case (id, _) =>
+      connection.send(StreamingMessage.FromClient.Stop(id))
+    }.void
+
+  // Halt = Terminate stream sent to client.
+  private def haltSubscriptions(
+    subscriptions: Map[String, Emitter[F]]
+  ): F[Unit] =
+    subscriptions.toList.traverse { case (_, emitter) => emitter.halt() }.void
+
+  private def haltSubscription(id: String, lenient: Boolean = false): F[Unit] =
     s"Terminating subscription [$id]".debugF >>
       state.get.flatMap {
         case Initialized(_, _, subscriptions) =>
@@ -441,7 +454,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
                    .fold[F[Unit]](
                      if (lenient) F.unit
                      else F.raiseError(new InvalidSubscriptionIdException(id))
-                   )(_.terminate())
+                   )(_.halt())
           } yield ()
         case _                                => "UNEXPECTED!".raiseError
       }
@@ -455,7 +468,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
 
     override def stop(): F[Unit] =
       for {
-        _ <- terminateSubscription(subscriptionId)
+        _ <- haltSubscription(subscriptionId)
         _ <- connection.send(StreamingMessage.FromClient.Stop(subscriptionId))
       } yield ()
   }
@@ -477,7 +490,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
       queue.enqueue1(Left(error))
     }
 
-    def terminate(): F[Unit] =
+    def halt(): F[Unit] =
       queue.enqueue1(Right(None))
   }
 
@@ -509,24 +522,26 @@ class ApolloClientImpl[F[_], S, CP, CE](
         buildQueue[D](request).map { case (id, emitter) =>
           def acquire: F[Unit] =
             stateModify {
-              case Initialized(i, c, subscriptions)       =>
+              case Initialized(i, c, subscriptions)                          =>
                 Initialized(i, c, subscriptions + (id -> emitter)) -> F.unit
-              case s @ Initializing(_, _, _, latch)       =>
+              case s @ Initializing(_, _, _, latch)                          =>
                 s -> (latch.get.rethrow >> acquire)
-              case s @ Reestablishing(_, _, _, initLatch) =>
-                s -> (initLatch.get.rethrow >> acquire)
-              case s @ _                                  => s -> "UNEXPECTED!".raiseError.void
+              case Reestablishing(i, subscriptions, connectLatch, initLatch) =>
+                Reestablishing(i, subscriptions + (id -> emitter), connectLatch, initLatch) ->
+                  F.unit
+              case s @ _                                                     => s -> "UNEXPECTED!".raiseError.void
             }
 
           def release: F[Unit] =
             stateModify {
-              case Initialized(i, c, subscriptions)       =>
+              case Initialized(i, c, subscriptions)                          =>
                 Initialized(i, c, subscriptions - id) -> F.unit
-              case s @ Initializing(_, _, _, latch)       =>
+              case s @ Initializing(_, _, _, latch)                          =>
                 s -> (latch.get.rethrow >> release)
-              case s @ Reestablishing(_, _, _, initLatch) =>
-                s -> (initLatch.get.rethrow >> release)
-              case s @ _                                  => s -> "UNEXPECTED!".raiseError.void
+              case Reestablishing(i, subscriptions, connectLatch, initLatch) =>
+                Reestablishing(i, subscriptions - id, connectLatch, initLatch) ->
+                  F.unit
+              case s @ _                                                     => s -> "UNEXPECTED!".raiseError.void
             }
 
           def sendStart: F[Unit] = state.get.flatMap {
@@ -556,7 +571,9 @@ class ApolloClientImpl[F[_], S, CP, CE](
               }
           )
 
-          SubscriptionInfo(createSubscription(connection, stream, id), terminateSubscription(id))
+          SubscriptionInfo(subscription = createSubscription(connection, stream, id),
+                           onComplete = haltSubscription(id)
+          )
         }
       case Initializing(_, _, _, latch)       =>
         latch.get.rethrow >> startSubscription(subscription, operationName, variables)
@@ -564,6 +581,7 @@ class ApolloClientImpl[F[_], S, CP, CE](
         initLatch.get.rethrow >> startSubscription(subscription, operationName, variables)
       case _                                  => "NOT INITIALIZED".raiseError
     }
+  // </GraphQLStreamingClient Helpers>
 }
 
 object ApolloClient {
