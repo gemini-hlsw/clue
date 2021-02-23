@@ -200,7 +200,6 @@ class ApolloClientImpl[F[_], S, CP, CE](
 
   // TODO A reinitialize() method?
 
-  // TODO See if we have logic in common with onClose()
   override def reestablish(): F[Unit] =
     Latch[F].flatMap { newConnectLatch =>
       Latch[F].flatMap { newInitLatch =>
@@ -285,17 +284,18 @@ class ApolloClientImpl[F[_], S, CP, CE](
 
   // TODO Handle interruptions? Can callbacks be canceled?
   override protected def onClose(event: CE): F[Unit] = {
-    val warn =
-      "onClose() called while connecting. This is unexpected. Client state may be incosistent.".warnF
+    val error = (new DisconnectedException()).asLeft
 
     reconnectionStrategy(0, event.asRight) match {
       case None       =>
         stateModify {
-          case s @ Disconnected                                 => s            -> s"onClose() called while disconnected.".warnF
-          case s @ (Connecting(_) | Reestablishing(_, _, _, _)) => s            -> warn
-          case Initializing(_, _, _, latch)                     =>
-            Disconnected -> latch.complete((new DisconnectedException()).asLeft)
-          case _                                                => Disconnected -> F.unit
+          case s @ Disconnected                              => s            -> s"onClose() called while disconnected.".warnF
+          case Connecting(latch)                             => Disconnected -> latch.complete(error)
+          case Reestablishing(_, _, connectLatch, initLatch) =>
+            Disconnected -> (connectLatch.complete(error) >> initLatch.complete(error))
+          case Initializing(_, _, _, latch)                  =>
+            Disconnected -> latch.complete(error)
+          case _                                             => Disconnected -> F.unit
         }
       case Some(wait) =>
         Latch[F].flatMap { newConnectLatch =>
