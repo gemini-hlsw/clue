@@ -107,12 +107,16 @@ class ApolloClientImpl[F[_], S, CP, CE](
   import State._
 
   private def stateModify(f: State[F, CP] => (State[F, CP], F[Unit])): F[Unit] =
-    for {
-      action   <- state.modify(f)
-      newState <- state.get
-      _        <- connectionStatus.set(newState.status)
-      _        <- action
-    } yield ()
+    state
+      .modify { oldState =>
+        val (newState, action) = f(oldState)
+        newState -> ((oldState, newState, action))
+      }
+      .flatMap { case (oldState, newState, action) =>
+        s"State Modified [$oldState] ==> [$newState]".debugF >>
+          connectionStatus.set(newState.status) >>
+          action
+      }
 
   override def status: F[StreamingClientStatus] =
     connectionStatus.get
@@ -157,7 +161,10 @@ class ApolloClientImpl[F[_], S, CP, CE](
     val warn  = "terminate() called while initializing.".warnF
 
     stateModify {
-      case Initialized(_, connection, _)       =>
+      case Initialized(_,
+                       connection,
+                       _
+          ) => // TODO: Terminate subscriptions and gracefully unsubscribe.
         Connected(connection) -> connection.send(StreamingMessage.FromClient.ConnectionTerminate)
       case s @ Initializing(_, _, latch)       => s -> (warn >> latch.get.rethrow >> terminate())
       case s @ Reestablishing(_, _, initLatch) =>
@@ -275,8 +282,12 @@ class ApolloClientImpl[F[_], S, CP, CE](
             val waitF = s"Connection closed. Attempting to reconnect...".warnF >> timer.sleep(wait)
 
             stateModify {
+              // TODO This logic is wrong. onClose can be called at any time, it is never unexpected.
+              // Also: if disconnect was called and we want reconnection logic to kick in, that is not happening,
+              // since disconnect sets state to disconnected!
+              // Maybe we can have a reconnect() method??
               case s @ Disconnected                              =>
-                s -> s"onClose() called while disconnected. Sice this is unexpected, reconnection strategy will not be applied.".warnF
+                s -> s"onClose() called while disconnected. Since this is unexpected, reconnection strategy will not be applied.".warnF
               case s @ (Connecting(_) | Reestablishing(_, _, _)) => s -> warn
               case Connected(_)                                  =>
                 Connecting(newConnectLatch) -> (waitF >> doConnect(newConnectLatch))
