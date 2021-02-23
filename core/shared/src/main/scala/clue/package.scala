@@ -28,6 +28,9 @@ package object clue {
 
     def debugF[F[_]](implicit logger: Logger[F]): F[Unit] =
       logger.debug(str)
+
+    def traceF[F[_]](implicit logger: Logger[F]): F[Unit] =
+      logger.trace(str)
   }
 
   final implicit class ThrowableOps(val t: Throwable) extends AnyVal {

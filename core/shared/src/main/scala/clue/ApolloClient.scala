@@ -144,7 +144,7 @@ abstract class ApolloClient[F[_]: ConcurrentEffect: Timer: Logger, S, CP, CE](
     for {
       _    <- Logger[F].debug(s"$LogPrefix Terminating subscription [$id]")
       subs <- subscriptions.get
-      _    <- Logger[F].debug(s"$LogPrefix Current subscriptions: [${subs.keySet}]")
+      _    <- Logger[F].trace(s"$LogPrefix Current subscriptions: [${subs.keySet}]")
       _    <- subs
                 .get(id)
                 .fold[F[Unit]](
