@@ -6,7 +6,7 @@ inThisBuild(
     homepage := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
     testFrameworks += new TestFramework("munit.Framework")
-  ) ++ gspPublishSettings
+  ) ++ lucumaPublishSettings
 )
 
 lazy val root = project

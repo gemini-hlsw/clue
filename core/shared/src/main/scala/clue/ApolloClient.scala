@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue
@@ -271,6 +271,7 @@ class ApolloClient[F[_], S, CP, CE](
           case _                                                                           => "UNEXPECTED Complete RECEIVED!".warnF
         }
       case Right(StreamingMessage.FromServer.ConnectionKeepAlive)        => F.unit
+      case _                                                             => s"Unexpected message received from server: [$msg]".warnF
     }
 
   // TODO Handle interruptions? Can callbacks be canceled?
