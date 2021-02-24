@@ -30,8 +30,8 @@ Either:
 ```
 
 NOTES: 
-* `ApolloStreamingClient` implements the de facto Apollo protocol for streaming over web sockets.
-* The `HttpClient.of` constructor requires an implicit instance of a `Backend[F]`. An `AjaxJSBackend[F]` is provided for Scala.js.
+* `ApolloStreamingClient` implements the "de facto" Apollo protocol for streaming over web sockets.
+* The `TransactionalClient.of` constructor requires an implicit instance of a `Backend[F]`. An `AjaxJSBackend[F]` is provided for Scala.js.
 * The `ApolloStreamingClient.of` constructor requires an implicit instance of a `StreamingBackend[F]`. A `WebSocketJSBackend[F]` is provided for Scala.js.
 
 

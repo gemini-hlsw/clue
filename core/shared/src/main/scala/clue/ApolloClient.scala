@@ -220,45 +220,58 @@ class ApolloClient[F[_], S, CP, CE](
   // </ApolloClient>
 
   // <WebSocketHandler>
-  override def onMessage(msg: String): F[Unit] =
+  override def onMessage(connectionId: String, msg: String): F[Unit] =
     decode[StreamingMessage.FromServer](msg) match {
       case Left(e)                                                       =>
         e.raiseF(s"Exception decoding message received from server: [$msg]")
       case Right(StreamingMessage.FromServer.ConnectionAck)              =>
         stateModify {
-          case Initializing(initPayloadF, connection, subscriptions, latch) =>
+          case Initializing(initPayloadF, connection, subscriptions, latch)
+              if connection.id === connectionId =>
             Initialized(initPayloadF, connection, subscriptions) ->
               (startSubscriptions(connection, subscriptions) >> latch.complete(().asRight))
-          case s                                                            => s -> s"Unexpected connection_ack received from server.".warnF
+          case s => s -> s"Unexpected connection_ack received from server.".warnF
         }
       case Right(StreamingMessage.FromServer.ConnectionError(payload))   =>
         stateModify {
-          case Initializing(_, connection, _, latch) =>
+          case Initializing(_, connection, _, latch) if connection.id === connectionId =>
             (Connected(connection) -> latch.complete(
               s"Initialization rejected by server: [$payload].".error
             ))
-          case s                                     => s -> s"Unexpected connection_error received from server.".warnF
+          case s                                                                       => s -> s"Unexpected connection_error received from server.".warnF
         }
       case Right(StreamingMessage.FromServer.DataJson(id, data, errors)) =>
         state.get.flatMap {
-          case Initialized(_, _, subscriptions) =>
+          case Initialized(_, connection, subscriptions) if connection.id === connectionId =>
             subscriptions.get(id) match {
               case None          =>
                 s"Received data for non existant subscription id [$id]: $data".errorF
               case Some(emitter) =>
                 errors.fold(emitter.emitData(data))(emitter.emitError)
             }
-          case _                                => "UNEXPECTED Data RECEIVED!".raiseError.void
+          case _                                                                           => "UNEXPECTED Data RECEIVED!".raiseError.void
         }
+      // TODO Contemplate different states.
       case Right(StreamingMessage.FromServer.Error(id, payload))         =>
         s"Error message received for subscription id [$id]:\n$payload".errorF
       case Right(StreamingMessage.FromServer.Complete(id))               =>
-        haltSubscription(id, lenient = true)
-      case _                                                             => F.unit
+        state.get.flatMap {
+          case Initialized(_, connection, subscriptions) if connection.id === connectionId =>
+            subscriptions.get(id) match {
+              case None               => F.unit
+              case Some(subscription) => subscription.halt()
+            }
+          // Next 3 case are expected. Server will send complete packages for subscriptions gracefully shut down when reestablishing.
+          case Reestablishing(_, _, _, _)                                                  => F.unit
+          case Initializing(_, connection, _, _) if connection.id =!= connectionId         => F.unit
+          case Initialized(_, connection, _) if connection.id === connectionId             => F.unit
+          case _                                                                           => "UNEXPECTED Complete RECEIVED!".warnF
+        }
+      case Right(StreamingMessage.FromServer.ConnectionKeepAlive)        => F.unit
     }
 
   // TODO Handle interruptions? Can callbacks be canceled?
-  override def onClose(event: CE): F[Unit] = {
+  override def onClose(connectionId: String, event: CE): F[Unit] = {
     val error = (new DisconnectedException()).asLeft
 
     reconnectionStrategy(0, event.asRight) match {
@@ -418,18 +431,16 @@ class ApolloClient[F[_], S, CP, CE](
   ): F[Unit] =
     subscriptions.toList.traverse { case (_, emitter) => emitter.halt() }.void
 
-  private def haltSubscription(id: String, lenient: Boolean = false): F[Unit] =
-    s"Halting subscription [$id]".debugF >>
+  private def haltSubscription(subscriptionId: String): F[Unit] =
+    s"Halting subscription [$subscriptionId]".debugF >>
       state.get.flatMap {
         case Initialized(_, _, subscriptions) =>
           for {
             _ <- s"Current subscriptions: [${subscriptions.keySet}]".traceF
-            _ <- subscriptions
-                   .get(id)
-                   .fold[F[Unit]](
-                     if (lenient) F.unit
-                     else F.raiseError(new InvalidSubscriptionIdException(id))
-                   )(_.halt())
+            _ <- subscriptions.get(subscriptionId) match {
+                   case None               => F.raiseError(new InvalidSubscriptionIdException(subscriptionId))
+                   case Some(subscription) => subscription.halt()
+                 }
           } yield ()
         case _                                => "UNEXPECTED haltSubscription!".raiseError
       }

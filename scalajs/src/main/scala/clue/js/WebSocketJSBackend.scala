@@ -17,6 +17,7 @@ import org.scalajs.dom.raw.MessageEvent
 import org.scalajs.dom.raw.WebSocket
 import sttp.model.Uri
 import cats.effect.concurrent.Ref
+import java.util.UUID
 
 /**
  * Streaming backend for JS WebSocket.
@@ -29,9 +30,10 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
     handler: PersistentBackendHandler[F, WebSocketCloseEvent]
   ): F[PersistentConnection[F, WebSocketCloseParams]] =
     for {
-      isOpen     <- Ref[F].of(false)
-      isErrored  <- Ref[F].of(false)
-      connection <-
+      isOpen       <- Ref[F].of(false)
+      isErrored    <- Ref[F].of(false)
+      connectionId <- Sync[F].delay(UUID.randomUUID().toString)
+      connection   <-
         Async[F].async[PersistentConnection[F, WebSocketCloseParams]] { cb =>
           val ws = new WebSocket(uri.toString, Protocol)
 
@@ -39,8 +41,8 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
             (
               for {
                 _ <- isOpen.set(true)
-                _ <- Logger[F].trace("WebSocket open")
-              } yield cb(new WebSocketJSConnection(ws).asRight)
+                _ <- s"WebSocket open for URI [$uri]".traceF
+              } yield cb(new WebSocketJSConnection(connectionId, ws).asRight)
             ).uncancelable
               .runAsync(_ => IO.unit)
               .unsafeRunSync()
@@ -50,9 +52,8 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
 
           ws.onmessage = { e: MessageEvent =>
             (e.data match {
-              case str: String => handler.onMessage(str)
-              case other       =>
-                Logger[F].error(s"Unexpected event from WebSocket for [$uri]: [$other]")
+              case str: String => handler.onMessage(connectionId, str)
+              case other       => s"Unexpected event from WebSocket for [$uri]: [$other]".errorF
             }).runAsync(_ => IO.unit).unsafeRunSync()
           }
 
@@ -61,7 +62,7 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
           ws.onerror = { _: Event =>
             (
               for {
-                _    <- Logger[F].error(s"Error on WebSocket for [$uri]")
+                _    <- s"Error on WebSocket for [$uri]".errorF
                 _    <- isErrored.set(true)
                 open <- isOpen.get
               } yield if (!open) cb(new ConnectionException().asLeft)
@@ -73,9 +74,11 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
           ws.onclose = { e: CloseEvent =>
             (
               for {
-                _       <- Logger[F].trace("WebSocket closed")
+                _       <- s"WebSocket closed for URI [$uri]".traceF
                 errored <- isErrored.get
-                _       <- handler.onClose(WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored))
+                _       <- handler.onClose(connectionId,
+                                           WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored)
+                           )
               } yield ()
             ).runAsync(_ => IO.unit).unsafeRunSync()
           }
@@ -87,13 +90,13 @@ object WebSocketJSBackend {
   def apply[F[_]: Effect: Logger]: WebSocketJSBackend[F] = new WebSocketJSBackend[F]
 }
 
-final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
+final class WebSocketJSConnection[F[_]: Sync: Logger](val id: String, private val ws: WebSocket)
     extends WebSocketConnection[F] {
   override def send(msg: StreamingMessage.FromClient): F[Unit] =
     Sync[F].delay(ws.send(msg.asJson.toString))
 
   override def closeInternal(closeParameters: Option[WebSocketCloseParams]): F[Unit] =
-    Logger[F].trace("Disconnecting WebSocket...") >>
+    "Disconnecting WebSocket...".traceF >>
       Sync[F].delay {
         val params = closeParameters.getOrElse(WebSocketCloseParams())
         // Facade for "ws.close" should define parameters as js.Undef, but it doesn't. So we contemplate all cases.
