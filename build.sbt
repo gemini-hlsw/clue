@@ -6,7 +6,7 @@ inThisBuild(
     homepage := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
     testFrameworks += new TestFramework("munit.Framework")
-  ) ++ gspPublishSettings
+  ) ++ lucumaPublishSettings
 )
 
 lazy val root = project
@@ -48,7 +48,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
         Settings.Libraries.Fs2.value ++
         Settings.Libraries.Log4Cats.value ++
         Settings.Libraries.SttpModel.value ++
-        Settings.Libraries.DisciplineMUnit.value
+        Settings.Libraries.DisciplineMUnit.value,
+    addCompilerPlugin(("org.typelevel" %% "kind-projector" % "0.11.3").cross(CrossVersion.full))
   )
   .dependsOn(model)
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue
@@ -12,8 +12,4 @@ object WebSocketCloseParams {
   def apply(code:   Int, reason: String): WebSocketCloseParams =
     WebSocketCloseParams(code = code.some, reason = reason.some)
 }
-case class WebSocketCloseEvent(code: Int, reason: String, wasClean: Boolean)
-
-trait WebSocketBackend[F[_]] extends PersistentBackend[F, WebSocketCloseParams, WebSocketCloseEvent]
-
-trait WebSocketConnection[F[_]] extends PersistentConnection[F, WebSocketCloseParams]
+case class WebSocketCloseEvent(code: Int, reason: String, wasClean: Boolean, wasErrored: Boolean)

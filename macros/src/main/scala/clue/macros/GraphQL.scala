@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue.macros
@@ -371,17 +371,17 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
             (operation match {
               case _: UntypedQuery        =>
                 q"""
-                        def query[F[_]](...$paramss)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                        def query[F[_]](...$paramss)(implicit client: _root_.clue.TransactionalClient[F, $schemaType]) =
                           client.request(this)(Variables(...$variablesNames))
                       """
               case _: UntypedMutation     =>
                 q"""
-                        def execute[F[_]](...$paramss)(implicit client: _root_.clue.GraphQLClient[F, $schemaType]) =
+                        def execute[F[_]](...$paramss)(implicit client: _root_.clue.TransactionalClient[F, $schemaType]) =
                           client.request(this)(Variables(...$variablesNames))
                       """
               case _: UntypedSubscription =>
                 q"""
-                        def subscribe[F[_]](...$paramss)(implicit client: _root_.clue.GraphQLStreamingClient[F, $schemaType]) =
+                        def subscribe[F[_]](...$paramss)(implicit client: _root_.clue.StreamingClient[F, $schemaType]) =
                           client.subscribe(this)(Variables(...$variablesNames))
                       """
             })

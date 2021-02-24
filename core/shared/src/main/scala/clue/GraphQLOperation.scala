@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue
@@ -6,6 +6,9 @@ package clue
 import io.circe.Decoder
 import io.circe.Encoder
 
+/*
+ * A query, mutation or subscription must extend this trait.
+ */
 trait GraphQLOperation[S] {
   val document: String
   type Variables

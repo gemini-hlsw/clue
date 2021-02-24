@@ -1,9 +1,8 @@
-// Copyright (c) 2016-2020 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue
 
-import cats.Applicative
 import cats.MonadError
 import cats.syntax.all._
 import clue.model.GraphQLRequest
@@ -17,16 +16,15 @@ import sttp.model.Uri
 //   "data": { ... }, // Typed
 //   "errors": [ ... ]
 // }
-class HttpClient[F[_]: Logger: Backend, S](uri: Uri)(implicit me: MonadError[F, Throwable])
-    extends GraphQLClient[F, S] {
-  private val LogPrefix = "[clue.HttpClient]"
-
+class TransactionalClientImpl[F[_]: MonadError[*[_], Throwable]: TransactionalBackend: Logger, S](
+  uri: Uri
+) extends clue.TransactionalClient[F, S] {
   override protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
   ): F[D] =
-    Backend[F]
+    TransactionalBackend[F]
       .request(uri, GraphQLRequest(document, operationName, variables))
       .map { response =>
         parse(response).flatMap { json =>
@@ -39,12 +37,5 @@ class HttpClient[F[_]: Logger: Backend, S](uri: Uri)(implicit me: MonadError[F, 
         }
       }
       .rethrow
-      .onError { case t: Throwable => Logger[F].error(t)(s"$LogPrefix Error in query: ") }
-}
-
-object HttpClient {
-  def of[F[_]: Logger: Backend, S](uri: Uri)(implicit
-    me:                                 MonadError[F, Throwable]
-  ): F[HttpClient[F, S]] =
-    Applicative[F].pure(new HttpClient[F, S](uri))
+      .onError { case t: Throwable => t.logF("Error in query: ") }
 }
