@@ -15,7 +15,7 @@ package object clue {
   type ReconnectionStrategy[CE]      = (Int, CloseReason[CE]) => Option[FiniteDuration]
   type WebSocketReconnectionStrategy = ReconnectionStrategy[WebSocketCloseEvent]
 
-  type GraphQLWebSocketClient[F[_], S] =
+  type WebSocketClient[F[_], S] =
     PersistentStreamingClient[F, S, WebSocketCloseParams, WebSocketCloseEvent]
 
   type WebSocketBackend[F[_]]    = PersistentBackend[F, WebSocketCloseParams, WebSocketCloseEvent]

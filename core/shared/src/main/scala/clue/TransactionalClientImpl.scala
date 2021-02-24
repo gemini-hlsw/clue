@@ -3,7 +3,6 @@
 
 package clue
 
-import cats.Applicative
 import cats.MonadError
 import cats.syntax.all._
 import clue.model.GraphQLRequest
@@ -17,11 +16,9 @@ import sttp.model.Uri
 //   "data": { ... }, // Typed
 //   "errors": [ ... ]
 // }
-class HttpClient[F[_]: Logger: TransactionalBackend, S](uri: Uri)(implicit
-  me:                                                        MonadError[F, Throwable]
-) extends TransactionalClient[F, S] {
-  private val LogPrefix = "[clue.HttpClient]"
-
+class TransactionalClientImpl[F[_]: MonadError[*[_], Throwable]: TransactionalBackend: Logger, S](
+  uri: Uri
+) extends clue.TransactionalClient[F, S] {
   override protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
@@ -40,12 +37,5 @@ class HttpClient[F[_]: Logger: TransactionalBackend, S](uri: Uri)(implicit
         }
       }
       .rethrow
-      .onError { case t: Throwable => Logger[F].error(t)(s"$LogPrefix Error in query: ") }
-}
-
-object HttpClient {
-  def of[F[_]: Logger: TransactionalBackend, S](uri: Uri)(implicit
-    me:                                              MonadError[F, Throwable]
-  ): F[HttpClient[F, S]] =
-    Applicative[F].pure(new HttpClient[F, S](uri))
+      .onError { case t: Throwable => t.logF("Error in query: ") }
 }

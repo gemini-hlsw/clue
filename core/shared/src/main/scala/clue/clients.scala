@@ -4,6 +4,10 @@ import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
 import cats.effect.Sync
+import io.chrisdavenport.log4cats.Logger
+import sttp.model.Uri
+import cats.MonadError
+import cats.Applicative
 
 /**
  * A client that allows one-shot queries and mutations.
@@ -37,6 +41,24 @@ trait TransactionalClient[F[_], S] {
     operationName: Option[String] = None,
     variables:     Option[Json] = None
   ): F[D]
+}
+
+object TransactionalClient {
+  def of[F[_], S](uri: Uri, name: String = "")(implicit
+    F:                 MonadError[F, Throwable],
+    backend:           TransactionalBackend[F],
+    logger:            Logger[F]
+  ): F[TransactionalClient[F, S]] = {
+    val logPrefix = s"clue.TransactionalClient[${if (name.isEmpty) uri else name}]"
+
+    Applicative[F].pure(
+      new TransactionalClientImpl[F, S](uri)(
+        F,
+        backend,
+        logger.withModifiedString(s => s"$logPrefix $s")
+      )
+    )
+  }
 }
 
 /*

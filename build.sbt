@@ -48,7 +48,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
         Settings.Libraries.Fs2.value ++
         Settings.Libraries.Log4Cats.value ++
         Settings.Libraries.SttpModel.value ++
-        Settings.Libraries.DisciplineMUnit.value
+        Settings.Libraries.DisciplineMUnit.value,
+    addCompilerPlugin(("org.typelevel" %% "kind-projector" % "0.11.3").cross(CrossVersion.full))
   )
   .dependsOn(model)
 
