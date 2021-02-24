@@ -261,7 +261,7 @@ class ApolloClient[F[_], S, CP, CE](
               case None               => F.unit
               case Some(subscription) => subscription.halt()
             }
-          // Next 3 case are expected. Server will send complete packages for subscriptions gracefully shut down when reestablishing.
+          // Next 3 cases are expected. Server will send complete packages for subscriptions gracefully shut down when reestablishing.
           case Reestablishing(_, _, _, _)                                                  => F.unit
           case Initializing(_, connection, _, _) if connection.id =!= connectionId         => F.unit
           case Initialized(_, connection, _) if connection.id === connectionId             => F.unit
