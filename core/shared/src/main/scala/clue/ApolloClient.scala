@@ -248,7 +248,7 @@ class ApolloClient[F[_], S, CP, CE](
               case Some(emitter) =>
                 errors.fold(emitter.emitData(data))(emitter.emitError)
             }
-          case _                                => "UNEXPECTED!".raiseError.void
+          case _                                => "UNEXPECTED Data RECEIVED!".raiseError.void
         }
       case Right(StreamingMessage.FromServer.Error(id, payload))         =>
         s"Error message received for subscription id [$id]:\n$payload".errorF
@@ -419,7 +419,7 @@ class ApolloClient[F[_], S, CP, CE](
     subscriptions.toList.traverse { case (_, emitter) => emitter.halt() }.void
 
   private def haltSubscription(id: String, lenient: Boolean = false): F[Unit] =
-    s"Terminating subscription [$id]".debugF >>
+    s"Halting subscription [$id]".debugF >>
       state.get.flatMap {
         case Initialized(_, _, subscriptions) =>
           for {
@@ -431,7 +431,7 @@ class ApolloClient[F[_], S, CP, CE](
                      else F.raiseError(new InvalidSubscriptionIdException(id))
                    )(_.halt())
           } yield ()
-        case _                                => "UNEXPECTED!".raiseError
+        case _                                => "UNEXPECTED haltSubscription!".raiseError
       }
 
   private def createSubscription[D](
@@ -504,7 +504,7 @@ class ApolloClient[F[_], S, CP, CE](
               case Reestablishing(i, subscriptions, connectLatch, initLatch) =>
                 Reestablishing(i, subscriptions + (id -> emitter), connectLatch, initLatch) ->
                   F.unit
-              case s @ _                                                     => s -> "UNEXPECTED!".raiseError.void
+              case s @ _                                                     => s -> "UNEXPECTED acquire!".raiseError.void
             }
 
           def release: F[Unit] =
@@ -516,7 +516,7 @@ class ApolloClient[F[_], S, CP, CE](
               case Reestablishing(i, subscriptions, connectLatch, initLatch) =>
                 Reestablishing(i, subscriptions - id, connectLatch, initLatch) ->
                   F.unit
-              case s @ _                                                     => s -> "UNEXPECTED!".raiseError.void
+              case s @ _                                                     => s -> "UNEXPECTED release!".raiseError.void
             }
 
           def sendStart: F[Unit] = state.get.flatMap {
@@ -527,7 +527,7 @@ class ApolloClient[F[_], S, CP, CE](
               latch.get.rethrow >> sendStart
             case Reestablishing(_, _, _, initLatch)   =>
               initLatch.get.rethrow >> sendStart
-            case _                                    => "UNEXPECTED!".raiseError.void
+            case _                                    => "UNEXPECTED sendStart!".raiseError.void
           }
 
           val bracket =
