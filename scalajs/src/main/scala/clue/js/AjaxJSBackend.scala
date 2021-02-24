@@ -15,7 +15,7 @@ import io.circe.syntax._
 import org.scalajs.dom.ext.Ajax
 import sttp.model.Uri
 
-final class AjaxJSBackend[F[_]: Async] extends Backend[F] {
+final class AjaxJSBackend[F[_]: Async] extends TransactionalBackend[F] {
   def request(
     uri:     Uri,
     request: GraphQLRequest

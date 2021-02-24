@@ -7,8 +7,8 @@ Experimental GraphQL client.
 ### 1) Create a client
 
 Either:
-  * A `GraphQLClient[F[_], S]` (supporting queries and mutations), or
-  * A `GraphQLStreamingClient[F[_], S]` (supporting queries, mutations and subscriptions).
+  * A `TransactionalClient[F[_], S]` (supporting queries and mutations), or
+  * A `StreamingClient[F[_], S]` (supporting queries, mutations and subscriptions).
 
   `S` is a type denoting the schema. It can be any type, even a phantom type. It's only used to type-match clients and operations.
 
@@ -23,10 +23,10 @@ Either:
   sealed trait StarWars
 
   implicit val backend: Backend[IO] = AjaxJSBackend[IO]
-  val oneShotClient: GraphQLClient[IO, StarWars] = HttpClient.of[IO, Schema]("https://starwars.com/graphql")
+  val transactionalClient: TransactionalClient[IO, StarWars] = TransactionalClient.of[IO, Schema]("https://starwars.com/graphql")
 
   implicit val streamingBackend: StreamingBackend[IO] = WebSocketJSBackend[IO]
-  val streamingClient: GraphQLStreamingClient[IO, StarWars] = ApolloStreamingClient.of[IO, Schema]("wss://starwars.com/graphql")
+  val streamingClient: StreamingClient[IO, StarWars] = ApolloStreamingClient.of[IO, Schema]("wss://starwars.com/graphql")
 ```
 
 NOTES: 

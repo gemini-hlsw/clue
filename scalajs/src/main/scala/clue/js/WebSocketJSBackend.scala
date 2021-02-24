@@ -25,9 +25,8 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
   private val Protocol = "graphql-ws"
 
   override def connect(
-    uri:       Uri,
-    onMessage: String => F[Unit],
-    onClose:   WebSocketCloseEvent => F[Unit]
+    uri:     Uri,
+    handler: PersistentBackendHandler[F, WebSocketCloseEvent]
   ): F[PersistentConnection[F, WebSocketCloseParams]] =
     for {
       isOpen     <- Ref[F].of(false)
@@ -51,7 +50,7 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
 
           ws.onmessage = { e: MessageEvent =>
             (e.data match {
-              case str: String => onMessage(str)
+              case str: String => handler.onMessage(str)
               case other       =>
                 Logger[F].error(s"Unexpected event from WebSocket for [$uri]: [$other]")
             }).runAsync(_ => IO.unit).unsafeRunSync()
@@ -76,7 +75,7 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
               for {
                 _       <- Logger[F].trace("WebSocket closed")
                 errored <- isErrored.get
-                _       <- onClose(WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored))
+                _       <- handler.onClose(WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored))
               } yield ()
             ).runAsync(_ => IO.unit).unsafeRunSync()
           }

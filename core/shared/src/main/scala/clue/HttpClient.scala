@@ -17,8 +17,9 @@ import sttp.model.Uri
 //   "data": { ... }, // Typed
 //   "errors": [ ... ]
 // }
-class HttpClient[F[_]: Logger: Backend, S](uri: Uri)(implicit me: MonadError[F, Throwable])
-    extends GraphQLClient[F, S] {
+class HttpClient[F[_]: Logger: TransactionalBackend, S](uri: Uri)(implicit
+  me:                                                        MonadError[F, Throwable]
+) extends TransactionalClient[F, S] {
   private val LogPrefix = "[clue.HttpClient]"
 
   override protected def requestInternal[D: Decoder](
@@ -26,7 +27,7 @@ class HttpClient[F[_]: Logger: Backend, S](uri: Uri)(implicit me: MonadError[F, 
     operationName: Option[String] = None,
     variables:     Option[Json] = None
   ): F[D] =
-    Backend[F]
+    TransactionalBackend[F]
       .request(uri, GraphQLRequest(document, operationName, variables))
       .map { response =>
         parse(response).flatMap { json =>
@@ -43,8 +44,8 @@ class HttpClient[F[_]: Logger: Backend, S](uri: Uri)(implicit me: MonadError[F, 
 }
 
 object HttpClient {
-  def of[F[_]: Logger: Backend, S](uri: Uri)(implicit
-    me:                                 MonadError[F, Throwable]
+  def of[F[_]: Logger: TransactionalBackend, S](uri: Uri)(implicit
+    me:                                              MonadError[F, Throwable]
   ): F[HttpClient[F, S]] =
     Applicative[F].pure(new HttpClient[F, S](uri))
 }
