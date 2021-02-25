@@ -17,7 +17,6 @@ import org.scalajs.dom.raw.MessageEvent
 import org.scalajs.dom.raw.WebSocket
 import sttp.model.Uri
 import cats.effect.concurrent.Ref
-import java.util.UUID
 
 /**
  * Streaming backend for JS WebSocket.
@@ -26,14 +25,14 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
   private val Protocol = "graphql-ws"
 
   override def connect(
-    uri:     Uri,
-    handler: PersistentBackendHandler[F, WebSocketCloseEvent]
+    uri:          Uri,
+    handler:      PersistentBackendHandler[F, WebSocketCloseEvent],
+    connectionId: ConnectionId
   ): F[PersistentConnection[F, WebSocketCloseParams]] =
     for {
-      isOpen       <- Ref[F].of(false)
-      isErrored    <- Ref[F].of(false)
-      connectionId <- Sync[F].delay(UUID.randomUUID().toString)
-      connection   <-
+      isOpen     <- Ref[F].of(false)
+      isErrored  <- Ref[F].of(false)
+      connection <-
         Async[F].async[PersistentConnection[F, WebSocketCloseParams]] { cb =>
           val ws = new WebSocket(uri.toString, Protocol)
 
@@ -42,7 +41,7 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
               for {
                 _ <- isOpen.set(true)
                 _ <- s"WebSocket open for URI [$uri]".traceF
-              } yield cb(new WebSocketJSConnection(connectionId, ws).asRight)
+              } yield cb(new WebSocketJSConnection(ws).asRight)
             ).uncancelable
               .runAsync(_ => IO.unit)
               .unsafeRunSync()
@@ -90,7 +89,7 @@ object WebSocketJSBackend {
   def apply[F[_]: Effect: Logger]: WebSocketJSBackend[F] = new WebSocketJSBackend[F]
 }
 
-final class WebSocketJSConnection[F[_]: Sync: Logger](val id: String, private val ws: WebSocket)
+final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
     extends WebSocketConnection[F] {
   override def send(msg: StreamingMessage.FromClient): F[Unit] =
     Sync[F].delay(ws.send(msg.asJson.toString))

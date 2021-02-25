@@ -1,6 +1,7 @@
 // Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
+import cats.Eq
 import cats.syntax.all._
 import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.duration.FiniteDuration
@@ -74,5 +75,15 @@ package clue {
   protected[clue] object Latch {
     def apply[F[_]: Concurrent]: F[Latch[F]] =
       Deferred[F, Either[Throwable, Unit]]
+  }
+
+  protected[clue] class ConnectionId(val value: Int) extends AnyVal {
+    def next: ConnectionId = new ConnectionId(value + 1)
+  }
+
+  protected[clue] object ConnectionId {
+    val Zero: ConnectionId = new ConnectionId(0)
+
+    implicit val eqConnectionId: Eq[ConnectionId] = Eq.by(_.value)
   }
 }
