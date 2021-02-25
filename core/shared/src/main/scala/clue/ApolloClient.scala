@@ -186,7 +186,8 @@ class ApolloClient[F[_], S, CP, CE](
             s -> (s"reestablish() called while already reestablishing.".errorF >> initLatch.get.rethrow)
           case Initialized(initPayloadF, connection, subscriptions) =>
             Reestablishing(initPayloadF, subscriptions, newConnectLatch, newInitLatch) ->
-              (gracefulTerminate(connection, subscriptions).start >>
+              ((gracefulTerminate(connection, subscriptions)
+                >> connection.close()).start >>
                 doConnect(newConnectLatch) >>
                 newInitLatch.get.rethrow)
           case s @ _                                                =>
