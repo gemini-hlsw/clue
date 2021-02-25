@@ -24,8 +24,8 @@ object TransactionalBackend {
  * CE = Close Event, received by client when connection is closed.
  */
 trait PersistentBackendHandler[F[_], CE] {
-  def onMessage(connectionId: String, msg:   String): F[Unit]
-  def onClose(connectionId:   String, event: CE): F[Unit]
+  def onMessage(connectionId: ConnectionId, msg:   String): F[Unit]
+  def onClose(connectionId:   ConnectionId, event: CE): F[Unit]
 }
 
 /*
@@ -33,7 +33,6 @@ trait PersistentBackendHandler[F[_], CE] {
  * CP = Close Parameters, sent by client when close is requested.
  */
 trait PersistentConnection[F[_], CP] {
-  val id: String
   def send(msg:                    StreamingMessage.FromClient): F[Unit]
   final def close(closeParameters: CP): F[Unit] = closeInternal(closeParameters.some)
   final def close(): F[Unit] = closeInternal(none)
@@ -47,8 +46,9 @@ trait PersistentConnection[F[_], CP] {
  */
 trait PersistentBackend[F[_], CP, CE] {
   def connect(
-    uri:     Uri,
-    handler: PersistentBackendHandler[F, CE]
+    uri:          Uri,
+    handler:      PersistentBackendHandler[F, CE],
+    connectionId: ConnectionId
   ): F[PersistentConnection[F, CP]]
 }
 
