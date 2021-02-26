@@ -9,7 +9,7 @@ import cats.effect.implicits._
 import clue._
 import clue.model.StreamingMessage
 import clue.model.json._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.syntax._
 import org.scalajs.dom.raw.CloseEvent
 import org.scalajs.dom.raw.Event

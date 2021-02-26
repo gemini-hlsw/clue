@@ -3,7 +3,7 @@
 
 import cats.Eq
 import cats.syntax.all._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.FiniteDuration
 import cats.MonadError
 import cats.effect.Concurrent

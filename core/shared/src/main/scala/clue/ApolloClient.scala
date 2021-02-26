@@ -13,7 +13,7 @@ import io.circe.parser._
 import cats.syntax.all._
 import java.util.UUID
 import cats.effect.ConcurrentEffect
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import cats.effect.ExitCase
 import cats.effect.Timer
 import clue.model.StreamingMessage

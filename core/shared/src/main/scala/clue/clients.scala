@@ -7,7 +7,7 @@ import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
 import cats.effect.Sync
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import sttp.model.Uri
 import cats.MonadError
 import cats.Applicative
