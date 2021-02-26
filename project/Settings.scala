@@ -12,7 +12,7 @@ object Settings {
     val fs2             = "2.5.3"
     val grackle         = "0.0.19"
     val jawn            = "1.1.0"
-    val log4Cats        = "1.1.1"
+    val log4Cats        = "1.2.0"
     val monocle         = "2.1.0"
     val scalaJSDom      = "1.1.0"
     val sttpModel       = "1.3.3"
@@ -75,7 +75,7 @@ object Settings {
 
     val Log4Cats = Def.setting(
       Seq(
-        "io.chrisdavenport" %%% "log4cats-core" % log4Cats
+        "org.typelevel" %%% "log4cats-core" % log4Cats
       )
     )
 
