@@ -274,8 +274,19 @@ class ApolloClient[F[_], S, CP, CE](
           case _ => "UNEXPECTED Data RECEIVED!".raiseError.void
         }
       // TODO Contemplate different states.
-      case Right(StreamingMessage.FromServer.Error(id, payload))                     =>
-        s"Error message received for subscription id [$id]:\n$payload".errorF
+      case Right(StreamingMessage.FromServer.Error(subscriptionId, payload))         =>
+        state.get.flatMap {
+          case Initialized(stateConnectionId, _, subscriptions, _)
+              if connectionId === stateConnectionId =>
+            subscriptions.get(subscriptionId) match {
+              case None          =>
+                s"Received error for non existant subscription id [$subscriptionId]: $payload".warnF
+              case Some(emitter) =>
+                s"Error message received for subscription id [$subscriptionId]:\n$payload".debugF >>
+                  emitter.emitError(payload)
+            }
+          case _ => "UNEXPECTED Error RECEIVED!".raiseError.void
+        }
       case Right(StreamingMessage.FromServer.Complete(subscriptionId))               =>
         state.get.flatMap {
           case Initialized(stateConnectionId, _, subscriptions, _)
