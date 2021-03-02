@@ -31,7 +31,7 @@ protected[clue] trait Emitter[F[_]] {
 
   def emitData(json:  Json): F[Unit]
   def emitError(json: Json): F[Unit]
-  def halt(): F[Unit]
+  val halt: F[Unit]
 }
 
 // Client internal state for the FSM.
@@ -122,20 +122,21 @@ class ApolloClient[F[_], S, CP, CE](
 
   override def initialize(payloadF: F[Map[String, Json]]): F[Unit] = {
     val error = "initialize() called while disconnected.".raiseError.void
-    val warn  = "initialize() called while already initialized or attempting to initialize.".warnF
+    val warn  =
+      "initialize() called while already attempting to initialize (or reestablishing).".warnF
 
     Latch[F].flatMap { newLatch =>
       stateModify {
-        case s @ (Disconnected(_) | Connecting(_, _))  => s     -> error
-        case Connected(connectionId, connection)       =>
-          Initializing(connectionId, connection, Map.empty, payloadF, newLatch) -> doInitialize(
-            payloadF,
-            connection,
-            newLatch
-          )
-        case s @ Initializing(_, _, _, _, latch)       => s     -> (warn >> latch.get.rethrow)
-        case s @ Reestablishing(_, _, _, _, initLatch) => s     -> (warn >> initLatch.get.rethrow)
-        case state                                     => state -> warn
+        case s @ (Disconnected(_) | Connecting(_, _))                       => s     -> error
+        case Connected(connectionId, connection)                            =>
+          Initializing(connectionId, connection, Map.empty, payloadF, newLatch) ->
+            doInitialize(payloadF, connection, newLatch)
+        case s @ Initializing(_, _, _, _, latch)                            => s     -> (warn >> latch.get.rethrow)
+        case s @ Reestablishing(_, _, _, _, initLatch)                      => s     -> (warn >> initLatch.get.rethrow)
+        case Initialized(connectionId, connection, subscriptions, payloadF) =>
+          Initializing(connectionId, connection, subscriptions, payloadF, newLatch) ->
+            doInitialize(payloadF, connection, newLatch)
+        case state                                                          => state -> warn
       }
     }
   }
@@ -293,7 +294,7 @@ class ApolloClient[F[_], S, CP, CE](
               if connectionId === stateConnectionId =>
             subscriptions.get(subscriptionId) match {
               case None               => F.unit
-              case Some(subscription) => subscription.halt()
+              case Some(subscription) => subscription.halt
             }
           // Next 3 cases are expected. Server will send complete packages for subscriptions gracefully shut down when reestablishing.
           case Reestablishing(stateConnectionId, _, _, _, _)
@@ -515,7 +516,7 @@ class ApolloClient[F[_], S, CP, CE](
   private def haltSubscriptions(
     subscriptions: Map[String, Emitter[F]]
   ): F[Unit] =
-    subscriptions.toList.traverse { case (_, emitter) => emitter.halt() }.void
+    subscriptions.toList.traverse { case (_, emitter) => emitter.halt }.void
 
   private def haltSubscription(subscriptionId: String): F[Unit] =
     s"Halting subscription [$subscriptionId]".debugF >>
@@ -525,7 +526,7 @@ class ApolloClient[F[_], S, CP, CE](
             _ <- s"Current subscriptions: [${subscriptions.keySet}]".traceF
             _ <- subscriptions.get(subscriptionId) match {
                    case None               => F.raiseError(new InvalidSubscriptionIdException(subscriptionId))
-                   case Some(subscription) => subscription.halt()
+                   case Some(subscription) => subscription.halt
                  }
           } yield ()
         case _                                   => "UNEXPECTED haltSubscription!".raiseError
@@ -559,11 +560,13 @@ class ApolloClient[F[_], S, CP, CE](
 
     def emitError(json: Json): F[Unit] = {
       val error = new GraphQLException(json.toString)
-      queue.enqueue1(Left(error))
+      queue.enqueue1(
+        Left(error)
+      ) // TODO This terminates the stream and halts the subscription. Do we want that?
     }
 
-    def halt(): F[Unit] =
-      queue.enqueue1(Right(None))
+    val halt: F[Unit] =
+      queue.enqueue1(Right(none))
   }
 
   private def buildQueue[D: Decoder](
