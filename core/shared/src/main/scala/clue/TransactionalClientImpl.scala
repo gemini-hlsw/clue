@@ -6,7 +6,7 @@ package clue
 import cats.MonadError
 import cats.syntax.all._
 import clue.model.GraphQLRequest
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe._
 import io.circe.parser._
 import sttp.model.Uri
