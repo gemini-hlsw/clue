@@ -53,20 +53,20 @@ protected object State {
     connectionId:  ConnectionId,
     connection:    PersistentConnection[F, CP],
     subscriptions: Map[String, Emitter[F]],
-    initPayloadF:  F[Map[String, Json]],
+    initPayload:   Map[String, Json],
     latch:         Latch[F]
   ) extends State[F, CP](PersistentClientStatus.Initializing)
   final case class Initialized[F[_], CP](
     connectionId:  ConnectionId,
     connection:    PersistentConnection[F, CP],
     subscriptions: Map[String, Emitter[F]],
-    initPayloadF:  F[Map[String, Json]]
+    initPayload:   Map[String, Json]
   ) extends State[F, CP](PersistentClientStatus.Initialized)
   // Reestablishing = We are in the process of reconnecting + reinitializing after a low level error/close, but we haven't connected yet.
   final case class Reestablishing[F[_]](
     connectionId:  ConnectionId,
     subscriptions: Map[String, Emitter[F]],
-    initPayloadF:  F[Map[String, Json]],
+    initPayload:   Map[String, Json],
     connectLatch:  Latch[F],
     initLatch:     Latch[F]
   ) extends State[F, Nothing](PersistentClientStatus.Connecting)
@@ -120,23 +120,23 @@ class ApolloClient[F[_], S, CP, CE](
     }
   }
 
-  override def initialize(payloadF: F[Map[String, Json]]): F[Unit] = {
+  override def initialize(payload: Map[String, Json]): F[Unit] = {
     val error = "initialize() called while disconnected.".raiseError.void
     val warn  =
       "initialize() called while already attempting to initialize (or reestablishing).".warnF
 
     Latch[F].flatMap { newLatch =>
       stateModify {
-        case s @ (Disconnected(_) | Connecting(_, _))                       => s     -> error
-        case Connected(connectionId, connection)                            =>
-          Initializing(connectionId, connection, Map.empty, payloadF, newLatch) ->
-            doInitialize(payloadF, connection, newLatch)
-        case s @ Initializing(_, _, _, _, latch)                            => s     -> (warn >> latch.get.rethrow)
-        case s @ Reestablishing(_, _, _, _, initLatch)                      => s     -> (warn >> initLatch.get.rethrow)
-        case Initialized(connectionId, connection, subscriptions, payloadF) =>
-          Initializing(connectionId, connection, subscriptions, payloadF, newLatch) ->
-            doInitialize(payloadF, connection, newLatch)
-        case state                                                          => state -> warn
+        case s @ (Disconnected(_) | Connecting(_, _))                => s     -> error
+        case Connected(connectionId, connection)                     =>
+          Initializing(connectionId, connection, Map.empty, payload, newLatch) ->
+            doInitialize(payload, connection, newLatch)
+        case s @ Initializing(_, _, _, _, latch)                     => s     -> (warn >> latch.get.rethrow)
+        case s @ Reestablishing(_, _, _, _, initLatch)               => s     -> (warn >> initLatch.get.rethrow)
+        case Initialized(connectionId, connection, subscriptions, _) =>
+          Initializing(connectionId, connection, subscriptions, payload, newLatch) ->
+            doInitialize(payload, connection, newLatch)
+        case state                                                   => state -> warn
       }
     }
   }
@@ -197,19 +197,19 @@ class ApolloClient[F[_], S, CP, CE](
     Latch[F].flatMap { newConnectLatch =>
       Latch[F].flatMap { newInitLatch =>
         stateModify {
-          case s @ Reestablishing(_, _, _, _, initLatch)                          =>
+          case s @ Reestablishing(_, _, _, _, initLatch)                         =>
             s -> (s"reestablish() called while already reestablishing.".errorF >> initLatch.get.rethrow)
-          case Initialized(connectionId, connection, subscriptions, initPayloadF) =>
+          case Initialized(connectionId, connection, subscriptions, initPayload) =>
             Reestablishing(connectionId.next,
                            subscriptions,
-                           initPayloadF,
+                           initPayload,
                            newConnectLatch,
                            newInitLatch
             ) ->
               ((gracefulTerminate(connection, subscriptions) >> connection.close()).start >>
                 doConnect(connectionId.next, newConnectLatch) >>
                 newInitLatch.get.rethrow)
-          case s @ _                                                              =>
+          case s @ _                                                             =>
             s -> s"reestablish() called while disconnected or uninitialized.".errorF
         }
       }
@@ -248,9 +248,9 @@ class ApolloClient[F[_], S, CP, CE](
         e.raiseF(s"Exception decoding message received from server: [$msg]")
       case Right(StreamingMessage.FromServer.ConnectionAck)                          =>
         stateModify {
-          case Initializing(stateConnectionId, connection, subscriptions, initPayloadF, latch)
+          case Initializing(stateConnectionId, connection, subscriptions, initPayload, latch)
               if connectionId === stateConnectionId =>
-            Initialized(connectionId, connection, subscriptions, initPayloadF) ->
+            Initialized(connectionId, connection, subscriptions, initPayload) ->
               (startSubscriptions(connection, subscriptions) >> latch.complete(().asRight))
           case s => s -> s"Unexpected connection_ack received from server.".warnF
         }
@@ -356,31 +356,31 @@ class ApolloClient[F[_], S, CP, CE](
               case Connected(stateConnectionId, _) if connectionId === stateConnectionId     =>
                 Connecting(connectionId.next, newConnectLatch) ->
                   waitAndConnect(connectionId.next, newConnectLatch)
-              case Initializing(stateConnectionId, _, subscriptions, initPayloadF, latch)
+              case Initializing(stateConnectionId, _, subscriptions, initPayload, latch)
                   if connectionId === stateConnectionId =>
                 Reestablishing(connectionId.next,
                                subscriptions,
-                               initPayloadF,
+                               initPayload,
                                newConnectLatch,
                                latch
                 ) -> waitAndConnect(connectionId.next, newConnectLatch)
-              case Initialized(stateConnectionId, _, subscriptions, initPayloadF)
+              case Initialized(stateConnectionId, _, subscriptions, initPayload)
                   if connectionId === stateConnectionId =>
                 Reestablishing(connectionId.next,
                                subscriptions,
-                               initPayloadF,
+                               initPayload,
                                newConnectLatch,
                                newInitLatch
                 ) -> waitAndConnect(connectionId.next, newConnectLatch)
               case Reestablishing(stateConnectionId,
                                   subscriptions,
-                                  initPayloadF,
+                                  initPayload,
                                   connectLatch,
                                   initLatch
                   ) if connectionId === stateConnectionId =>
                 Reestablishing(connectionId.next,
                                subscriptions,
-                               initPayloadF,
+                               initPayload,
                                connectLatch,
                                initLatch
                 ) -> waitAndConnect(connectionId.next, connectLatch)
@@ -406,7 +406,7 @@ class ApolloClient[F[_], S, CP, CE](
             doConnect(nextConnectionId, latch, attempt + 1)
 
         stateModify {
-          case Connecting(connectionId, latch)                                                    =>
+          case Connecting(connectionId, latch)                                                   =>
             connection match {
               case Left(t)  =>
                 reconnectionStrategy(attempt, t.asLeft) match {
@@ -416,7 +416,7 @@ class ApolloClient[F[_], S, CP, CE](
                 }
               case Right(c) => Connected(connectionId, c) -> latch.complete(().asRight)
             }
-          case Reestablishing(connectionId, subscriptions, initPayloadF, connectLatch, initLatch) =>
+          case Reestablishing(connectionId, subscriptions, initPayload, connectLatch, initLatch) =>
             connection match {
               case Left(t)  =>
                 reconnectionStrategy(attempt, t.asLeft) match {
@@ -426,16 +426,16 @@ class ApolloClient[F[_], S, CP, CE](
                   case Some(wait) =>
                     Reestablishing(connectionId.next,
                                    subscriptions,
-                                   initPayloadF,
+                                   initPayload,
                                    connectLatch,
                                    initLatch
                     ) -> retry(t, wait, connectionId.next)
                 }
               case Right(c) =>
-                Initializing(connectionId, c, subscriptions, initPayloadF, initLatch) ->
-                  (latch.complete(().asRight) >> doInitialize(initPayloadF, c, initLatch))
+                Initializing(connectionId, c, subscriptions, initPayload, initLatch) ->
+                  (latch.complete(().asRight) >> doInitialize(initPayload, c, initLatch))
             }
-          case s                                                                                  =>
+          case s                                                                                 =>
             s -> (latch.complete(connection.void) >>
               s"Unexpected state [$s] in connect(). Unblocking clients, but state may be inconsistent.".raiseError.void)
         }
@@ -462,12 +462,11 @@ class ApolloClient[F[_], S, CP, CE](
       }
 
   private def doInitialize(
-    payload:    F[Map[String, Json]],
+    payload:    Map[String, Json],
     connection: PersistentConnection[F, CP],
     latch:      Latch[F]
   ): F[Unit] = (for {
-    p <- payload
-    _ <- connection.send(StreamingMessage.FromClient.ConnectionInit(p))
+    _ <- connection.send(StreamingMessage.FromClient.ConnectionInit(payload))
     _ <- latch.get.rethrow
   } yield ()).guaranteeCase {
     case ExitCase.Completed | ExitCase.Error(_) => F.unit
