@@ -18,7 +18,7 @@ Either:
   import clue._
   import clue.js._
   import cats.effect.IO
-  import io.chrisdavenport.log4cats.Logger
+  import org.typelevel.log4cats.Logger
 
   sealed trait StarWars
 

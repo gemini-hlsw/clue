@@ -6,7 +6,6 @@ package clue
 import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
-import cats.effect.Sync
 import org.typelevel.log4cats.Logger
 import sttp.model.Uri
 import cats.MonadError
@@ -122,10 +121,7 @@ trait PersistentClient[F[_], CP, CE] {
   def statusStream: fs2.Stream[F, PersistentClientStatus]
 
   def connect(): F[Unit]
-  def initialize(payload: F[Map[String, Json]]): F[Unit]
-
-  final def initialize(payload: Map[String, Json] = Map.empty)(implicit sync: Sync[F]): F[Unit] =
-    initialize(sync.delay(payload))
+  def initialize(payload: Map[String, Json] = Map.empty): F[Unit]
 
   def terminate(): F[Unit]
   def disconnect(closeParameters: CP): F[Unit]
