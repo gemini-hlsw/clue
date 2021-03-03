@@ -120,7 +120,7 @@ class ApolloClient[F[_], S, CP, CE](
     }
   }
 
-  override def initialize(payload: Map[String, Json]): F[Unit] = {
+  override def initialize(payload: Map[String, Json] = Map.empty): F[Unit] = {
     val error = "initialize() called while disconnected.".raiseError.void
     val warn  =
       "initialize() called while already attempting to initialize (or reestablishing).".warnF
@@ -135,7 +135,8 @@ class ApolloClient[F[_], S, CP, CE](
         case s @ Reestablishing(_, _, _, _, initLatch)               => s     -> (warn >> initLatch.get.rethrow)
         case Initialized(connectionId, connection, subscriptions, _) =>
           Initializing(connectionId, connection, subscriptions, payload, newLatch) ->
-            doInitialize(payload, connection, newLatch)
+            (stopSubscriptions(connection, subscriptions) >>
+              doInitialize(payload, connection, newLatch)).uncancelable
         case state                                                   => state -> warn
       }
     }
@@ -190,8 +191,6 @@ class ApolloClient[F[_], S, CP, CE](
       case s                                                           => s -> error
     }.uncancelable
   }
-
-  // TODO A reinitialize() method?
 
   override def reestablish(): F[Unit] =
     Latch[F].flatMap { newConnectLatch =>
@@ -296,15 +295,15 @@ class ApolloClient[F[_], S, CP, CE](
               case None               => F.unit
               case Some(subscription) => subscription.halt
             }
-          // Next 3 cases are expected. Server will send complete packages for subscriptions gracefully shut down when reestablishing.
+          // Next 3 cases are expected. Server will send complete packages for subscriptions shut down when reestablishing/reinitializing.
           case Reestablishing(stateConnectionId, _, _, _, _)
               if connectionId =!= stateConnectionId =>
             F.unit
-          case Initializing(stateConnectionId, _, _, _, _) if connectionId =!= stateConnectionId =>
+          case Initializing(_, _, _, _, _)                                                   =>
             F.unit
-          case Initialized(stateConnectionId, _, _, _) if connectionId =!= stateConnectionId     =>
+          case Initialized(stateConnectionId, _, _, _) if connectionId =!= stateConnectionId =>
             F.unit
-          case _                                                                                 =>
+          case _                                                                             =>
             "UNEXPECTED Complete RECEIVED!".warnF
         }
       case Right(StreamingMessage.FromServer.ConnectionKeepAlive)                    => F.unit

@@ -121,7 +121,7 @@ trait PersistentClient[F[_], CP, CE] {
   def statusStream: fs2.Stream[F, PersistentClientStatus]
 
   def connect(): F[Unit]
-  def initialize(payload: Map[String, Json]): F[Unit]
+  def initialize(payload: Map[String, Json] = Map.empty): F[Unit]
 
   def terminate(): F[Unit]
   def disconnect(closeParameters: CP): F[Unit]
