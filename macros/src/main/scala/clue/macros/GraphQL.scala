@@ -89,13 +89,9 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
           val nextType  = Constants.MetaTypes.getOrElse(name, currentType.field(name))
 
           val accumulatorOpt =
-            nextType.dealias match {
-              case union: UnionType => go(child, union).some
-              case _                =>
-                nextType.underlyingObject match {
-                  case GNoType  => none
-                  case baseType => go(child, baseType).some
-                }
+            nextType.underlyingObject match {
+              case GNoType  => none
+              case baseType => go(child, baseType).some
             }
 
           val (newClass, paramTypeNameOverride) =
@@ -465,7 +461,7 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
                               ..${modObjDefs(objDefs)}
                             }
                           """
-                        }.flatTap(result => IO.whenA(params.debug)(log(result)))
+                        }.flatTap(result => log(result).whenA(params.debug))
                       }
                     }
                 }

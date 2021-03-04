@@ -124,7 +124,7 @@ private[clue] final class GraphQLSchemaImpl(val c: blackbox.Context) extends Gra
               }
             """
           }
-          .flatTap(result => IO.whenA(params.debug)(log(result)))
+          .flatTap(result => log(result).whenA(params.debug))
     }
 
 }
