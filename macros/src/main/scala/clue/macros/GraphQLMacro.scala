@@ -75,7 +75,10 @@ protected[macros] trait GraphQLMacro extends Macro {
           case ListType(tpe)     => tq"List[${resolveType(tpe)}]"
           case nt: NamedType     =>
             parseType(mappings.getOrElse(nt.name, snakeToCamel(nameOverride.getOrElse(nt.name))))
-          case NoType            => tq"io.circe.Json"
+          case NoType            =>
+            abort(
+              s"Could not resolve type for field [$name] (isInput: [$isInput]) - Is this a valid field present in the schema?"
+            ).unsafeRunSync()
         }
 
       // log(s"Resolving Grackle type: [$tpe]").unsafeRunSync()

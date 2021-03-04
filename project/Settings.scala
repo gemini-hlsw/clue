@@ -10,7 +10,7 @@ object Settings {
     val circe           = "0.13.0"
     val disciplineMUnit = "1.0.6"
     val fs2             = "2.5.3"
-    val grackle         = "0.0.19"
+    val grackle         = "0.0.42"
     val jawn            = "1.1.0"
     val log4Cats        = "1.2.0"
     val monocle         = "2.1.0"

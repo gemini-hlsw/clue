@@ -134,19 +134,21 @@ class MacroTest extends FunSuite {
   object LucumaQuery extends GraphQLOperation[LucumaODB] {
     val document = """
       query Program {
-        program(id: "p-2") {
+        program(programId: "p-2") {
           id
           name
-          targets(includeDeleted: true) {
-            id
-            name
-            tracking {
-              tracktype: __typename 
-              ... on Sidereal {
-                epoch
-              }
-              ... on Nonsidereal {
-                keyType
+          targets(first: 10, includeDeleted: true) {
+            nodes {
+              id
+              name
+              tracking {
+                tracktype: __typename 
+                ... on Sidereal {
+                  epoch
+                }
+                ... on Nonsidereal {
+                  keyType
+                }
               }
             }
           }
@@ -160,24 +162,26 @@ class MacroTest extends FunSuite {
         "program": {
           "id": "p-1",
           "name": "Macro program",
-          "targets": [
-            {
-              "id": "t-1",
-              "name": "Sirius",
-              "tracking": {
-                "tracktype": "Sidereal",
-                "epoch": "J2000.000"
+          "targets": {
+            "nodes": [
+              {
+                "id": "t-1",
+                "name": "Sirius",
+                "tracking": {
+                  "tracktype": "Sidereal",
+                  "epoch": "J2000.000"
+                }
+              },
+              {
+                "id": "t-2",
+                "name": "Saturn",
+                "tracking": {
+                  "tracktype": "Nonsidereal",
+                  "keyType": "MAJOR_BODY"
+                }
               }
-            },
-            {
-              "id": "t-2",
-              "name": "Saturn",
-              "tracking": {
-                "tracktype": "Nonsidereal",
-                "keyType": "MAJOR_BODY"
-              }
-            }
-          ]
+            ]
+          }
         }
       }
       """
@@ -191,17 +195,19 @@ class MacroTest extends FunSuite {
           .Program(
             "p-1",
             "Macro program".some,
-            List(
-              Data.Program.Targets(
-                "t-1",
-                "Sirius",
-                Data.Program.Targets.Tracking.Sidereal("J2000.000")
-              ),
-              Data.Program.Targets(
-                "t-2",
-                "Saturn",
-                Data.Program.Targets.Tracking.Nonsidereal(
-                  LucumaODB.Enums.EphemerisKeyType.MajorBody
+            Data.Program.Targets(
+              List(
+                Data.Program.Targets.Nodes(
+                  "t-1",
+                  "Sirius",
+                  Data.Program.Targets.Nodes.Tracking.Sidereal("J2000.000")
+                ),
+                Data.Program.Targets.Nodes(
+                  "t-2",
+                  "Saturn",
+                  Data.Program.Targets.Nodes.Tracking.Nonsidereal(
+                    LucumaODB.Enums.EphemerisKeyType.MajorBody
+                  )
                 )
               )
             )
@@ -217,15 +223,17 @@ class MacroTest extends FunSuite {
   object LucumaSiderealQuery extends GraphQLOperation[LucumaODB] {
     val document = """
       query Program {
-        program(id: "p-2") {
+        program(programId: "p-2") {
           id
           name
-          targets(includeDeleted: true) {
-            id
-            name
-            tracking {
-              ... on Sidereal {
-                epoch
+          targets(includeDeleted: true, first: 100) {
+            nodes {
+              id
+              name
+              tracking {
+                ... on Sidereal {
+                  epoch
+                }
               }
             }
           }
@@ -239,15 +247,17 @@ class MacroTest extends FunSuite {
         "program": {
           "id": "p-1",
           "name": "Macro program",
-          "targets": [
-            {
-              "id": "t-1",
-              "name": "Sirius",
-              "tracking": {
-                "epoch": "J2000.000"
+          "targets": {
+            "nodes": [
+              {
+                "id": "t-1",
+                "name": "Sirius",
+                "tracking": {
+                  "epoch": "J2000.000"
+                }
               }
-            }
-          ]
+            ]
+          }
         }
       }
       """
@@ -260,11 +270,13 @@ class MacroTest extends FunSuite {
           .Program(
             "p-1",
             "Macro program".some,
-            List(
-              Data.Program.Targets(
-                "t-1",
-                "Sirius",
-                Data.Program.Targets.Tracking("J2000.000")
+            Data.Program.Targets(
+              List(
+                Data.Program.Targets.Nodes(
+                  "t-1",
+                  "Sirius",
+                  Data.Program.Targets.Nodes.Tracking("J2000.000")
+                )
               )
             )
           )
@@ -279,12 +291,9 @@ class MacroTest extends FunSuite {
   object LucumaTestSubscription extends GraphQLOperation[LucumaODB] {
     val document = """
       |subscription {
-      |  targetEdited {
+      |  targetEdit {
       |    id
-      |    oldValue {
-      |      name
-      |    }
-      |    newValue {
+      |    value {
       |      name
       |    }
       |  }
@@ -294,12 +303,9 @@ class MacroTest extends FunSuite {
   test("Lucuma ODB subscription macro") {
     val json = """
       {
-        "targetEdited": {
+        "targetEdit": {
           "id": 6,
-          "oldValue": {
-            "name": "M51"
-          },
-          "newValue": {
+          "value": {
             "name": "Betelgeuse"
           }
         }
@@ -310,10 +316,7 @@ class MacroTest extends FunSuite {
     import LucumaTestSubscription._
     val expectedData = Right(
       Data(
-        Data.TargetEdited(6,
-                          Data.TargetEdited.OldValue("M51"),
-                          Data.TargetEdited.NewValue("Betelgeuse")
-        )
+        Data.TargetEdit(6, Data.TargetEdit.Value("Betelgeuse"))
       )
     )
     assertEquals(data, expectedData)
@@ -496,6 +499,85 @@ class MacroTest extends FunSuite {
             ).some
           )
           .some
+      )
+    )
+
+    assertEquals(data, expectedData)
+  }
+
+  @GraphQL(debug = false)
+  object LucumaObsQuery extends GraphQLOperation[LucumaODB] {
+    val document = """
+      query {
+        result:observations(programId: "p-2", first:10000) {
+          observations:nodes {
+            id
+            name
+            observationTarget {
+              __typename
+              ... on Target {
+                targetId: id
+              }
+              ... on Asterism {
+                asterismId:id
+              }
+            }
+          }
+        }
+      }"""
+  }
+
+  test("Lucuma ODB query with inline fragments for nullable union type macro") {
+    val json = """
+      {
+        "result": {
+            "observations": [
+              {
+                "id": "o-2",
+                "name": "Observation 2",
+                "observationTarget": {
+                  "__typename": "Target",
+                  "targetId": "t-2"
+                }
+              },
+              {
+                "id": "o-3",
+                "name": "Observation 3",
+                "observationTarget": {
+                  "__typename": "Asterism",
+                  "asterismId": "a-2"
+                }
+              },
+              {
+                "id": "o-4",
+                "name": "Observation 4",
+                "observationTarget": null
+              }
+            ]          
+        }
+      }
+      """
+
+    val data = decode[LucumaObsQuery.Data](json)
+
+    import LucumaObsQuery._
+    val expectedData = Right(
+      Data(
+        Data
+          .Result(
+            List(
+              Data.Result.Observations("o-2",
+                                       "Observation 2".some,
+                                       Data.Result.Observations.ObservationTarget.Target("t-2").some
+              ),
+              Data.Result.Observations(
+                "o-3",
+                "Observation 3".some,
+                Data.Result.Observations.ObservationTarget.Asterism("a-2").some
+              ),
+              Data.Result.Observations("o-4", "Observation 4".some, none)
+            )
+          )
       )
     )
 

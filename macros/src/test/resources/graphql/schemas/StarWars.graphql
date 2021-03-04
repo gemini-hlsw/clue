@@ -23,6 +23,7 @@ type Human implements Character {
   id: String!
   name: String
   friends: [Character!]
+  more_friends: [Character!]
   appearsIn: [Episode!]
   homePlanet: String
 }
@@ -31,6 +32,7 @@ type Droid implements Character {
   id: String!
   name: String
   friends: [Character!]
+  more_friends: [Character!]
   appearsIn: [Episode!]
   primaryFunction: String
 }
