@@ -57,6 +57,11 @@ final case class Assign[A](value: A) extends Input[A]
 object Input {
   def apply[A](a: A): Input[A] = Assign(a)
 
+  /**
+   * Alias for `apply`.
+   */
+  def assign[A](a: A): Input[A] = Input(a)
+
   def unassign[A]: Input[A] = Unassign
 
   def ignore[A]: Input[A] = Ignore
