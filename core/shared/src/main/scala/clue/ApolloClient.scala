@@ -558,13 +558,12 @@ class ApolloClient[F[_], S, CP, CE](
 
     def emitError(json: Json): F[Unit] = {
       val error = new GraphQLException(json.toString)
-      queue.enqueue1(
-        Left(error)
-      ) // TODO This terminates the stream and halts the subscription. Do we want that?
+      // TODO When an Error message is received, we terminate the stream and halt the subscription. Do we want that?
+      queue.enqueue1(error.asLeft)
     }
 
     val halt: F[Unit] =
-      queue.enqueue1(Right(none))
+      queue.enqueue1(none.asRight)
   }
 
   private def buildQueue[D: Decoder](
@@ -642,9 +641,6 @@ class ApolloClient[F[_], S, CP, CE](
                 emitter.queue.dequeue
                   .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".debugF)
             ).rethrow.unNoneTerminate
-              .onError { case t: Throwable =>
-                Stream.eval(t.logF(s"Error in subscription [$id]: "))
-              }
           )
 
           SubscriptionInfo(subscription = createSubscription(connection, stream, id),

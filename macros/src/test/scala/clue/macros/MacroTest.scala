@@ -566,9 +566,10 @@ class MacroTest extends FunSuite {
         Data
           .Result(
             List(
-              Data.Result.Observations("o-2",
-                                       "Observation 2".some,
-                                       Data.Result.Observations.ObservationTarget.Target("t-2").some
+              Data.Result.Observations(
+                "o-2",
+                "Observation 2".some,
+                Data.Result.Observations.ObservationTarget.Target("t-2").some
               ),
               Data.Result.Observations(
                 "o-3",
