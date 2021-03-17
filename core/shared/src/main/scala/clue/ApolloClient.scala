@@ -231,7 +231,7 @@ class ApolloClient[F[_], S, CP, CE](
   ): F[D] = F.asyncF[D] { cb =>
     startSubscription[D](document, operationName, variables).flatMap { subscriptionInfo =>
       subscriptionInfo.subscription.stream.attempt
-        .evalMap(result => F.delay(cb(result)) >> subscriptionInfo.onComplete)
+        .evalMap(result => F.delay(cb(result)))
         .compile
         .drain
     }
