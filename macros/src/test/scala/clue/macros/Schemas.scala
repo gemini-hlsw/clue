@@ -19,15 +19,17 @@ object Schemas {
   @GraphQLSchema(debug = false)
   object LucumaODB {
     object Scalars {
-      type AsterismId    = String
-      type BigDecimal    = scala.BigDecimal
-      type DmsString     = String
-      type EpochString   = String
-      type HmsString     = String
-      type Long          = scala.Long
-      type ObservationId = String
-      type ProgramId     = String
-      type TargetId      = String
+      type AsterismId      = String
+      type BigDecimal      = scala.BigDecimal
+      type DmsString       = String
+      type EpochString     = String
+      type HmsString       = String
+      type Long            = scala.Long
+      type ObservationId   = String
+      type ProgramId       = String
+      type TargetId        = String
+      type NonEmptyString  = String
+      type ConstraintSetId = String
     }
   }
 

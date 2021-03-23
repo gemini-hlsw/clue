@@ -10,10 +10,11 @@ object Settings {
     val circe           = "0.13.0"
     val disciplineMUnit = "1.0.7"
     val fs2             = "2.5.4"
-    val grackle         = "0.0.42"
+    val grackle         = "0.0.44"
     val jawn            = "1.1.0"
     val log4Cats        = "2.0.0"
     val monocle         = "2.1.0"
+    val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom      = "1.1.0"
     val sttpModel       = "1.4.0"
   }
@@ -81,8 +82,8 @@ object Settings {
 
     val Monocle = Def.setting(
       Seq(
-        "com.github.julien-truffaut" %%% "monocle-core"  % monocle % "test",
-        "com.github.julien-truffaut" %%% "monocle-macro" % monocle % "test"
+        "com.github.julien-truffaut" %%% "monocle-core"  % monocle,
+        "com.github.julien-truffaut" %%% "monocle-macro" % monocle
       )
     )
 
@@ -90,6 +91,18 @@ object Settings {
       Seq(
         "org.scala-js" %%% "scalajs-dom" % scalaJSDom
       )
+    )
+
+    val ScalaFix = Def.setting(
+      Seq(
+        "ch.epfl.scala" %%% "scalafix-core" % scalaFix
+      )
+    )
+
+    val ScalaFixTestkit = Def.setting(
+      Seq(
+        "ch.epfl.scala" %%% "scalafix-testkit" % scalaFix % "test"
+      ).map(_.cross(CrossVersion.full))
     )
 
     val SttpModel = Def.setting(
