@@ -9,6 +9,7 @@ import edu.gemini.grackle._
 import cats.effect.IO
 import cats.syntax.all._
 
+@deprecated("Macros are no longer supported", since = "0.12.0")
 class GraphQLSchema(
   val mappings: Map[String, String] = Map.empty,
   val eq:       Boolean = false,

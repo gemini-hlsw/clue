@@ -14,6 +14,7 @@ import edu.gemini.grackle.{ TypeRef => GTypeRef }
 import edu.gemini.grackle.UntypedOperation._
 import cats.effect.IO
 
+@deprecated("Macros are no longer supported", since = "0.12.0")
 class GraphQL(
   val mappings: Map[String, String] = Map.empty,
   val eq:       Boolean = false,
@@ -472,5 +473,6 @@ private[clue] final class GraphQLImpl(val c: blackbox.Context) extends GraphQLMa
               "Invalid annotation target: must be an object extending GraphQLOperation[Schema]"
             )
         }
+      case _ => IO.pure(annottees.head)
     }
 }
