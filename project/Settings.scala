@@ -15,7 +15,7 @@ object Settings {
     val log4Cats        = "1.2.1"
     val monocle         = "2.1.0"
     val scalaJSDom      = "1.1.0"
-    val sttpModel       = "1.3.4"
+    val sttpModel       = "1.4.0"
   }
 
   object Libraries {
