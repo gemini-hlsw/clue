@@ -3,10 +3,8 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 inThisBuild(
   List(
     scalacOptions += "-Ymacro-annotations",
-    // scalacOptions += "-Yrangepos",
     homepage := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
-    // addCompilerPlugin(scalafixSemanticdb),
     testFrameworks += new TestFramework("munit.Framework")
   ) ++ lucumaPublishSettings
 )
@@ -168,7 +166,6 @@ lazy val macros =
       scalacOptions += "-language:experimental.macros",
       scalacOptions ~= (_.filterNot(Set("-Wunused:patvars"))) // Needed for quasiquote matching.
     )
-    // .dependsOn(core)
     .dependsOn(coreJVM)
 
 lazy val genRules = project
@@ -182,11 +179,11 @@ lazy val genRules = project
   )
   .dependsOn(coreJVM)
 
-// TODO This is not necessary in final version
-scalafixScalaBinaryVersion in ThisBuild :=
-  CrossVersion.binaryScalaVersion(scalaVersion.value)
+// Only necessary to fix inputs in place. Sometimes it gives a clearer picture than a diff.
+// scalafixScalaBinaryVersion in ThisBuild :=
+//   CrossVersion.binaryScalaVersion(scalaVersion.value)
 
-lazy val genInput  = project
+lazy val genInput = project
   .in(file("gen/input"))
   .settings(
     skip in publish := true,
@@ -194,7 +191,7 @@ lazy val genInput  = project
       Settings.Libraries.Monocle.value
   )
   .dependsOn(coreJVM)
-  .dependsOn(genRules % ScalafixConfig) // TODO This is not necessary in final version
+//.dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
 
 lazy val genOutput = project
   .in(file("gen/output"))
