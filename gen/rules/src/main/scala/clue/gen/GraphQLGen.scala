@@ -55,9 +55,13 @@ class GraphQLGen(config: GraphQLGenConfig)
               }
               .fold(Patch.empty) { end =>
                 // The previous token to the start comment should be the newline we insert.
-                // Similarly to the next token to the end comment.
+                // Start comment may be indented. Leading spaces are reversed, so we focus on last.
+                // Similarly, the next token to the end comment is a newline.
                 Patch.removeTokens(
-                  tokenList.slice(tokenList.prev(start), tokenList.next(tokenList.next(end)))
+                  tokenList.slice(
+                    tokenList.prev(tokenList.leadingSpaces(start).lastOption.getOrElse(start)),
+                    tokenList.next(tokenList.next(end))
+                  )
                 )
               }
           }
@@ -85,18 +89,18 @@ class GraphQLGen(config: GraphQLGenConfig)
 
               Patch.addRight(
                 obj,
-                indented(obj)(
-                  List(
-                    "",
-                    StartComment,
-                    FormatOff,
-                    q"sealed trait ${Type.Name(objName)}".toString,
-                    q"..$newMods object ${Term
-                      .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString,
-                    FormatOn,
-                    EndComment
-                  ).mkString("\n")
-                )
+                "\n" +
+                  indented(obj)(
+                    List(
+                      StartComment,
+                      FormatOff,
+                      q"sealed trait ${Type.Name(objName)}".toString,
+                      q"..$newMods object ${Term
+                        .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString,
+                      FormatOn,
+                      EndComment
+                    ).mkString("\n")
+                  )
               )
             }
           // TODO Remove annotation, which implies remove import, which is not that simple (it could come from a wildcard).
@@ -158,17 +162,17 @@ class GraphQLGen(config: GraphQLGenConfig)
                           // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
                           Patch.addRight(
                             obj,
-                            indented(obj)(
-                              List(
-                                "",
-                                StartComment,
-                                FormatOff,
-                                q"..$newMods object ${Term
-                                  .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString,
-                                FormatOn,
-                                EndComment
-                              ).mkString("\n")
-                            )
+                            "\n" +
+                              indented(obj)(
+                                List(
+                                  StartComment,
+                                  FormatOff,
+                                  q"..$newMods object ${Term
+                                    .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString,
+                                  FormatOn,
+                                  EndComment
+                                ).mkString("\n")
+                              )
                           )
                         }
                       }
