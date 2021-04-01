@@ -6,7 +6,7 @@ inThisBuild(
     // scalacOptions += "-Yrangepos",
     homepage := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
-    addCompilerPlugin(scalafixSemanticdb),
+    // addCompilerPlugin(scalafixSemanticdb),
     testFrameworks += new TestFramework("munit.Framework")
   ) ++ lucumaPublishSettings
 )

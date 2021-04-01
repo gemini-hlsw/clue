@@ -5,11 +5,4 @@ package clue.annotation
 
 import scala.annotation.StaticAnnotation
 
-class GraphQL(
-  // val mappings: Map[String, String] = Map.empty,
-  // val eq:       Boolean = false,
-  // val show:     Boolean = false,
-  // val lenses:   Boolean = false,
-  // val reuse:    Boolean = false,
-  // val debug:    Boolean = false
-) extends StaticAnnotation
+class GraphQL() extends StaticAnnotation
