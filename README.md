@@ -23,10 +23,12 @@ Either:
   sealed trait StarWars
 
   implicit val backend: Backend[IO] = AjaxJSBackend[IO]
-  val transactionalClient: TransactionalClient[IO, StarWars] = TransactionalClient.of[IO, Schema]("https://starwars.com/graphql")
+  val transactionalClient: TransactionalClient[IO, StarWars] = 
+    TransactionalClient.of[IO, Schema]("https://starwars.com/graphql")
 
   implicit val streamingBackend: StreamingBackend[IO] = WebSocketJSBackend[IO]
-  val streamingClient: StreamingClient[IO, StarWars] = ApolloStreamingClient.of[IO, Schema]("wss://starwars.com/graphql")
+  val streamingClient: StreamingClient[IO, StarWars] = 
+    ApolloStreamingClient.of[IO, Schema]("wss://starwars.com/graphql")
 ```
 
 NOTES: 
@@ -84,8 +86,8 @@ They must extend `GraphQLOperation[S]`, defining the following members:
 #### Example
 
 ``` scala
-  oneShotClient.request(CharacterQuery)(CharacterQuery.Variables("0001"))
-    .forEach(println).unsafeRunSync()
+transactionalClient.request(CharacterQuery)(CharacterQuery.Variables("0001"))
+  .forEach(println).unsafeRunSync()
 
 # Data(Some(Character("0001", Some("Luke"))))
 ```
