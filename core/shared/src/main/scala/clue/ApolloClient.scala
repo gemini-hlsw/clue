@@ -149,8 +149,12 @@ class ApolloClient[F[_], S, CP, CE](
     stateModify {
       case Initialized(connectionId, connection, subscriptions, _) =>
         Connected(connectionId, connection) ->
-          (gracefulTerminate(connection, subscriptions).start >>
-            haltSubscriptions(subscriptions).start.void)
+          (for {
+            t <- gracefulTerminate(connection, subscriptions).start
+            h <- haltSubscriptions(subscriptions).start
+            _ <- t.join
+            _ <- h.join
+          } yield ())
       case s @ Initializing(_, _, _, _, latch)                     =>
         s -> (warn >> latch.get.rethrow >> terminate())
       case s @ Reestablishing(_, _, _, _, initLatch)               =>
@@ -221,7 +225,6 @@ class ApolloClient[F[_], S, CP, CE](
     variables:     Option[Json]
   ): F[GraphQLSubscription[F, D]] =
     startSubscription(subscription, operationName, variables)(implicitly[Decoder[D]])
-      .map(_.subscription)
 
   // <TransactionalClient>
   override protected def requestInternal[D: Decoder](
@@ -229,12 +232,12 @@ class ApolloClient[F[_], S, CP, CE](
     operationName: Option[String],
     variables:     Option[Json]
   ): F[D] = F.asyncF[D] { cb =>
-    startSubscription[D](document, operationName, variables).flatMap { subscriptionInfo =>
-      subscriptionInfo.subscription.stream.attempt
+    startSubscription[D](document, operationName, variables).flatMap(
+      _.stream.attempt
         .evalMap(result => F.delay(cb(result)))
         .compile
         .drain
-    }
+    )
   }
   // </TransactionalClient>
   // </StreamingClient>
@@ -271,7 +274,8 @@ class ApolloClient[F[_], S, CP, CE](
               case Some(emitter) =>
                 errors.fold(emitter.emitData(data))(emitter.emitError)
             }
-          case _ => "UNEXPECTED Data RECEIVED!".raiseError.void
+          case s @ _ =>
+            s"UNEXPECTED Data RECEIVED for subscription [$subscriptionId]. State is: [$s]".raiseError.void
         }
       // TODO Contemplate different states.
       case Right(StreamingMessage.FromServer.Error(subscriptionId, payload))         =>
@@ -285,7 +289,8 @@ class ApolloClient[F[_], S, CP, CE](
                 s"Error message received for subscription id [$subscriptionId]:\n$payload".debugF >>
                   emitter.emitError(payload)
             }
-          case _ => "UNEXPECTED Error RECEIVED!".raiseError.void
+          case s @ _ =>
+            s"UNEXPECTED Error RECEIVED for subscription [$subscriptionId]. State is: [$s]".raiseError.void
         }
       case Right(StreamingMessage.FromServer.Complete(subscriptionId))               =>
         state.get.flatMap {
@@ -303,8 +308,8 @@ class ApolloClient[F[_], S, CP, CE](
             F.unit
           case Initialized(stateConnectionId, _, _, _) if connectionId =!= stateConnectionId =>
             F.unit
-          case _                                                                             =>
-            "UNEXPECTED Complete RECEIVED!".warnF
+          case s @ _                                                                         =>
+            s"UNEXPECTED Complete RECEIVED for subscription [$subscriptionId]. State is: [$s]".warnF
         }
       case Right(StreamingMessage.FromServer.ConnectionKeepAlive)                    => F.unit
       case _                                                                         => s"Unexpected message received from server: [$msg]".warnF
@@ -319,7 +324,7 @@ class ApolloClient[F[_], S, CP, CE](
       case None       =>
         stateModify {
           case s @ Disconnected(_)                                                           =>
-            s -> s"onClose() called while disconnected.".warnF
+            s -> s"onClose() called while disconnected.".debugF
           case Connecting(stateConnectionId, latch) if connectionId === stateConnectionId    =>
             Disconnected(connectionId.next) -> latch.complete(error)
           case Reestablishing(stateConnectionId, _, _, connectLatch, initLatch)
@@ -527,7 +532,8 @@ class ApolloClient[F[_], S, CP, CE](
                    case Some(subscription) => subscription.halt
                  }
           } yield ()
-        case _                                   => "UNEXPECTED haltSubscription!".raiseError
+        case s @ _                               =>
+          s"UNEXPECTED haltSubscription for subscription [$subscriptionId]. State is: [$s]".raiseError
       }
 
   private def createSubscription[D](
@@ -575,18 +581,13 @@ class ApolloClient[F[_], S, CP, CE](
       emitter = QueueEmitter(queue, request)
     } yield (id, emitter)
 
-  private case class SubscriptionInfo[D](
-    subscription: GraphQLSubscription[F, D],
-    onComplete:   F[Unit]
-  )
-
   // TODO Handle interruptions in subscription and query.
 
   private def startSubscription[D: Decoder](
     subscription:  String,
     operationName: Option[String],
     variables:     Option[Json]
-  ): F[SubscriptionInfo[D]] =
+  ): F[GraphQLSubscription[F, D]] =
     state.get.flatMap {
       case Initialized(_, connection, _, _)      =>
         val request = GraphQLRequest(subscription, operationName, variables)
@@ -602,7 +603,7 @@ class ApolloClient[F[_], S, CP, CE](
                 Reestablishing(cid, subscriptions + (id -> emitter), i, connectLatch, initLatch) ->
                   F.unit
               case s @ _                                                          =>
-                s -> "UNEXPECTED acquire!".raiseError.void
+                s -> s"UNEXPECTED acquire for subscription [$id]. State is: [$s]".raiseError.void
             }
 
           def release: F[Unit] =
@@ -614,8 +615,12 @@ class ApolloClient[F[_], S, CP, CE](
               case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
                 Reestablishing(cid, subscriptions - id, i, connectLatch, initLatch) ->
                   F.unit
+              case s @ (Connected(_, _) | Disconnected(_))                        =>
+                // It's OK to call release when Connected or Disconnected.
+                // It may happen if protocol was terminated or client disconnected and we are halting streams.
+                s -> F.unit
               case s @ _                                                          =>
-                s -> "UNEXPECTED release!".raiseError.void
+                s -> s"UNEXPECTED release for subscription [$id]. State is: [$s]".raiseError.void
             }
 
           def sendStart: F[Unit] = state.get.flatMap {
@@ -626,8 +631,8 @@ class ApolloClient[F[_], S, CP, CE](
               latch.get.rethrow >> sendStart
             case Reestablishing(_, _, _, _, initLatch)   =>
               initLatch.get.rethrow >> sendStart
-            case _                                       =>
-              "UNEXPECTED sendStart!".raiseError.void
+            case s @ _                                   =>
+              s"UNEXPECTED sendStart for subscription [$id]. State is: [$s]".raiseError.void
           }
 
           val bracket =
@@ -643,9 +648,7 @@ class ApolloClient[F[_], S, CP, CE](
             ).rethrow.unNoneTerminate
           )
 
-          SubscriptionInfo(subscription = createSubscription(connection, stream, id),
-                           onComplete = haltSubscription(id)
-          )
+          createSubscription(connection, stream, id)
         }
       case Initializing(_, _, _, _, latch)       =>
         latch.get.rethrow >> startSubscription(subscription, operationName, variables)
