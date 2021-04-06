@@ -61,6 +61,8 @@ trait Generator {
       // case Type.Select?
       case Type.Apply(ttpe, args) =>
         Type.Apply(ttpe, args.map(t => nestedTypeTree(nestTree, t)))
+      case other                  =>
+        throw new Exception(s"Type structure [$other] not supported.")
     }
 
   private def qualifiedNestedType(nestTree: Option[Term.Ref], tpe: Type): Type =

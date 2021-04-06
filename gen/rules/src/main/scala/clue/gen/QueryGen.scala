@@ -399,13 +399,15 @@ trait QueryGen extends Generator {
           case Defn.Class(_, Type.Name(name), _, Ctor.Primary(_, _, paramss), _)
               if name == "Variables" =>
             // Strip "val" from mods.
-            paramss.map(_.map { case Term.Param(_, name, decltpe, default) =>
-              param"$name: $decltpe = $default"
+            paramss.map(_.map {
+              case Term.Param(_, name, decltpe, default) => param"$name: $decltpe = $default"
+              case other                                 => throw new Exception(s"Unexpected param structure [$other]")
             })
         }
         .map { paramss =>
-          val variablesNames = paramss.map(_.map { case Term.Param(_, Name(name), _, _) =>
-            Term.Name(name)
+          val variablesNames = paramss.map(_.map {
+            case Term.Param(_, Name(name), _, _) => Term.Name(name)
+            case other                           => throw new Exception(s"Unexpected param structure [$other]")
           })
           parentBody :+
             (operation match {
