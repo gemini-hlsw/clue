@@ -77,7 +77,7 @@ lazy val genRules = project
   .dependsOn(coreJVM)
 
 // Only necessary to fix inputs in place. Sometimes it gives a clearer picture than a diff.
-// scalafixScalaBinaryVersion in ThisBuild :=
+// ThisBuild / scalafixScalaBinaryVersion :=
 //   CrossVersion.binaryScalaVersion(scalaVersion.value)
 
 lazy val genInput = project

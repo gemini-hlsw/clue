@@ -32,11 +32,16 @@ object StarWars {
         case Empire => "EMPIRE"
         case Jedi => "JEDI"
       })
-      implicit val jsonDecoderEpisode: io.circe.Decoder[Episode] = io.circe.Decoder.decodeString.emapTry(s => scala.util.Try(s match {
-        case "NEWHOPE" => Newhope
-        case "EMPIRE" => Empire
-        case "JEDI" => Jedi
-      }))
+      implicit val jsonDecoderEpisode: io.circe.Decoder[Episode] = io.circe.Decoder.decodeString.emap(_ match {
+        case "NEWHOPE" =>
+          Right(Newhope)
+        case "EMPIRE" =>
+          Right(Empire)
+        case "JEDI" =>
+          Right(Jedi)
+        case other =>
+          Left(s"Invalid value [$other]")
+      })
     }
   }
   object Types {

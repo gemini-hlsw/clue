@@ -23,6 +23,12 @@ trait QueryGen extends Generator {
 
   // TODO Support concatenation and stripMargin?
   // Actually when we support gql"" that should delimit things...
+  // Actually(2)... Scalafix runs in a completely different context than the actual code.
+  // Therefore, the only way to see the whole evaluated document from scalafix would be
+  // to use a macro expansion to solve the document, and this would ONLY WORK IF semanticdb
+  // kicked in after macro expansion, and not before.
+  // Actually(3)... We are out of luck, scalafix doesn't see macro expansions:
+  // https://scalacenter.github.io/scalafix/docs/developers/semantic-tree.html#macros
   protected def extractDocument(stats: List[Stat]): Option[String] =
     stats.collectFirst {
       case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
@@ -393,13 +399,15 @@ trait QueryGen extends Generator {
           case Defn.Class(_, Type.Name(name), _, Ctor.Primary(_, _, paramss), _)
               if name == "Variables" =>
             // Strip "val" from mods.
-            paramss.map(_.map { case Term.Param(_, name, decltpe, default) =>
-              param"$name: $decltpe = $default"
+            paramss.map(_.map {
+              case Term.Param(_, name, decltpe, default) => param"$name: $decltpe = $default"
+              case other                                 => throw new Exception(s"Unexpected param structure [$other]")
             })
         }
         .map { paramss =>
-          val variablesNames = paramss.map(_.map { case Term.Param(_, Name(name), _, _) =>
-            Term.Name(name)
+          val variablesNames = paramss.map(_.map {
+            case Term.Param(_, Name(name), _, _) => Term.Name(name)
+            case other                           => throw new Exception(s"Unexpected param structure [$other]")
           })
           parentBody :+
             (operation match {
