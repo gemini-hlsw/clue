@@ -536,9 +536,9 @@ trait Generator {
       case TypeType.Enum(enumValues) =>
         val cases: List[Case] =
           enumValues.map(enumValue =>
-            p"case ${enumValue.asString} => ${Term.Name(enumValue.className)}"
-          )
-        q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.Decoder.decodeString.emapTry(s => scala.util.Try(s match {..case $cases}))"
+            p"case ${enumValue.asString} => Right(${Term.Name(enumValue.className)})"
+          ) :+ p"""case other => Left(s"Invalid value [$$other]")"""
+        q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.Decoder.decodeString.emap(_ match {..case $cases})"
       case TypeType.Sum(_)           =>
         q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.generic.extras.semiauto.deriveConfiguredDecoder[$n]"
     })
