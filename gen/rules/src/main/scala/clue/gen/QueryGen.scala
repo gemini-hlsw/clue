@@ -205,17 +205,28 @@ trait QueryGen extends Generator {
         case Rename(name, child)            =>
           go(child, currentType, name.some)
         case Group(selections)              =>
+          // A Group in an inline fragment "... on X" will be represented as Group(List(UntypedNarrow(X, ...), UntypedNarrow(X, ...))).
+          // We fix that to UntypedNarrow(X, Group(List(..., ...)))
+          val fixedSelections = selections.map(_ match {
+            // We flatly assume that if the first element of a group is UntypedNarrow(X, ...), then all elements are.
+            case Group(list @ UntypedNarrow(typeName, _) +: _) =>
+              UntypedNarrow(typeName, Group(list.collect { case UntypedNarrow(_, child) => child }))
+            case other                                         => other
+          })
+
           // (Also, check what Grackle is returning when there's an interface)
           val hierarchyAccumulators =
-            selections.zipWithIndex // We want to preserve order of appeareance
+            fixedSelections.zipWithIndex // We want to preserve order of appeareance
               .groupBy {
                 _._1 match {
-                  case UntypedNarrow(typeName, _) => typeName.some // Selection in inline fragment
-                  case _                          => none          // Selection in base group
+                  case UntypedNarrow(typeName, _) =>
+                    typeName.some // Selection in inline fragment, group by discriminator.some
+                  case _                          =>
+                    none // Selection in base group, group by none
                 }
               }
               .toList
-              .sortBy(_._2.head._2) // Sort by first appeareance of each subtype
+              .sortBy(_._2.head._2)      // Sort by first appeareance of each subtype
               .map { // Resolve groups
                 case (Some(typeName), subQueries) =>
                   (typeName.some, // Unwrap inline fragment selections
