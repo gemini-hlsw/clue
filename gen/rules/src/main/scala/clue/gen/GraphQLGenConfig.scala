@@ -4,14 +4,12 @@
 package clue.gen
 
 import cats.syntax.all._
-import cats.effect.ContextShift
 import cats.effect.IO
 import scala.concurrent.ExecutionContext
-import cats.effect.concurrent.Ref
-import cats.effect.concurrent.Deferred
 import edu.gemini.grackle.Schema
 import java.io.File
 import scala.io.Source
+import cats.effect.{ Deferred, Ref }
 
 final case class GraphQLGenConfig(
   schemaDirs:        List[String] = List.empty,

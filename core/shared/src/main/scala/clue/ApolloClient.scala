@@ -3,7 +3,6 @@
 
 package clue
 
-import cats.effect.concurrent.Ref
 import cats.effect.implicits._
 import sttp.model.Uri
 import clue.GraphQLSubscription
@@ -15,7 +14,6 @@ import java.util.UUID
 import cats.effect.ConcurrentEffect
 import org.typelevel.log4cats.Logger
 import cats.effect.ExitCase
-import cats.effect.Timer
 import clue.model.StreamingMessage
 import clue.model.json._
 import scala.concurrent.duration.FiniteDuration
@@ -24,6 +22,7 @@ import clue.model.GraphQLRequest
 import fs2.Stream
 import fs2.concurrent.Queue
 import fs2.concurrent.SignallingRef
+import cats.effect.{ Ref, Temporal }
 
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {
@@ -80,7 +79,7 @@ class ApolloClient[F[_], S, CP, CE](
 )(implicit
   F:                    ConcurrentEffect[F],
   backend:              PersistentBackend[F, CP, CE],
-  timer:                Timer[F],
+  timer:                Temporal[F],
   logger:               Logger[F]
 ) extends PersistentStreamingClient[F, S, CP, CE]
     with PersistentBackendHandler[F, CE] {
@@ -670,7 +669,7 @@ object ApolloClient {
   )(implicit
     F:                    ConcurrentEffect[F],
     backend:              PersistentBackend[F, CP, CE],
-    timer:                Timer[F],
+    timer:                Temporal[F],
     logger:               Logger[F]
   ): F[ApolloClient[F, S, CP, CE]] = {
     val logPrefix = s"clue.ApolloClient[${if (name.isEmpty) uri else name}]"
@@ -689,7 +688,7 @@ object ApolloClient {
 }
 
 object ApolloWebSocketClient {
-  def of[F[_]: ConcurrentEffect: Timer: Logger, S](
+  def of[F[_]: ConcurrentEffect: Temporal: Logger, S](
     uri:                  Uri,
     name:                 String = "",
     reconnectionStrategy: ReconnectionStrategy[WebSocketCloseEvent] = ReconnectionStrategy.never
