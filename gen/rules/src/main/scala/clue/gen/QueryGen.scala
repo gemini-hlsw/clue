@@ -115,7 +115,7 @@ trait QueryGen extends Generator {
           addModuleDefs("Variables",
                         config.catsEq,
                         config.catsShow,
-                        scalajsReactReuse = false,
+                        scalaJSReactReuse = false,
                         circeEncoder = true
           )(
             parentBody
@@ -125,7 +125,7 @@ trait QueryGen extends Generator {
             config.catsEq,
             config.catsShow,
             config.monocleLenses,
-            scalajsReactReuse = false,
+            scalaJSReactReuse = false,
             circeEncoder = true,
             forceModule = true
           )(parentBody)
@@ -312,7 +312,7 @@ trait QueryGen extends Generator {
           addModuleDefs("Data",
                         config.catsEq,
                         config.catsShow,
-                        config.scalajsReactReuse,
+                        config.scalaJSReactReuse,
                         circeDecoder = true
           )(parentBody)
         case Define(_, _, _) => // For now, we don't allow specifying Data class parents.
@@ -339,7 +339,7 @@ trait QueryGen extends Generator {
             config.catsEq,
             config.catsShow,
             config.monocleLenses,
-            config.scalajsReactReuse,
+            config.scalaJSReactReuse,
             circeDecoder = true,
             forceModule = true
           )(parentBody)

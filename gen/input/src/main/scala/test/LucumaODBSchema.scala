@@ -6,13 +6,12 @@
   rules = [GraphQLGen]
   GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
  */
-// format: on
 package test
 
 import clue.annotation.GraphQLSchema
 
 @GraphQLSchema
-object LucumaODBGQL {
+trait LucumaODB {
   object Scalars {
     type AsterismId      = String
     type BigDecimal      = scala.BigDecimal
@@ -27,3 +26,4 @@ object LucumaODBGQL {
     type ConstraintSetId = String
   }
 }
+// format: on
