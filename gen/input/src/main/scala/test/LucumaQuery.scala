@@ -6,14 +6,13 @@
   rules = [GraphQLGen]
   GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
  */
-// format: on
 package test
 
 import clue.annotation.GraphQL
 import clue.GraphQLOperation
 
 @GraphQL
-trait LucumaQueryGQL extends GraphQLOperation[LucumaODB] {
+trait LucumaQuery extends GraphQLOperation[LucumaODB] {
   val document = """
       query Program {
         program(programId: "p-2") {
@@ -37,3 +36,4 @@ trait LucumaQueryGQL extends GraphQLOperation[LucumaODB] {
         }
       }"""
 }
+// format: on

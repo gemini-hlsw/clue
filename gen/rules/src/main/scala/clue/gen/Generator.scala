@@ -160,7 +160,7 @@ trait Generator {
       catsEq: Boolean,
       catsShow:          Boolean,
       monocleLenses:     Boolean,
-      scalajsReactReuse: Boolean,
+      scalaJSReactReuse: Boolean,
       circeEncoder:      Boolean = false,
       circeDecoder:      Boolean = false,
       forceModule:       Boolean = false,
@@ -206,7 +206,7 @@ trait Generator {
       catsEq:            Boolean,
       catsShow:          Boolean,
       monocleLenses:     Boolean,
-      scalajsReactReuse: Boolean,
+      scalaJSReactReuse: Boolean,
       circeEncoder:      Boolean = false,
       circeDecoder:      Boolean = false,
       forceModule:       Boolean = false,
@@ -228,7 +228,7 @@ trait Generator {
             catsEq,
             catsShow,
             monocleLenses,
-            scalajsReactReuse,
+            scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
             nestPath = nextPath
@@ -251,7 +251,7 @@ trait Generator {
             camelName,
             catsEq,
             catsShow,
-            scalajsReactReuse,
+            scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
             bodyMod = scala.Function.chain(addNested ++ addLenses),
@@ -302,7 +302,7 @@ trait Generator {
       catsEq:            Boolean,
       catsShow:          Boolean,
       monocleLenses:     Boolean,
-      scalajsReactReuse: Boolean,
+      scalaJSReactReuse: Boolean,
       circeEncoder:      Boolean,
       circeDecoder:      Boolean,
       forceModule:       Boolean,
@@ -326,7 +326,7 @@ trait Generator {
             _.addToParentBody(catsEq,
                               catsShow,
                               monocleLenses,
-                              scalajsReactReuse,
+                              scalaJSReactReuse,
                               circeEncoder,
                               circeDecoder,
                               forceModule,
@@ -338,7 +338,7 @@ trait Generator {
               _.addToParentBody(catsEq,
                                 catsShow,
                                 monocleLenses,
-                                scalajsReactReuse,
+                                scalaJSReactReuse,
                                 circeEncoder,
                                 circeDecoder,
                                 forceModule,
@@ -370,7 +370,7 @@ trait Generator {
             camelName,
             catsEq,
             catsShow,
-            scalajsReactReuse,
+            scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
             TypeType.Sum(sum.discriminator),
@@ -386,7 +386,7 @@ trait Generator {
     def addToParentBody(
       catsEq:            Boolean,
       catsShow:          Boolean,
-      scalajsReactReuse: Boolean,
+      scalaJSReactReuse: Boolean,
       circeEncoder:      Boolean = false,
       circeDecoder:      Boolean = false
     ): List[Stat] => List[Stat] =
@@ -394,7 +394,7 @@ trait Generator {
               values,
               catsEq,
               catsShow,
-              scalajsReactReuse,
+              scalaJSReactReuse,
               circeEncoder,
               circeDecoder
       )
@@ -405,7 +405,7 @@ trait Generator {
     values:            List[String],
     catsEq:            Boolean,
     catsShow:          Boolean,
-    scalajsReactReuse: Boolean,
+    scalaJSReactReuse: Boolean,
     circeEncoder:      Boolean = false,
     circeDecoder:      Boolean = false
   ): List[Stat] => List[Stat] =
@@ -420,7 +420,7 @@ trait Generator {
             name,
             catsEq,
             catsShow,
-            scalajsReactReuse,
+            scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
             TypeType.Enum(enumValues),
@@ -483,7 +483,7 @@ trait Generator {
     name:              String,
     catsEq:            Boolean,
     catsShow:          Boolean,
-    scalajsReactReuse: Boolean,
+    scalaJSReactReuse: Boolean,
     circeEncoder:      Boolean = false,
     circeDecoder:      Boolean = false,
     typeType:          TypeType = TypeType.CaseClass,
@@ -503,7 +503,7 @@ trait Generator {
       q"implicit val ${valName("show")}: cats.Show[$n] = cats.Show.fromToString"
     )
 
-    val reuseDef = Option.when(scalajsReactReuse)(
+    val reuseDef = Option.when(scalaJSReactReuse)(
       q"""implicit val ${valName("reuse")}: japgolly.scalajs.react.Reusability[$n] = {
               import japgolly.scalajs.react.Reusability
               japgolly.scalajs.react.Reusability.derive

@@ -6,9 +6,18 @@ package clue.gen
 import scala.meta._
 import scala.reflect.ClassTag
 import clue.annotation._
+import scalafix.v1._
+import scala.annotation.StaticAnnotation
 
-// Copied from simulacrum-scalafix
-class AnnotationPattern(val name: String) {
+// Adapted from simulacrum-scalafix
+class AnnotationPattern[T <: StaticAnnotation](implicit classTag: ClassTag[T]) {
+
+  private val clazz = classTag.runtimeClass
+
+  val name = clazz.getSimpleName
+
+  val symbol = Symbol(s"${clazz.getName}#")
+
   private def isAnnotationNamed(name: String)(typeTree: Type): Boolean = typeTree match {
     case Type.Select(_, Type.Name(`name`)) => true
     case Type.Name(`name`)                 => true
@@ -26,8 +35,6 @@ class AnnotationPattern(val name: String) {
   }.flatten
 }
 
-object GraphQLSchemaAnnotation
-    extends AnnotationPattern(implicitly[ClassTag[GraphQLSchema]].runtimeClass.getSimpleName)
+object GraphQLSchemaAnnotation extends AnnotationPattern[GraphQLSchema]
 
-object GraphQLAnnotation
-    extends AnnotationPattern(implicitly[ClassTag[GraphQL]].runtimeClass.getSimpleName)
+object GraphQLAnnotation extends AnnotationPattern[GraphQL]

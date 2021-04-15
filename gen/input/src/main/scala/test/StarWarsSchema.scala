@@ -6,10 +6,10 @@
   rules = [GraphQLGen]
   GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
  */
-// format: on
 package test
 
 import clue.annotation.GraphQLSchema
 
 @GraphQLSchema
-object StarWarsGQL
+trait StarWars
+// format: on

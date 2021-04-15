@@ -5,15 +5,18 @@
 /*
   rules = [GraphQLGen]
   GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
+  GraphQLGen.scalaJSReactReuse = true
  */
 package test
 
 import clue.annotation.GraphQL
 import clue.GraphQLOperation
 import test.StarWars
+// gql: import japgolly.scalajs.react.Dummy._
 
-@GraphQL
-trait StarWarsQuery extends GraphQLOperation[StarWars] {
+object Wrapper /* gql: extends Something */ {
+  @GraphQL
+  trait StarWarsQuery2 extends GraphQLOperation[StarWars] {
   override val document: String = """
         query ($charId: ID!) {
           character(id: $charId) {
@@ -32,5 +35,6 @@ trait StarWarsQuery extends GraphQLOperation[StarWars] {
           }
         }
       """
+}
 }
 // format: on
