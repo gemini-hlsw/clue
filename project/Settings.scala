@@ -16,7 +16,7 @@ object Settings {
     val monocle         = "2.1.0"
     val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom      = "1.1.0"
-    val sttpModel       = "1.4.2"
+    val sttpModel       = "1.4.3"
   }
 
   object Libraries {
