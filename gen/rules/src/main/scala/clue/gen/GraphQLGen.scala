@@ -8,6 +8,7 @@ import scala.meta._
 import cats.syntax.all._
 import metaconfig.Configured
 import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 import edu.gemini.grackle.QueryParser
 
 class GraphQLGen(config: GraphQLGenConfig)

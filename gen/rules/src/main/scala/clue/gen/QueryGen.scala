@@ -4,6 +4,7 @@
 package clue.gen
 
 import cats.syntax.all._
+import cats.effect.unsafe.implicits.global
 import scala.meta._
 import edu.gemini.grackle.{ Type => GType, Term => _, _ }
 import edu.gemini.grackle.UntypedOperation._

@@ -4,11 +4,9 @@
 package clue.gen
 
 import cats.syntax.all._
-import cats.effect.ContextShift
 import cats.effect.IO
-import scala.concurrent.ExecutionContext
-import cats.effect.concurrent.Ref
-import cats.effect.concurrent.Deferred
+import cats.effect.Ref
+import cats.effect.Deferred
 import edu.gemini.grackle.Schema
 import java.io.File
 import scala.io.Source
@@ -23,8 +21,6 @@ final case class GraphQLGenConfig(
   circeEncoder:      Boolean = true,
   circeDecoder:      Boolean = true
 ) {
-  implicit private val csIO: ContextShift[IO] = IO.contextShift(ExecutionContext.Implicits.global)
-
   private val schemas: Ref[IO, Map[String, Deferred[IO, Schema]]] = Ref.unsafe(Map.empty)
 
   /**
