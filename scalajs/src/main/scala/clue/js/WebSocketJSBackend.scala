@@ -16,7 +16,7 @@ import org.scalajs.dom.raw.Event
 import org.scalajs.dom.raw.MessageEvent
 import org.scalajs.dom.raw.WebSocket
 import sttp.model.Uri
-import cats.effect.concurrent.Ref
+import cats.effect.Ref
 
 /**
  * Streaming backend for JS WebSocket.
@@ -33,7 +33,7 @@ final class WebSocketJSBackend[F[_]: Effect: Logger] extends WebSocketBackend[F]
       isOpen     <- Ref[F].of(false)
       isErrored  <- Ref[F].of(false)
       connection <-
-        Async[F].async[PersistentConnection[F, WebSocketCloseParams]] { cb =>
+        Async[F].async_[PersistentConnection[F, WebSocketCloseParams]] { cb =>
           val ws = new WebSocket(uri.toString, Protocol)
 
           ws.onopen = { _: Event =>
