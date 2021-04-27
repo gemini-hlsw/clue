@@ -22,7 +22,6 @@ import clue.model.GraphQLRequest
 
 import fs2.Stream
 import fs2.concurrent.SignallingRef
-import cats.effect.std.Dispatcher
 
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {
@@ -109,16 +108,14 @@ class ApolloClient[F[_], S, CP, CE](
   override def connect(): F[Unit] = {
     val warn = "connect() called while already connected or attempting to connect.".warnF
 
-    Dispatcher[F].use { d =>
-      Latch[F].flatMap { newLatch =>
-        stateModify {
-          case Disconnected(connectionId)                   =>
-            Connecting(connectionId, newLatch) -> doConnect(connectionId, newLatch, dispatcher = d)
-          case s @ Connecting(_, latch)                     => s     -> (warn >> latch.get.rethrow)
-          case s @ Reestablishing(_, _, _, connectLatch, _) =>
-            s -> (warn >> connectLatch.get.rethrow)
-          case state                                        => state -> warn
-        }
+    Latch[F].flatMap { newLatch =>
+      stateModify {
+        case Disconnected(connectionId)                   =>
+          Connecting(connectionId, newLatch) -> doConnect(connectionId, newLatch)
+        case s @ Connecting(_, latch)                     => s     -> (warn >> latch.get.rethrow)
+        case s @ Reestablishing(_, _, _, connectLatch, _) =>
+          s -> (warn >> connectLatch.get.rethrow)
+        case state                                        => state -> warn
       }
     }
   }
@@ -204,23 +201,21 @@ class ApolloClient[F[_], S, CP, CE](
   override def reestablish(): F[Unit] =
     Latch[F].flatMap { newConnectLatch =>
       Latch[F].flatMap { newInitLatch =>
-        Dispatcher[F].use { d =>
-          stateModify {
-            case s @ Reestablishing(_, _, _, _, initLatch)                         =>
-              s -> (s"reestablish() called while already reestablishing.".errorF >> initLatch.get.rethrow)
-            case Initialized(connectionId, connection, subscriptions, initPayload) =>
-              Reestablishing(connectionId.next,
-                             subscriptions,
-                             initPayload,
-                             newConnectLatch,
-                             newInitLatch
-              ) ->
-                ((gracefulTerminate(connection, subscriptions) >> connection.close()).start >>
-                  doConnect(connectionId.next, newConnectLatch, dispatcher = d) >>
-                  newInitLatch.get.rethrow)
-            case s @ _                                                             =>
-              s -> s"reestablish() called while disconnected or uninitialized.".errorF
-          }
+        stateModify {
+          case s @ Reestablishing(_, _, _, _, initLatch)                         =>
+            s -> (s"reestablish() called while already reestablishing.".errorF >> initLatch.get.rethrow)
+          case Initialized(connectionId, connection, subscriptions, initPayload) =>
+            Reestablishing(connectionId.next,
+                           subscriptions,
+                           initPayload,
+                           newConnectLatch,
+                           newInitLatch
+            ) ->
+              ((gracefulTerminate(connection, subscriptions) >> connection.close()).start >>
+                doConnect(connectionId.next, newConnectLatch) >>
+                newInitLatch.get.rethrow)
+          case s @ _                                                             =>
+            s -> s"reestablish() called while disconnected or uninitialized.".errorF
         }
       }
     }
@@ -352,54 +347,52 @@ class ApolloClient[F[_], S, CP, CE](
       case Some(wait) =>
         Latch[F].flatMap { newConnectLatch =>
           Latch[F].flatMap { newInitLatch =>
-            Dispatcher[F].use { d =>
-              def waitAndConnect(nextConnectionId: ConnectionId, latch: Latch[F]): F[Unit] =
-                s"Connection closed. Attempting to reconnect.".warnF >>
-                  s"Waiting [$wait] before reconnect...".debugF >>
-                  timer.sleep(wait) >>
-                  doConnect(nextConnectionId, latch, dispatcher = d)
+            def waitAndConnect(nextConnectionId: ConnectionId, latch: Latch[F]): F[Unit] =
+              s"Connection closed. Attempting to reconnect.".warnF >>
+                s"Waiting [$wait] before reconnect...".debugF >>
+                timer.sleep(wait) >>
+                doConnect(nextConnectionId, latch)
 
-              stateModify {
-                case s @ Disconnected(stateConnectionId) if connectionId === stateConnectionId =>
-                  s -> s"Unexpected onClose() called while disconnected. Not applying reconnectStrategy.".warnF
-                case Connecting(stateConnectionId, connectLatch)
-                    if connectionId === stateConnectionId =>
-                  Connecting(connectionId.next, connectLatch) ->
-                    waitAndConnect(connectionId.next, connectLatch)
-                case Connected(stateConnectionId, _) if connectionId === stateConnectionId     =>
-                  Connecting(connectionId.next, newConnectLatch) ->
-                    waitAndConnect(connectionId.next, newConnectLatch)
-                case Initializing(stateConnectionId, _, subscriptions, initPayload, latch)
-                    if connectionId === stateConnectionId =>
-                  Reestablishing(connectionId.next,
-                                 subscriptions,
-                                 initPayload,
-                                 newConnectLatch,
-                                 latch
-                  ) -> waitAndConnect(connectionId.next, newConnectLatch)
-                case Initialized(stateConnectionId, _, subscriptions, initPayload)
-                    if connectionId === stateConnectionId =>
-                  Reestablishing(connectionId.next,
-                                 subscriptions,
-                                 initPayload,
-                                 newConnectLatch,
-                                 newInitLatch
-                  ) -> waitAndConnect(connectionId.next, newConnectLatch)
-                case Reestablishing(stateConnectionId,
-                                    subscriptions,
-                                    initPayload,
-                                    connectLatch,
-                                    initLatch
-                    ) if connectionId === stateConnectionId =>
-                  Reestablishing(connectionId.next,
-                                 subscriptions,
-                                 initPayload,
-                                 connectLatch,
-                                 initLatch
-                  ) -> waitAndConnect(connectionId.next, connectLatch)
-                case s @ _                                                                     =>
-                  s -> debug
-              }
+            stateModify {
+              case s @ Disconnected(stateConnectionId) if connectionId === stateConnectionId =>
+                s -> s"Unexpected onClose() called while disconnected. Not applying reconnectStrategy.".warnF
+              case Connecting(stateConnectionId, connectLatch)
+                  if connectionId === stateConnectionId =>
+                Connecting(connectionId.next, connectLatch) ->
+                  waitAndConnect(connectionId.next, connectLatch)
+              case Connected(stateConnectionId, _) if connectionId === stateConnectionId     =>
+                Connecting(connectionId.next, newConnectLatch) ->
+                  waitAndConnect(connectionId.next, newConnectLatch)
+              case Initializing(stateConnectionId, _, subscriptions, initPayload, latch)
+                  if connectionId === stateConnectionId =>
+                Reestablishing(connectionId.next,
+                               subscriptions,
+                               initPayload,
+                               newConnectLatch,
+                               latch
+                ) -> waitAndConnect(connectionId.next, newConnectLatch)
+              case Initialized(stateConnectionId, _, subscriptions, initPayload)
+                  if connectionId === stateConnectionId =>
+                Reestablishing(connectionId.next,
+                               subscriptions,
+                               initPayload,
+                               newConnectLatch,
+                               newInitLatch
+                ) -> waitAndConnect(connectionId.next, newConnectLatch)
+              case Reestablishing(stateConnectionId,
+                                  subscriptions,
+                                  initPayload,
+                                  connectLatch,
+                                  initLatch
+                  ) if connectionId === stateConnectionId =>
+                Reestablishing(connectionId.next,
+                               subscriptions,
+                               initPayload,
+                               connectLatch,
+                               initLatch
+                ) -> waitAndConnect(connectionId.next, connectLatch)
+              case s @ _                                                                     =>
+                s -> debug
             }
           }
         }
@@ -411,18 +404,17 @@ class ApolloClient[F[_], S, CP, CE](
   private def doConnect(
     connectionId: ConnectionId,
     latch:        Latch[F],
-    attempt:      Int = 1,
-    dispatcher:   Dispatcher[F]
+    attempt:      Int = 1
   ): F[Unit] =
     backend
-      .connect(uri, this, connectionId, dispatcher)
+      .connect(uri, this, connectionId)
       .attempt
       .flatMap { connection =>
         def retry(t: Throwable, wait: FiniteDuration, nextConnectionId: ConnectionId): F[Unit] =
           t.warnF(s"Error in connect() after attempt #[$attempt]. Retrying.") >>
             s"Waiting [$wait] before reconnect...".debugF >>
             timer.sleep(wait) >>
-            doConnect(nextConnectionId, latch, attempt + 1, dispatcher)
+            doConnect(nextConnectionId, latch, attempt + 1)
 
         stateModify {
           case Connecting(connectionId, latch)                                                   =>

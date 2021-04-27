@@ -28,59 +28,60 @@ final class WebSocketJSBackend[F[_]: Async: Logger] extends WebSocketBackend[F] 
   override def connect(
     uri:          Uri,
     handler:      PersistentBackendHandler[F, WebSocketCloseEvent],
-    connectionId: ConnectionId,
-    dispatcher:   Dispatcher[F]
+    connectionId: ConnectionId
   ): F[PersistentConnection[F, WebSocketCloseParams]] =
     for {
       isOpen     <- Ref[F].of(false)
       isErrored  <- Ref[F].of(false)
       connection <-
-        Async[F].async_[PersistentConnection[F, WebSocketCloseParams]] { cb =>
-          val ws = new WebSocket(uri.toString, Protocol)
+        Dispatcher[F].use { dispatcher =>
+          Async[F].async_[PersistentConnection[F, WebSocketCloseParams]] { cb =>
+            val ws = new WebSocket(uri.toString, Protocol)
 
-          ws.onopen = { _: Event =>
-            val open: F[Unit] = (
-              for {
-                _ <- isOpen.set(true)
-                _ <- s"WebSocket open for URI [$uri]".traceF
-              } yield cb(new WebSocketJSConnection(ws).asRight)
-            ).uncancelable
-            dispatcher.unsafeRunAndForget(open)
-          }
-
-          // TODO PROCESS ERRORS/INTERRUPTIONS ON CALLBACKS !
-
-          ws.onmessage = { e: MessageEvent =>
-            val message: F[Unit] = e.data match {
-              case str: String => handler.onMessage(connectionId, str)
-              case other       => s"Unexpected event from WebSocket for [$uri]: [$other]".errorF
+            ws.onopen = { _: Event =>
+              val open: F[Unit] = (
+                for {
+                  _ <- isOpen.set(true)
+                  _ <- s"WebSocket open for URI [$uri]".traceF
+                } yield cb(new WebSocketJSConnection(ws).asRight)
+              ).uncancelable
+              dispatcher.unsafeRunAndForget(open)
             }
-            dispatcher.unsafeRunAndForget(message)
-          }
 
-          // According to spec, onError is only closed prior to a close.
-          // https://html.spec.whatwg.org/multipage/web-sockets.html
-          ws.onerror = { _: Event =>
-            val error: F[Unit] = (
-              for {
-                _    <- s"Error on WebSocket for [$uri]".errorF
-                _    <- isErrored.set(true)
-                open <- isOpen.get
-              } yield if (!open) cb(new ConnectionException().asLeft)
-            ).uncancelable
-            dispatcher.unsafeRunAndForget(error)
-          }
+            // TODO PROCESS ERRORS/INTERRUPTIONS ON CALLBACKS !
 
-          ws.onclose = { e: CloseEvent =>
-            val close: F[Unit] =
-              for {
-                _       <- s"WebSocket closed for URI [$uri]".traceF
-                errored <- isErrored.get
-                _       <- handler.onClose(connectionId,
-                                           WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored)
-                           )
-              } yield ()
-            dispatcher.unsafeRunAndForget(close)
+            ws.onmessage = { e: MessageEvent =>
+              val message: F[Unit] = e.data match {
+                case str: String => handler.onMessage(connectionId, str)
+                case other       => s"Unexpected event from WebSocket for [$uri]: [$other]".errorF
+              }
+              dispatcher.unsafeRunAndForget(message)
+            }
+
+            // According to spec, onError is only closed prior to a close.
+            // https://html.spec.whatwg.org/multipage/web-sockets.html
+            ws.onerror = { _: Event =>
+              val error: F[Unit] = (
+                for {
+                  _    <- s"Error on WebSocket for [$uri]".errorF
+                  _    <- isErrored.set(true)
+                  open <- isOpen.get
+                } yield if (!open) cb(new ConnectionException().asLeft)
+              ).uncancelable
+              dispatcher.unsafeRunAndForget(error)
+            }
+
+            ws.onclose = { e: CloseEvent =>
+              val close: F[Unit] =
+                for {
+                  _       <- s"WebSocket closed for URI [$uri]".traceF
+                  errored <- isErrored.get
+                  _       <- handler.onClose(connectionId,
+                                             WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored)
+                             )
+                } yield ()
+              dispatcher.unsafeRunAndForget(close)
+            }
           }
         }
     } yield connection

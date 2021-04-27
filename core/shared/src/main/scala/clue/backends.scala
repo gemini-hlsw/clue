@@ -4,7 +4,6 @@
 package clue
 
 import cats.syntax.all._
-import cats.effect.std.Dispatcher
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
 import sttp.model.Uri
@@ -49,8 +48,7 @@ trait PersistentBackend[F[_], CP, CE] {
   def connect(
     uri:          Uri,
     handler:      PersistentBackendHandler[F, CE],
-    connectionId: ConnectionId,
-    dispatcher:   Dispatcher[F]
+    connectionId: ConnectionId
   ): F[PersistentConnection[F, CP]]
 }
 
