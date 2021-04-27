@@ -39,6 +39,7 @@ protected[clue] trait Emitter[F[_]] {
 protected sealed abstract class State[+F[_], +CP](val status: PersistentClientStatus) {
   val connectionId: ConnectionId
 }
+
 protected object State {
   final case class Disconnected(connectionId: ConnectionId)
       extends State[Nothing, Nothing](PersistentClientStatus.Disconnected)
@@ -79,11 +80,11 @@ class ApolloClient[F[_], S, CP, CE](
 )(implicit
   F:                    Async[F],
   backend:              PersistentBackend[F, CP, CE],
-  timer:                Temporal[F],
   logger:               Logger[F]
 ) extends PersistentStreamingClient[F, S, CP, CE]
     with PersistentBackendHandler[F, CE] {
   import State._
+  val timer = Temporal[F]
 
   // Transition FSM state and execute an action.
   private def stateModify[A](f: State[F, CP] => (State[F, CP], F[A])): F[A] =
@@ -685,7 +686,6 @@ object ApolloClient {
   )(implicit
     F:                    Async[F],
     backend:              PersistentBackend[F, CP, CE],
-    timer:                Temporal[F],
     logger:               Logger[F]
   ): F[ApolloClient[F, S, CP, CE]] = {
     val logPrefix = s"clue.ApolloClient[${if (name.isEmpty) uri else name}]"
@@ -697,7 +697,6 @@ object ApolloClient {
     } yield new ApolloClient(uri, reconnectionStrategy, state, connectionStatus)(
       F,
       backend,
-      timer,
       logger.withModifiedString(s => s"$logPrefix $s")
     )
   }
