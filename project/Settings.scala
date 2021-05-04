@@ -5,18 +5,18 @@ import sbt.librarymanagement._
 object Settings {
 
   object LibraryVersions {
-    val cats            = "2.5.0"
-    val catsEffect      = "2.4.1"
+    val cats            = "2.6.0"
+    val catsEffect      = "2.5.0"
     val circe           = "0.13.0"
-    val disciplineMUnit = "1.0.7"
-    val fs2             = "2.5.4"
+    val disciplineMUnit = "1.0.8"
+    val fs2             = "2.5.5"
     val grackle         = "0.0.44"
     val jawn            = "1.1.1"
-    val log4Cats        = "1.2.2"
+    val log4Cats        = "1.3.0"
     val monocle         = "2.1.0"
     val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom      = "1.1.0"
-    val sttpModel       = "1.4.1"
+    val sttpModel       = "1.4.5"
   }
 
   object Libraries {
