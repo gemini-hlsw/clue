@@ -15,7 +15,6 @@ import scala.io.Source
 
 final case class GraphQLGenConfig(
   schemaDirs:        List[String] = List.empty,
-  // schemaDirs:        String = "",
   catsEq:            Boolean = true,
   catsShow:          Boolean = true,
   monocleLenses:     Boolean = true,
