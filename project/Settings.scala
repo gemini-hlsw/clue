@@ -6,13 +6,13 @@ object Settings {
 
   object LibraryVersions {
     val cats            = "2.6.0"
-    val catsEffect      = "2.5.0"
+    val catsEffect      = "3.1.0"
     val circe           = "0.13.0"
     val disciplineMUnit = "1.0.8"
-    val fs2             = "2.5.5"
+    val fs2             = "3.0.2"
     val grackle         = "0.0.44"
     val jawn            = "1.1.1"
-    val log4Cats        = "1.3.0"
+    val log4Cats        = "2.0.1"
     val monocle         = "2.1.0"
     val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom      = "1.1.0"

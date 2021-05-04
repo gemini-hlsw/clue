@@ -20,7 +20,7 @@ final class AjaxJSBackend[F[_]: Async] extends TransactionalBackend[F] {
     uri:     Uri,
     request: GraphQLRequest
   ): F[String] =
-    Async[F].async { cb =>
+    Async[F].async_ { cb =>
       Ajax
         .post(
           url = uri.toString,

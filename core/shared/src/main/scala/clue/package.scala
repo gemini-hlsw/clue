@@ -7,7 +7,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.FiniteDuration
 import cats.MonadError
 import cats.effect.Concurrent
-import cats.effect.concurrent.Deferred
+import cats.effect.Deferred
 
 package object clue {
   type CloseReason[CE]               = Either[Throwable, CE]
