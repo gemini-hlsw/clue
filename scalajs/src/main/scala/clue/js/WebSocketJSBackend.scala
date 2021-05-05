@@ -22,7 +22,8 @@ import cats.effect.std.Dispatcher
 /**
  * Streaming backend for JS WebSocket.
  */
-final class WebSocketJSBackend[F[_]: Async: Logger] extends WebSocketBackend[F] {
+final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
+    extends WebSocketBackend[F] {
   private val Protocol = "graphql-ws"
 
   override def connect(
@@ -34,61 +35,60 @@ final class WebSocketJSBackend[F[_]: Async: Logger] extends WebSocketBackend[F] 
       isOpen     <- Ref[F].of(false)
       isErrored  <- Ref[F].of(false)
       connection <-
-        Dispatcher[F].use { dispatcher =>
-          Async[F].async_[PersistentConnection[F, WebSocketCloseParams]] { cb =>
-            val ws = new WebSocket(uri.toString, Protocol)
+        Async[F].async_[PersistentConnection[F, WebSocketCloseParams]] { cb =>
+          val ws = new WebSocket(uri.toString, Protocol)
 
-            ws.onopen = { _: Event =>
-              val open: F[Unit] = (
-                for {
-                  _ <- isOpen.set(true)
-                  _ <- s"WebSocket open for URI [$uri]".traceF
-                } yield cb(new WebSocketJSConnection(ws).asRight)
-              ).uncancelable
-              dispatcher.unsafeRunAndForget(open)
+          ws.onopen = { _: Event =>
+            val open: F[Unit] = (
+              for {
+                _ <- isOpen.set(true)
+                _ <- s"WebSocket open for URI [$uri]".traceF
+              } yield cb(new WebSocketJSConnection(ws).asRight)
+            ).uncancelable
+            dispatcher.unsafeRunAndForget(open)
+          }
+
+          // TODO PROCESS ERRORS/INTERRUPTIONS ON CALLBACKS !
+
+          ws.onmessage = { e: MessageEvent =>
+            val message: F[Unit] = e.data match {
+              case str: String => handler.onMessage(connectionId, str)
+              case other       => s"Unexpected event from WebSocket for [$uri]: [$other]".errorF
             }
+            dispatcher.unsafeRunAndForget(message)
+          }
 
-            // TODO PROCESS ERRORS/INTERRUPTIONS ON CALLBACKS !
+          // According to spec, onError is only closed prior to a close.
+          // https://html.spec.whatwg.org/multipage/web-sockets.html
+          ws.onerror = { _: Event =>
+            val error: F[Unit] = (
+              for {
+                _    <- s"Error on WebSocket for [$uri]".errorF
+                _    <- isErrored.set(true)
+                open <- isOpen.get
+              } yield if (!open) cb(new ConnectionException().asLeft)
+            ).uncancelable
+            dispatcher.unsafeRunAndForget(error)
+          }
 
-            ws.onmessage = { e: MessageEvent =>
-              val message: F[Unit] = e.data match {
-                case str: String => handler.onMessage(connectionId, str)
-                case other       => s"Unexpected event from WebSocket for [$uri]: [$other]".errorF
-              }
-              dispatcher.unsafeRunAndForget(message)
-            }
-
-            // According to spec, onError is only closed prior to a close.
-            // https://html.spec.whatwg.org/multipage/web-sockets.html
-            ws.onerror = { _: Event =>
-              val error: F[Unit] = (
-                for {
-                  _    <- s"Error on WebSocket for [$uri]".errorF
-                  _    <- isErrored.set(true)
-                  open <- isOpen.get
-                } yield if (!open) cb(new ConnectionException().asLeft)
-              ).uncancelable
-              dispatcher.unsafeRunAndForget(error)
-            }
-
-            ws.onclose = { e: CloseEvent =>
-              val close: F[Unit] =
-                for {
-                  _       <- s"WebSocket closed for URI [$uri]".traceF
-                  errored <- isErrored.get
-                  _       <- handler.onClose(connectionId,
-                                             WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored)
-                             )
-                } yield ()
-              dispatcher.unsafeRunAndForget(close)
-            }
+          ws.onclose = { e: CloseEvent =>
+            val close: F[Unit] =
+              for {
+                _       <- s"WebSocket closed for URI [$uri]".traceF
+                errored <- isErrored.get
+                _       <- handler.onClose(connectionId,
+                                           WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored)
+                           )
+              } yield ()
+            dispatcher.unsafeRunAndForget(close)
           }
         }
     } yield connection
 }
 
 object WebSocketJSBackend {
-  def apply[F[_]: Async: Logger]: WebSocketJSBackend[F] = new WebSocketJSBackend[F]
+  def apply[F[_]: Async: Logger](dispatcher: Dispatcher[F]): WebSocketJSBackend[F] =
+    new WebSocketJSBackend[F](dispatcher)
 }
 
 final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
