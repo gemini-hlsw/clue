@@ -12,7 +12,7 @@ object Settings {
     val fs2             = "3.0.3"
     val grackle         = "0.0.44"
     val jawn            = "1.1.1"
-    val log4Cats        = "2.0.1"
+    val log4Cats        = "2.1.1"
     val monocle         = "2.1.0"
     val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom      = "1.1.0"
