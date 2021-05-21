@@ -9,8 +9,10 @@ object Settings {
     val catsEffect      = "3.1.1"
     val circe           = "0.13.0"
     val disciplineMUnit = "1.0.9"
-    val fs2             = "3.0.3"
+    val fs2             = "3.0.4"
     val grackle         = "0.0.44"
+    val http4s          = "1.0.0-M21"
+    val http4sJDKClient = "0.5.0-M4"
     val jawn            = "1.1.1"
     val log4Cats        = "2.0.1"
     val monocle         = "2.1.0"
@@ -65,6 +67,18 @@ object Settings {
     val Grackle = Def.setting(
       Seq(
         "edu.gemini" %%% "gsp-graphql-core" % grackle
+      )
+    )
+
+    val Http4sCirce = Def.setting(
+      Seq(
+        "org.http4s" %%% "http4s-circe" % http4s
+      )
+    )
+
+    val Http4sJDKClient = Def.setting(
+      Seq(
+        "org.http4s" %%% "http4s-jdk-http-client" % http4sJDKClient
       )
     )
 

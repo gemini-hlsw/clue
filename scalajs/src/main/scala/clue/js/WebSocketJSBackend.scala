@@ -77,7 +77,8 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
                 _       <- s"WebSocket closed for URI [$uri]".traceF
                 errored <- isErrored.get
                 _       <- handler.onClose(connectionId,
-                                           WebSocketCloseEvent(e.code, e.reason, e.wasClean, errored)
+                                           if (errored) new DisconnectedException().asLeft
+                                           else WebSocketCloseParams(e.code, e.reason).asRight
                            )
               } yield ()
             dispatcher.unsafeRunAndForget(close)
