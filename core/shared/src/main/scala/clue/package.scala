@@ -27,6 +27,8 @@ package object clue {
 
   protected[clue] type Latch[F[_]] = Deferred[F, Either[Throwable, Unit]]
 
+  type WebSocketCloseEvent = Either[Throwable, WebSocketCloseParams]
+
   final implicit class StringOps(val str: String) extends AnyVal {
     def error[A]: Either[Throwable, A] =
       new Exception(str).asLeft[A]

@@ -10,7 +10,17 @@ inThisBuild(
 
 lazy val root = project
   .in(file("."))
-  .aggregate(modelJVM, modelJS, coreJVM, coreJS, scalaJS, genRules, genInput, genOutput, genTests)
+  .aggregate(modelJVM,
+             modelJS,
+             coreJVM,
+             coreJS,
+             scalaJS,
+             http4sJDK,
+             genRules,
+             genInput,
+             genOutput,
+             genTests
+  )
   .settings(
     name := "clue",
     publish := {},
@@ -64,6 +74,16 @@ lazy val scalaJS = project
   )
   .dependsOn(coreJS)
   .enablePlugins(ScalaJSPlugin)
+
+lazy val http4sJDK = project
+  .in(file("http4s-jdk"))
+  .settings(
+    moduleName := "clue-http4s-jdk-client",
+    libraryDependencies ++=
+      Settings.Libraries.Http4sCirce.value ++
+        Settings.Libraries.Http4sJDKClient.value
+  )
+  .dependsOn(coreJVM)
 
 lazy val genRules = project
   .in(file("gen/rules"))

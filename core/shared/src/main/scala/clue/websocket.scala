@@ -12,4 +12,3 @@ object WebSocketCloseParams {
   def apply(code:   Int, reason: String): WebSocketCloseParams =
     WebSocketCloseParams(code = code.some, reason = reason.some)
 }
-case class WebSocketCloseEvent(code: Int, reason: String, wasClean: Boolean, wasErrored: Boolean)
