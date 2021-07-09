@@ -11,7 +11,7 @@ import io.circe.syntax._
 import sttp.model.Uri
 import org.http4s.circe._
 import org.http4s.client.Client
-import org.http4s.client.jdkhttpclient.JdkHttpClient
+import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.Method._
 import org.http4s.headers._
