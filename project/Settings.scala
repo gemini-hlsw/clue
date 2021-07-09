@@ -7,15 +7,15 @@ object Settings {
   object LibraryVersions {
     val cats            = "2.6.1"
     val catsEffect      = "3.1.1"
-    val circe           = "0.13.0"
+    val circe           = "0.14.1"
     val disciplineMUnit = "1.0.9"
     val fs2             = "3.0.6"
     val grackle         = "0.0.44"
-    val http4s          = "1.0.0-M21"
-    val http4sJDKClient = "0.5.0-M4"
+    val http4s          = "1.0.0-M23"
+    val http4sJDKClient = "0.6.0-M1"
     val jawn            = "1.1.1"
     val log4Cats        = "2.1.1"
-    val monocle         = "2.1.0"
+    val monocle         = "3.0.0"
     val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom      = "1.1.0"
     val sttpModel       = "1.4.7"
@@ -96,8 +96,8 @@ object Settings {
 
     val Monocle = Def.setting(
       Seq(
-        "com.github.julien-truffaut" %%% "monocle-core"  % monocle,
-        "com.github.julien-truffaut" %%% "monocle-macro" % monocle
+        "dev.optics" %%% "monocle-core"  % monocle,
+        "dev.optics" %%% "monocle-macro" % monocle
       )
     )
 

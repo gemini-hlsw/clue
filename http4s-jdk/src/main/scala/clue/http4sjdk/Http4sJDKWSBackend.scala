@@ -12,9 +12,8 @@ import clue.model.StreamingMessage
 import clue.model.json._
 import io.circe.syntax._
 import sttp.model.Uri
-import org.http4s.client.jdkhttpclient._
+import org.http4s.jdkhttpclient._
 import java.net.http.HttpClient
-import org.http4s.client.jdkhttpclient.JdkWSClient
 
 /**
  * Streaming backend for http4s-JDK WebSocket.
