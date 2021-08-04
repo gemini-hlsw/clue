@@ -421,7 +421,9 @@ class ApolloClient[F[_], S, CP, CE](
             connection match {
               case Left(t)  =>
                 reconnectionStrategy(attempt, t.asLeft) match {
-                  case None       => Disconnected(connectionId.next) -> latch.complete(t.asLeft).void
+                  case None       =>
+                    Disconnected(connectionId.next) ->
+                      (latch.complete(t.asLeft) >> F.raiseError(t)).void
                   case Some(wait) =>
                     Connecting(connectionId.next, latch) -> retry(t, wait, connectionId.next)
                 }
@@ -433,7 +435,9 @@ class ApolloClient[F[_], S, CP, CE](
                 reconnectionStrategy(attempt, t.asLeft) match {
                   case None       =>
                     Disconnected(connectionId.next) ->
-                      (latch.complete(t.asLeft) >> initLatch.complete(t.asLeft)).void
+                      (latch.complete(t.asLeft) >>
+                        initLatch.complete(t.asLeft) >>
+                        F.raiseError(t)).void
                   case Some(wait) =>
                     Reestablishing(connectionId.next,
                                    subscriptions,
