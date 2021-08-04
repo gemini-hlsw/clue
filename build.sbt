@@ -85,6 +85,18 @@ lazy val http4sJDK = project
   )
   .dependsOn(coreJVM)
 
+lazy val http4sJDKDemo = project
+  .in(file("http4s-jdk-demo"))
+  .settings(
+    moduleName := "clue-http4s-jdk-client-demo",
+    publish := false,
+    libraryDependencies ++= Seq(
+      "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
+      "org.slf4j"      % "slf4j-simple"   % "1.6.4"
+    )
+  )
+  .dependsOn(http4sJDK)
+
 lazy val genRules = project
   .in(file("gen/rules"))
   .settings(
