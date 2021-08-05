@@ -221,6 +221,36 @@ package object json {
             )
         }
 
+  implicit val EncoderGraphQLErrorLocation: Encoder[GraphQLError.Location] =
+    (a: GraphQLError.Location) =>
+      Json.obj(
+        "line"   -> a.line.asJson,
+        "column" -> a.column.asJson
+      )
+
+  implicit val DecoderGraphQLErrorLocation: Decoder[GraphQLError.Location] =
+    (c: HCursor) =>
+      for {
+        line   <- c.downField("line").as[Int]
+        column <- c.downField("column").as[Int]
+      } yield GraphQLError.Location(line, column)
+
+  implicit val EncoderGraphQLError: Encoder[GraphQLError] =
+    (a: GraphQLError) =>
+      Json.obj(
+        "message"   -> a.message.asJson,
+        "path"      -> a.path.asJson,
+        "locations" -> a.locations.asJson
+      )
+
+  implicit val DecoderGraphQLError: Decoder[GraphQLError] =
+    (c: HCursor) =>
+      for {
+        message   <- c.downField("message").as[String]
+        path      <- c.downField("path").as[List[String]]
+        locations <- c.downField("locations").as[List[GraphQLError.Location]]
+      } yield GraphQLError(message, path, locations)
+
   private def checkType(c: HCursor, expected: String): Decoder.Result[Unit] =
     c.downField("type")
       .as[String]

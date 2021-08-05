@@ -31,7 +31,7 @@ class TransactionalClientImpl[F[_]: MonadError[*[_], Throwable]: TransactionalBa
           val cursor = json.hcursor
           cursor
             .get[List[Json]]("errors")
-            .map(errors => new GraphQLException(errors.toString))
+            .map(errors => new ResponseException(errors))
             .swap
             .flatMap(_ => cursor.get[D]("data"))
         }
