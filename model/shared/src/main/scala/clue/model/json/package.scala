@@ -221,6 +221,55 @@ package object json {
             )
         }
 
+  implicit val EncoderGraphQLErrorPathElement: Encoder[GraphQLError.PathElement] =
+    (a: GraphQLError.PathElement) => a.fold(_.asJson, _.asJson)
+
+  implicit val DecoderGraphQLErrorPathElement: Decoder[GraphQLError.PathElement] =
+    (c: HCursor) =>
+      c.as[Int]
+        .map(GraphQLError.PathElement.int)
+        .orElse(c.as[String].map(GraphQLError.PathElement.string))
+        .orElse(DecodingFailure(s"Unexpected PathElement", c.history).asLeft)
+
+  implicit val EncoderGraphQLErrorLocation: Encoder[GraphQLError.Location] =
+    (a: GraphQLError.Location) =>
+      Json.obj(
+        "line"   -> a.line.asJson,
+        "column" -> a.column.asJson
+      )
+
+  implicit val DecoderGraphQLErrorLocation: Decoder[GraphQLError.Location] =
+    (c: HCursor) =>
+      for {
+        line   <- c.get[Int]("line")
+        column <- c.get[Int]("column")
+      } yield GraphQLError.Location(line, column)
+
+  private def optionalField[A: Encoder](name: String, a: A)(
+    predicate:                                A => Boolean
+  ): Option[(String, Json)] =
+    if (predicate(a)) (name, a.asJson).some else none
+
+  implicit val EncoderGraphQLError: Encoder[GraphQLError] =
+    (a: GraphQLError) =>
+      Json.fromFields(
+        List(
+          ("message" -> a.message.asJson).some,
+          optionalField[List[GraphQLError.PathElement]]("path", a.path)(_.nonEmpty),
+          optionalField[List[GraphQLError.Location]]("locations", a.locations)(_.nonEmpty),
+          optionalField[Map[String, String]]("extensions", a.extensions)(_.nonEmpty)
+        ).flattenOption
+      )
+
+  implicit val DecoderGraphQLError: Decoder[GraphQLError] =
+    (c: HCursor) =>
+      for {
+        message    <- c.get[String]("message")
+        path       <- c.getOrElse[List[GraphQLError.PathElement]]("path")(List.empty)
+        locations  <- c.getOrElse[List[GraphQLError.Location]]("locations")(List.empty)
+        extensions <- c.getOrElse[Map[String, String]]("extensions")(Map.empty)
+      } yield GraphQLError(message, path, locations, extensions)
+
   private def checkType(c: HCursor, expected: String): Decoder.Result[Unit] =
     c.downField("type")
       .as[String]

@@ -574,7 +574,7 @@ class ApolloClient[F[_], S, CP, CE](
     }
 
     def emitError(json: Json): F[Unit] = {
-      val error = new GraphQLException(json.toString)
+      val error = new ResponseException(json.asArray.fold(List(json))(_.toList))
       // TODO When an Error message is received, we terminate the stream and halt the subscription. Do we want that?
       queue.offer(error.asLeft)
     }
