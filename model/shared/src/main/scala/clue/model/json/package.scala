@@ -222,14 +222,14 @@ package object json {
         }
 
   implicit val EncoderGraphQLErrorPathElement: Encoder[GraphQLError.PathElement] =
-    (a: GraphQLError.PathElement) =>
-      a.fold(_.asJson, _.asJson)
+    (a: GraphQLError.PathElement) => a.fold(_.asJson, _.asJson)
 
   implicit val DecoderGraphQLErrorPathElement: Decoder[GraphQLError.PathElement] =
     (c: HCursor) =>
-      c.as[Int].map(GraphQLError.PathElement.int)
-       .orElse(c.as[String].map(GraphQLError.PathElement.string))
-       .orElse(DecodingFailure(s"Unexpected PathElement", c.history).asLeft)
+      c.as[Int]
+        .map(GraphQLError.PathElement.int)
+        .orElse(c.as[String].map(GraphQLError.PathElement.string))
+        .orElse(DecodingFailure(s"Unexpected PathElement", c.history).asLeft)
 
   implicit val EncoderGraphQLErrorLocation: Encoder[GraphQLError.Location] =
     (a: GraphQLError.Location) =>
@@ -245,7 +245,9 @@ package object json {
         column <- c.get[Int]("column")
       } yield GraphQLError.Location(line, column)
 
-  private def optionalField[A: Encoder](name: String, a: A)(predicate: A => Boolean): Option[(String, Json)] =
+  private def optionalField[A: Encoder](name: String, a: A)(
+    predicate:                                A => Boolean
+  ): Option[(String, Json)] =
     if (predicate(a)) (name, a.asJson).some else none
 
   implicit val EncoderGraphQLError: Encoder[GraphQLError] =

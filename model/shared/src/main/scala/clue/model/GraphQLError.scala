@@ -53,7 +53,6 @@ object GraphQLError {
   final case class StringPathElement(element: String) extends PathElement
   final case class IntPathElement(element: Int) extends PathElement
 
-
   final case class Location(line: Int, column: Int)
 
   object Location {
