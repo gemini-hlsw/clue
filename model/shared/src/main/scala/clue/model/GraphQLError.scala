@@ -18,17 +18,21 @@ object GraphQLError {
 
   object Location {
     implicit val EqLocation: Eq[Location] =
-      Eq.by { a => (
-        a.line,
-        a.column
-      )}
+      Eq.by { a =>
+        (
+          a.line,
+          a.column
+        )
+      }
   }
 
   implicit val EqGraphQLError: Eq[GraphQLError] =
-    Eq.by { a => (
-      a.message,
-      a.path,
-      a.locations
-    )}
+    Eq.by { a =>
+      (
+        a.message,
+        a.path,
+        a.locations
+      )
+    }
 
 }

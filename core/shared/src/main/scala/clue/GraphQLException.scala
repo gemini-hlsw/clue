@@ -6,7 +6,7 @@ package clue
 import cats.syntax.traverse._
 import clue.model.GraphQLError
 import clue.model.json.DecoderGraphQLError
-import io.circe.{Decoder, Json}
+import io.circe.{ Decoder, Json }
 
 class GraphQLException(msg: String) extends Exception(msg)
 
@@ -15,10 +15,10 @@ class ConnectionException() extends GraphQLException("Could not establish connec
 class DisconnectedException() extends GraphQLException("Connection was closed")
 
 class InvalidSubscriptionIdException(id: String)
-  extends GraphQLException(s"Invalid subscription id: $id")
+    extends GraphQLException(s"Invalid subscription id: $id")
 
 class ResponseException(errors: List[Json])
-  extends GraphQLException(errors.map(_.spaces2).mkString(",")) {
+    extends GraphQLException(errors.map(_.spaces2).mkString(",")) {
 
   /**
    * Decodes and returns the errors as `GraphQLError` if possible.
@@ -27,5 +27,3 @@ class ResponseException(errors: List[Json])
     errors.traverse(Decoder[GraphQLError].decodeJson).getOrElse(List.empty)
 
 }
-
-

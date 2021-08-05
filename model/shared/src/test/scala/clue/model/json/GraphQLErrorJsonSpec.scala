@@ -15,6 +15,6 @@ final class GraphQLErrorJsonSpec extends DisciplineSuite {
   import ArbGraphQLError._
 
   checkAll("GraphQLError.Location", CodecTests[GraphQLError.Location].codec)
-  checkAll("GraphQLError",          CodecTests[GraphQLError].codec)
+  checkAll("GraphQLError", CodecTests[GraphQLError].codec)
 
 }
