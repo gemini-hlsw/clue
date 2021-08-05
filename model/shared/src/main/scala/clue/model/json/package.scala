@@ -241,25 +241,32 @@ package object json {
   implicit val DecoderGraphQLErrorLocation: Decoder[GraphQLError.Location] =
     (c: HCursor) =>
       for {
-        line   <- c.downField("line").as[Int]
-        column <- c.downField("column").as[Int]
+        line   <- c.get[Int]("line")
+        column <- c.get[Int]("column")
       } yield GraphQLError.Location(line, column)
+
+  private def optionalField[A: Encoder](name: String, a: A)(predicate: A => Boolean): Option[(String, Json)] =
+    if (predicate(a)) (name, a.asJson).some else none
 
   implicit val EncoderGraphQLError: Encoder[GraphQLError] =
     (a: GraphQLError) =>
-      Json.obj(
-        "message"   -> a.message.asJson,
-        "path"      -> a.path.asJson,
-        "locations" -> a.locations.asJson
+      Json.fromFields(
+        List(
+          ("message" -> a.message.asJson).some,
+          optionalField[List[GraphQLError.PathElement]]("path", a.path)(_.nonEmpty),
+          optionalField[List[GraphQLError.Location]]("locations", a.locations)(_.nonEmpty),
+          optionalField[Map[String, String]]("extensions", a.extensions)(_.nonEmpty)
+        ).flattenOption
       )
 
   implicit val DecoderGraphQLError: Decoder[GraphQLError] =
     (c: HCursor) =>
       for {
-        message   <- c.downField("message").as[String]
-        path      <- c.downField("path").as[List[GraphQLError.PathElement]]
-        locations <- c.downField("locations").as[List[GraphQLError.Location]]
-      } yield GraphQLError(message, path, locations)
+        message    <- c.get[String]("message")
+        path       <- c.getOrElse[List[GraphQLError.PathElement]]("path")(List.empty)
+        locations  <- c.getOrElse[List[GraphQLError.Location]]("locations")(List.empty)
+        extensions <- c.getOrElse[Map[String, String]]("extensions")(Map.empty)
+      } yield GraphQLError(message, path, locations, extensions)
 
   private def checkType(c: HCursor, expected: String): Decoder.Result[Unit] =
     c.downField("type")

@@ -30,10 +30,11 @@ trait ArbGraphQLError {
   implicit val arbGraphQLError: Arbitrary[GraphQLError] =
     Arbitrary {
       for {
-        message   <- arbitrary[String]
-        path      <- arbitrary[List[PathElement]]
-        locations <- arbitrary[List[Location]]
-      } yield GraphQLError(message, path, locations)
+        message    <- arbitrary[String]
+        path       <- arbitrary[List[PathElement]]
+        locations  <- arbitrary[List[Location]]
+        extensions <- arbitrary[Map[String, String]]
+      } yield GraphQLError(message, path, locations, extensions)
     }
 
 }

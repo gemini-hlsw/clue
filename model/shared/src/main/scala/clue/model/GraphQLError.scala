@@ -9,9 +9,10 @@ import cats.syntax.eq._
 import clue.model.GraphQLError.{ Location, PathElement }
 
 final case class GraphQLError(
-  message:   String,
-  path:      List[PathElement],
-  locations: List[Location]
+  message:    String,
+  path:       List[PathElement],
+  locations:  List[Location],
+  extensions: Map[String, String]
 )
 
 object GraphQLError {
@@ -70,7 +71,8 @@ object GraphQLError {
       (
         a.message,
         a.path,
-        a.locations
+        a.locations,
+        a.extensions
       )
     }
 
