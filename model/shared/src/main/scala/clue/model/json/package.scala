@@ -221,6 +221,16 @@ package object json {
             )
         }
 
+  implicit val EncoderGraphQLErrorPathElement: Encoder[GraphQLError.PathElement] =
+    (a: GraphQLError.PathElement) =>
+      a.fold(_.asJson, _.asJson)
+
+  implicit val DecoderGraphQLErrorPathElement: Decoder[GraphQLError.PathElement] =
+    (c: HCursor) =>
+      c.as[Int].map(GraphQLError.PathElement.int)
+       .orElse(c.as[String].map(GraphQLError.PathElement.string))
+       .orElse(DecodingFailure(s"Unexpected PathElement", c.history).asLeft)
+
   implicit val EncoderGraphQLErrorLocation: Encoder[GraphQLError.Location] =
     (a: GraphQLError.Location) =>
       Json.obj(
@@ -247,7 +257,7 @@ package object json {
     (c: HCursor) =>
       for {
         message   <- c.downField("message").as[String]
-        path      <- c.downField("path").as[List[String]]
+        path      <- c.downField("path").as[List[GraphQLError.PathElement]]
         locations <- c.downField("locations").as[List[GraphQLError.Location]]
       } yield GraphQLError(message, path, locations)
 

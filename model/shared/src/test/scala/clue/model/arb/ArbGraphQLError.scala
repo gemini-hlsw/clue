@@ -9,7 +9,15 @@ import org.scalacheck.Arbitrary._
 
 trait ArbGraphQLError {
 
-  import GraphQLError.Location
+  import GraphQLError.{ Location, PathElement }
+
+  implicit val arbPathElement: Arbitrary[PathElement] =
+    Arbitrary {
+      Gen.oneOf(
+        arbitrary[Int].map(PathElement.int),
+        arbitrary[String].map(PathElement.string)
+      )
+    }
 
   implicit val arbGraphQLErrorLocation: Arbitrary[Location] =
     Arbitrary {
@@ -23,7 +31,7 @@ trait ArbGraphQLError {
     Arbitrary {
       for {
         message   <- arbitrary[String]
-        path      <- arbitrary[List[String]]
+        path      <- arbitrary[List[PathElement]]
         locations <- arbitrary[List[Location]]
       } yield GraphQLError(message, path, locations)
     }

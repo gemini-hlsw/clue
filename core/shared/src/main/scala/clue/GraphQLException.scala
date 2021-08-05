@@ -21,9 +21,12 @@ class ResponseException(errors: List[Json])
     extends GraphQLException(errors.map(_.spaces2).mkString(",")) {
 
   /**
-   * Decodes and returns the errors as `GraphQLError` if possible.
+   * Decodes and returns the errors as a list of `GraphQLError` if possible.
+   *
+   * @return None if there is a problem parsing the JSON as an array of
+   *         GraphQLError, Some(List[GraphQLError]) if successful
    */
-  def asGraphQLErrors: List[GraphQLError] =
-    errors.traverse(Decoder[GraphQLError].decodeJson).getOrElse(List.empty)
+  def asGraphQLErrors: Option[List[GraphQLError]] =
+    errors.traverse(Decoder[GraphQLError].decodeJson).toOption
 
 }
