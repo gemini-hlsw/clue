@@ -1,50 +1,86 @@
 package clue.`http4sjdk-demo`
 
-import cats.effect.IOApp
+import cats.Applicative
+import cats.effect.Async
 import cats.effect.IO
-import clue.http4sjdk.Http4sJDKWSBackend
+import cats.effect.IOApp
+import cats.effect.Resource
+import cats.effect.Sync
+import cats.syntax.all._
 import clue.ApolloWebSocketClient
 import clue.GraphQLOperation
-import io.circe.Encoder
+import clue.PersistentStreamingClient
+import clue.http4sjdk.Http4sJDKWSBackend
 import io.circe.Decoder
+import io.circe.Encoder
 import io.circe.Json
+import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import sttp.model.Uri
 
+import scala.concurrent.duration._
+
 object Demo extends IOApp.Simple {
+
+  object Query extends GraphQLOperation[Nothing] {
+    type Data      = Json
+    type Variables = Json
+
+    override val document: String = """
+    |query {
+    |  observations(programId: "p-2") {
+    |    nodes {
+    |      id
+    |      name
+    |    }
+    |  }
+    |}""".stripMargin
+
+    override val varEncoder: Encoder[Variables] = Encoder[Json]
+
+    override val dataDecoder: Decoder[Data] = Decoder[Json]
+  }
+
+  object Subscription extends GraphQLOperation[Nothing] {
+    type Data      = Json
+    type Variables = Json
+
+    override val document: String = """
+    |subscription {
+    |  observationEdit(programId:"p-2") {
+    |    id
+    |  }
+    |}""".stripMargin
+
+    override val varEncoder: Encoder[Variables] = Encoder[Json]
+
+    override val dataDecoder: Decoder[Data] = Decoder[Json]
+  }
+
+  def withLogger[F[_]: Sync]: Resource[F, Logger[F]] =
+    Resource.make(Slf4jLogger.create[F])(_ => Applicative[F].unit)
+
+  def withStreamingClient[F[_]: Async: Logger]
+    : Resource[F, PersistentStreamingClient[F, Nothing, _, _]] =
+    for {
+      backend <- Http4sJDKWSBackend[F]
+      uri      = Uri.parse("wss://lucuma-odb-development.herokuapp.com/ws").getOrElse(???)
+      sc      <- Resource.eval(ApolloWebSocketClient.of(uri)(Async[F], Logger[F], backend))
+      _       <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
+    } yield sc
+
   def run =
-    Slf4jLogger.create[IO].flatMap { implicit logger =>
-      Http4sJDKWSBackend[IO].use { implicit backend =>
-        ApolloWebSocketClient
-          .of[IO, Unit](
-            Uri.parse("wss://lucuma-odb-development.herokuapp.com/ws").getOrElse(???)
-          )
-          .flatMap { implicit client =>
-            client.connect() >>
-              client.initialize() >>
-              client
-                .request(new GraphQLOperation[Unit] {
-                  type Data      = Json
-                  type Variables = Json
-
-                  override val document: String = """
-                  |query {
-                  |  observations(programId: "p-2") {
-                  |    nodes {
-                  |      id
-                  |      name
-                  |    }
-                  |  }
-                  |}""".stripMargin
-
-                  override val varEncoder: Encoder[Variables] = Encoder[Json]
-
-                  override val dataDecoder: Decoder[Data] = Decoder[Json]
-
-                })
-                .flatMap(IO.println) >> client.terminate() >> client.disconnect()
-          }
-          .onError(t => IO(t.printStackTrace()))
+    withLogger[IO].use { implicit logger =>
+      withStreamingClient[IO].use { implicit client =>
+        for {
+          result       <- client.request(Query)
+          _            <- IO.println(result)
+          subscription <- client.subscribe(Subscription)
+          fiber        <- subscription.stream.evalMap(IO.println).compile.drain.start
+          _            <- IO.sleep(10.seconds)
+          _            <- subscription.stop()
+          _            <- fiber.join
+        } yield ()
       }
     }
 }
