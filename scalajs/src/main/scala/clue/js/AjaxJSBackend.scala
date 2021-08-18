@@ -3,17 +3,17 @@
 
 package clue.js
 
-import scala.concurrent.ExecutionContext.Implicits._
-import scala.util.Failure
-import scala.util.Success
-
 import cats.effect._
 import clue._
 import clue.model.GraphQLRequest
 import clue.model.json._
 import io.circe.syntax._
+import org.http4s.Uri
 import org.scalajs.dom.ext.Ajax
-import sttp.model.Uri
+
+import scala.concurrent.ExecutionContext.Implicits._
+import scala.util.Failure
+import scala.util.Success
 
 final class AjaxJSBackend[F[_]: Async] extends TransactionalBackend[F] {
   def request(

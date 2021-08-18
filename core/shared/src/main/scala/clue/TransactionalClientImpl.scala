@@ -6,10 +6,10 @@ package clue
 import cats.MonadError
 import cats.syntax.all._
 import clue.model.GraphQLRequest
-import org.typelevel.log4cats.Logger
 import io.circe._
 import io.circe.parser._
-import sttp.model.Uri
+import org.http4s.Uri
+import org.typelevel.log4cats.Logger
 
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
 // {

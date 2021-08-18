@@ -3,21 +3,21 @@
 
 package clue.js
 
-import cats.syntax.all._
+import cats.effect.Ref
 import cats.effect._
 import cats.effect.implicits._
+import cats.effect.std.Dispatcher
+import cats.syntax.all._
 import clue._
 import clue.model.StreamingMessage
 import clue.model.json._
-import org.typelevel.log4cats.Logger
 import io.circe.syntax._
+import org.http4s.Uri
 import org.scalajs.dom.raw.CloseEvent
 import org.scalajs.dom.raw.Event
 import org.scalajs.dom.raw.MessageEvent
 import org.scalajs.dom.raw.WebSocket
-import sttp.model.Uri
-import cats.effect.Ref
-import cats.effect.std.Dispatcher
+import org.typelevel.log4cats.Logger
 
 /**
  * Streaming backend for JS WebSocket.

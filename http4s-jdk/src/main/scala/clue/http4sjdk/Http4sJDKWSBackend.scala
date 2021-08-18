@@ -3,19 +3,19 @@
 
 package clue.http4sjdk
 
-import cats.syntax.all._
+import cats.effect.Resource.ExitCase
 import cats.effect._
 import cats.effect.implicits._
-import cats.effect.Resource.ExitCase
+import cats.syntax.all._
 import clue._
 import clue.model.StreamingMessage
 import clue.model.json._
 import io.circe.syntax._
-import org.http4s.jdkhttpclient._
 import org.http4s.Header
 import org.http4s.Headers
+import org.http4s.Uri
+import org.http4s.jdkhttpclient._
 import org.typelevel.ci._
-import sttp.model.Uri
 
 import java.net.http.HttpClient
 
@@ -31,9 +31,7 @@ final class Http4sJDKWSBackend[F[_]: Async](client: WSClient[F]) extends WebSock
   ): F[PersistentConnection[F, WebSocketCloseParams]] =
     client
       .connectHighLevel(
-        WSRequest(sttpUriToHttp4sUri(uri),
-                  headers = Headers(Header.Raw(ci"Sec-WebSocket-Protocol", "graphql-ws"))
-        )
+        WSRequest(uri, headers = Headers(Header.Raw(ci"Sec-WebSocket-Protocol", "graphql-ws")))
       )
       .allocated
       .flatMap { case (connection, release) =>

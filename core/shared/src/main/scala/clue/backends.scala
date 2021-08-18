@@ -6,7 +6,7 @@ package clue
 import cats.syntax.all._
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
-import sttp.model.Uri
+import org.http4s.Uri
 
 /*
  * One-shot backend.
