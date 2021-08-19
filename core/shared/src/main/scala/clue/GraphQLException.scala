@@ -23,8 +23,9 @@ class ResponseException(errors: List[Json])
   /**
    * Decodes and returns the errors as a list of `GraphQLError` if possible.
    *
-   * @return None if there is a problem parsing the JSON as an array of
-   *         GraphQLError, Some(List[GraphQLError]) if successful
+   * @return
+   *   None if there is a problem parsing the JSON as an array of GraphQLError,
+   *   Some(List[GraphQLError]) if successful
    */
   def asGraphQLErrors: Option[List[GraphQLError]] =
     errors.traverse(Decoder[GraphQLError].decodeJson).toOption

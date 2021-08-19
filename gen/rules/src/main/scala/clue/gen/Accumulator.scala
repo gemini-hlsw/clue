@@ -6,9 +6,11 @@ package clue.gen
 import cats._
 
 /**
- *  Holds the aggregated `CaseClass`es, their `ClassParam`s and possible `Sum` info as we recurse the query AST.
+ * Holds the aggregated `CaseClass`es, their `ClassParam`s and possible `Sum` info as we recurse the
+ * query AST.
  *
- * `parAccum` accumulates parameters until we have a whole case class definition, then moves it to an element of `classes`.
+ * `parAccum` accumulates parameters until we have a whole case class definition, then moves it to
+ * an element of `classes`.
  */
 case class Accumulator[C, CP, S](
   classes:  List[C] = List.empty,
