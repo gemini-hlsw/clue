@@ -17,7 +17,7 @@ object Settings {
     val log4Cats        = "2.1.1"
     val monocle         = "3.0.0"
     val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
-    val scalaJSDom      = "1.1.0"
+    val scalaJSDom      = "1.2.0"
   }
 
   object Libraries {
