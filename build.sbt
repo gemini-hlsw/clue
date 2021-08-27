@@ -2,7 +2,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 inThisBuild(
   List(
-    homepage := Some(url("https://github.com/gemini-hlsw/clue")),
+    homepage                      := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
     testFrameworks += new TestFramework("munit.Framework")
   ) ++ lucumaPublishSettings
@@ -22,9 +22,9 @@ lazy val root = project
              genTests
   )
   .settings(
-    name := "clue",
-    publish := {},
-    publishLocal := {},
+    name              := "clue",
+    publish           := {},
+    publishLocal      := {},
     packagedArtifacts := Map.empty
   )
 
@@ -49,7 +49,7 @@ lazy val modelJVM = model.jvm
 lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("core"))
   .settings(
-    moduleName := "clue-core",
+    moduleName                         := "clue-core",
     libraryDependencies ++=
       Settings.Libraries.Cats.value ++
         Settings.Libraries.CatsEffect.value ++
@@ -89,7 +89,7 @@ lazy val http4sJDKDemo = project
   .in(file("http4s-jdk-demo"))
   .settings(
     moduleName := "clue-http4s-jdk-client-demo",
-    publish := false,
+    publish    := false,
     libraryDependencies ++= Seq(
       "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
       "org.slf4j"      % "slf4j-simple"   % "1.6.4"
@@ -134,16 +134,16 @@ lazy val genOutput = project
 lazy val genTests = project
   .in(file("gen/tests"))
   .settings(
-    publish / skip := true,
+    publish / skip                         := true,
     libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value,
     scalafixTestkitOutputSourceDirectories :=
       (genOutput / Compile / sourceDirectories).value,
-    scalafixTestkitInputSourceDirectories :=
+    scalafixTestkitInputSourceDirectories  :=
       (genInput / Compile / sourceDirectories).value,
-    scalafixTestkitInputClasspath :=
+    scalafixTestkitInputClasspath          :=
       (genInput / Compile / fullClasspath).value :+
         Attributed.blank((genInput / Compile / semanticdbTargetRoot).value),
-    Compile / compile :=
+    Compile / compile                      :=
       (Compile / compile)
         .dependsOn(genInput / Compile / compile)
         .value

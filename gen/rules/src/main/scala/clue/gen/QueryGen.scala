@@ -6,7 +6,7 @@ package clue.gen
 import cats.syntax.all._
 import cats.effect.unsafe.implicits.global
 import scala.meta._
-import edu.gemini.grackle.{ Type => GType, Term => _, _ }
+import edu.gemini.grackle.{ Term => _, Type => GType, _ }
 import edu.gemini.grackle.UntypedOperation._
 
 trait QueryGen extends Generator {
@@ -151,7 +151,7 @@ trait QueryGen extends Generator {
   }
 
   /**
-   * Recurse the query AST and collect the necessary [[CaseClass]]es to hold its results.
+   * Recurse the query AST and collect the necessary [[CaseClass]] es to hold its results.
    */
   protected def resolveData(
     schema:   Schema,
@@ -222,7 +222,7 @@ trait QueryGen extends Generator {
                 _._1 match {
                   case UntypedNarrow(typeName, _) =>
                     typeName.some // Selection in inline fragment, group by discriminator.some
-                  case _                          =>
+                  case _ =>
                     none // Selection in base group, group by none
                 }
               }
@@ -236,7 +236,7 @@ trait QueryGen extends Generator {
                    }
                   )
                 case (None, subQueries)           =>
-                  (none, (subQueries.map { case (q, idx) => (go(q, currentType), idx) }))
+                  (none, subQueries.map { case (q, idx) => (go(q, currentType), idx) })
               }
 
           val baseAccumulators    = hierarchyAccumulators.collectFirst { case (None, accumulators) =>
@@ -347,7 +347,7 @@ trait QueryGen extends Generator {
       }
 
   private def isTermDefined(termName: String): List[Stat] => Boolean =
-    parentBody => {
+    parentBody =>
       parentBody.exists {
         // We are not checking in pattern assignments
         // case q"$_ val $tname: $_ = $_" => tname == tpe
@@ -356,7 +356,6 @@ trait QueryGen extends Generator {
         case Defn.Var(_, List(Pat.Var(Term.Name(name))), _, _) => name == termName
         case _                                                 => false
       }
-    }
 
   private def addValDef(
     valName: String,
