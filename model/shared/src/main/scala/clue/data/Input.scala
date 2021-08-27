@@ -3,20 +3,21 @@
 
 package clue.data
 
-import cats.syntax.all._
-import cats.Eq
 import cats.Align
 import cats.Applicative
+import cats.Eq
 import cats.Eval
 import cats.Functor
-import cats.Traverse
-import cats.data.Ior
-import scala.annotation.tailrec
 import cats.Monad
 import cats.Show
+import cats.Traverse
+import cats.data.Ior
+import cats.syntax.all._
+import clue.data.syntax._
 import io.circe._
 import io.circe.syntax._
-import clue.data.syntax._
+
+import scala.annotation.tailrec
 
 sealed trait Input[+A] {
   def map[B](f: A => B): Input[B] =

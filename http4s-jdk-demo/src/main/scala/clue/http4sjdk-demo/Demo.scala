@@ -14,9 +14,9 @@ import clue.http4sjdk.Http4sJDKWSBackend
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
+import org.http4s.implicits._
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import sttp.model.Uri
 
 import scala.concurrent.duration._
 
@@ -64,7 +64,7 @@ object Demo extends IOApp.Simple {
     : Resource[F, PersistentStreamingClient[F, Nothing, _, _]] =
     for {
       backend <- Http4sJDKWSBackend[F]
-      uri      = Uri.parse("wss://lucuma-odb-development.herokuapp.com/ws").getOrElse(???)
+      uri      = uri"wss://lucuma-odb-development.herokuapp.com/ws"
       sc      <- Resource.eval(ApolloWebSocketClient.of(uri)(Async[F], Logger[F], backend))
       _       <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
     } yield sc

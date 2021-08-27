@@ -6,7 +6,8 @@ package clue.model
 import cats.Eq
 import cats.syntax.either._
 import cats.syntax.eq._
-import clue.model.GraphQLError.{ Location, PathElement }
+import clue.model.GraphQLError.Location
+import clue.model.GraphQLError.PathElement
 
 final case class GraphQLError(
   message:    String,

@@ -3,25 +3,25 @@
 
 package clue
 
+import cats.effect.Ref
+import cats.effect.Temporal
 import cats.effect._
 import cats.effect.implicits._
-import sttp.model.Uri
-import clue.GraphQLSubscription
-import io.circe._
-import io.circe.parser._
-
-import cats.syntax.all._
-import java.util.UUID
-import org.typelevel.log4cats.Logger
 import cats.effect.std.Queue
-import cats.effect.{ Ref, Temporal }
+import cats.syntax.all._
+import clue.GraphQLSubscription
+import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
 import clue.model.json._
-import scala.concurrent.duration.FiniteDuration
-import clue.model.GraphQLRequest
-
 import fs2.Stream
 import fs2.concurrent.SignallingRef
+import io.circe._
+import io.circe.parser._
+import org.http4s.Uri
+import org.typelevel.log4cats.Logger
+
+import java.util.UUID
+import scala.concurrent.duration.FiniteDuration
 
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {

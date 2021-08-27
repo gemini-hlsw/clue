@@ -3,13 +3,13 @@
 
 package clue
 
+import cats.Applicative
+import cats.MonadError
 import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
+import org.http4s.Uri
 import org.typelevel.log4cats.Logger
-import sttp.model.Uri
-import cats.MonadError
-import cats.Applicative
 
 /**
  * A client that allows one-shot queries and mutations.
