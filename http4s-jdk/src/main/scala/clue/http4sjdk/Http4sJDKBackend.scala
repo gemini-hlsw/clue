@@ -8,14 +8,15 @@ import clue._
 import clue.model.GraphQLRequest
 import clue.model.json._
 import io.circe.syntax._
-import sttp.model.Uri
+import org.http4s.MediaType
+import org.http4s.Method._
+import org.http4s.Uri
 import org.http4s.circe._
 import org.http4s.client.Client
-import org.http4s.jdkhttpclient.JdkHttpClient
 import org.http4s.client.dsl.Http4sClientDsl
-import org.http4s.Method._
 import org.http4s.headers._
-import org.http4s.MediaType
+import org.http4s.jdkhttpclient.JdkHttpClient
+
 import java.net.http.HttpClient
 
 final class Http4sJDKBackend[F[_]: Async](val client: Client[F]) extends TransactionalBackend[F] {
@@ -28,9 +29,7 @@ final class Http4sJDKBackend[F[_]: Async](val client: Client[F]) extends Transac
     request: GraphQLRequest
   ): F[String] =
     client.expect[String](
-      POST(request.asJson, sttpUriToHttp4sUri(uri)).withContentType(
-        `Content-Type`(MediaType.application.json)
-      )
+      POST(request.asJson, uri).withContentType(`Content-Type`(MediaType.application.json))
     )
 }
 

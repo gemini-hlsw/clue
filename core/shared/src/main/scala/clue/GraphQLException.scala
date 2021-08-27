@@ -6,7 +6,8 @@ package clue
 import cats.syntax.traverse._
 import clue.model.GraphQLError
 import clue.model.json.DecoderGraphQLError
-import io.circe.{ Decoder, Json }
+import io.circe.Decoder
+import io.circe.Json
 
 class GraphQLException(msg: String) extends Exception(msg)
 

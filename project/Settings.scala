@@ -17,8 +17,7 @@ object Settings {
     val log4Cats        = "2.1.1"
     val monocle         = "3.0.0"
     val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
-    val scalaJSDom      = "1.2.0"
-    val sttpModel       = "1.4.10"
+    val scalaJSDom      = "1.1.0"
   }
 
   object Libraries {
@@ -119,9 +118,9 @@ object Settings {
       ).map(_.cross(CrossVersion.full))
     )
 
-    val SttpModel = Def.setting(
+    val Http4sCore = Def.setting(
       Seq(
-        "com.softwaremill.sttp.model" %%% "core" % sttpModel
+        "org.http4s" %%% "http4s-core" % http4s
       )
     )
   }

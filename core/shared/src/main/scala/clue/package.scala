@@ -2,12 +2,13 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 import cats.Eq
-import cats.syntax.all._
-import org.typelevel.log4cats.Logger
-import scala.concurrent.duration.FiniteDuration
 import cats.MonadError
 import cats.effect.Concurrent
 import cats.effect.Deferred
+import cats.syntax.all._
+import org.typelevel.log4cats.Logger
+
+import scala.concurrent.duration.FiniteDuration
 
 package object clue {
   type CloseReason[CE]               = Either[Throwable, CE]
