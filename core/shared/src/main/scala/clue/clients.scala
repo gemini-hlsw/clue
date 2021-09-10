@@ -131,8 +131,8 @@ trait PersistentClient[F[_], CP, CE] {
 }
 
 /**
- * A client that keeps a connection open and initializable protocol with the server,
- * and allows GraphQL queries, mutations and subscriptions.
+ * A client that keeps a connection open and initializable protocol with the server, and allows
+ * GraphQL queries, mutations and subscriptions.
  */
 trait PersistentStreamingClient[F[_], S, CP, CE]
     extends StreamingClient[F, S]
