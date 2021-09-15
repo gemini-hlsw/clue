@@ -38,7 +38,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
         Async[F].async_[PersistentConnection[F, WebSocketCloseParams]] { cb =>
           val ws = new WebSocket(uri.toString, Protocol)
 
-          ws.onopen = { _: Event =>
+          ws.onopen = { (_: Event) =>
             val open: F[Unit] = (
               for {
                 _ <- isOpen.set(true)
@@ -50,7 +50,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
 
           // TODO PROCESS ERRORS/INTERRUPTIONS ON CALLBACKS !
 
-          ws.onmessage = { e: MessageEvent =>
+          ws.onmessage = { (e: MessageEvent) =>
             val message: F[Unit] = e.data match {
               case str: String => handler.onMessage(connectionId, str)
               case other       => s"Unexpected event from WebSocket for [$uri]: [$other]".errorF
@@ -60,7 +60,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
 
           // According to spec, onError is only closed prior to a close.
           // https://html.spec.whatwg.org/multipage/web-sockets.html
-          ws.onerror = { _: Event =>
+          ws.onerror = { (_: Event) =>
             val error: F[Unit] = (
               for {
                 _    <- s"Error on WebSocket for [$uri]".errorF
@@ -71,7 +71,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
             dispatcher.unsafeRunAndForget(error)
           }
 
-          ws.onclose = { e: CloseEvent =>
+          ws.onclose = { (e: CloseEvent) =>
             val close: F[Unit] =
               for {
                 _       <- s"WebSocket closed for URI [$uri]".traceF

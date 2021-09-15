@@ -10,14 +10,14 @@ object Settings {
     val circe           = "0.14.1"
     val disciplineMUnit = "1.0.9"
     val fs2             = "3.1.2"
-    val grackle         = "0.0.44"
+    val grackle         = "0.1.9"
     val http4s          = "1.0.0-M24"
     val http4sJDKClient = "0.6.0-M2"
     val jawn            = "1.1.1"
     val log4Cats        = "2.1.1"
     val monocle         = "3.0.0"
     val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
-    val scalaJSDom      = "1.1.0"
+    val scalaJSDom      = "1.2.0"
   }
 
   object Libraries {
@@ -45,7 +45,6 @@ object Settings {
       Seq(
         "io.circe" %%% "circe-core",
         "io.circe" %%% "circe-generic",
-        "io.circe" %%% "circe-generic-extras",
         "io.circe" %%% "circe-parser",
         "io.circe" %%% "circe-testing"
       ).map(_ % circe)
@@ -102,7 +101,7 @@ object Settings {
 
     val ScalaJSDom = Def.setting(
       Seq(
-        "org.scala-js" %%% "scalajs-dom" % scalaJSDom
+        ("org.scala-js" %%% "scalajs-dom" % scalaJSDom).cross(CrossVersion.for3Use2_13)
       )
     )
 

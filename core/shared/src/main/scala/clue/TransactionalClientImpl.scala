@@ -16,7 +16,7 @@ import org.typelevel.log4cats.Logger
 //   "data": { ... }, // Typed
 //   "errors": [ ... ]
 // }
-class TransactionalClientImpl[F[_]: MonadError[*[_], Throwable]: TransactionalBackend: Logger, S](
+class TransactionalClientImpl[F[_]: MonadThrowable: TransactionalBackend: Logger, S](
   uri: Uri
 ) extends clue.TransactionalClient[F, S] {
   override protected def requestInternal[D: Decoder](

@@ -85,7 +85,7 @@ object StreamingMessage {
     /**
      * Informs the server that the client wishes to terminate the connection.
      */
-    final case object ConnectionTerminate extends FromClient
+    case object ConnectionTerminate extends FromClient
 
     implicit val EqFromClient: Eq[FromClient] =
       Eq.instance {
@@ -107,7 +107,7 @@ object StreamingMessage {
     /**
      * A server acknowledgement and acceptance of a `ConnectionInit` request.
      */
-    final case object ConnectionAck extends FromServer
+    case object ConnectionAck extends FromServer
 
     /**
      * A server rejection of a `ConnectionInit` request.
@@ -126,7 +126,7 @@ object StreamingMessage {
     /**
      * Server initiated message that keeps the client connection alive.
      */
-    final case object ConnectionKeepAlive extends FromServer
+    case object ConnectionKeepAlive extends FromServer
 
     final case class DataWrapper(data: Json, errors: Option[Json])
 
@@ -157,7 +157,7 @@ object StreamingMessage {
         Eq.by(a => (a.id, a.payload))
     }
 
-    final object DataJson {
+    object DataJson {
       def unapply(data: Data): Option[(String, Json, Option[Json])] = Some(
         (data.id, data.payload.data, data.payload.errors)
       )
