@@ -18,22 +18,26 @@ import io.circe.testing.CodecTests
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import io.circe.testing.instances._
-import io.circe.generic.extras.semiauto._
-import io.circe.generic.extras.Configuration
+import io.circe.generic.semiauto._
 
 case class SomeInput(value: Input[Int] = Ignore)
 object SomeInput {
-  implicit val customConfig: Configuration = Configuration.default.withDefaults
-
-  implicit val someInputDecoder: Decoder[SomeInput] =
-    deriveConfiguredDecoder[SomeInput]
   implicit val someInputEncoder: Encoder[SomeInput] =
-    deriveConfiguredEncoder[SomeInput].mapJson(_.deepDropIgnore)
-  implicit val someInputArb: Arbitrary[SomeInput]   =
+    deriveEncoder[SomeInput].mapJson(_.deepDropIgnore)
+
+  implicit val someInputDecoder: Decoder[SomeInput] = Decoder.instance[SomeInput](
+    _.downField("value").success
+      .fold(SomeInput().asRight[DecodingFailure])(
+        _.as[Option[Int]].map(_.fold(SomeInput(Unassign))(v => SomeInput(Assign(v))))
+      )
+  )
+
+  implicit val someInputArb: Arbitrary[SomeInput] =
     Arbitrary(
       arbitrary[Input[Int]].map(SomeInput.apply)
     )
-  implicit val someInputEq: Eq[SomeInput]           = Eq.fromUniversalEquals
+
+  implicit val someInputEq: Eq[SomeInput] = Eq.fromUniversalEquals
 }
 
 class InputSpec extends DisciplineSuite {

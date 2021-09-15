@@ -3,7 +3,6 @@
 
 package clue
 
-import cats.MonadError
 import cats.syntax.all._
 import clue.model.GraphQLRequest
 import io.circe._

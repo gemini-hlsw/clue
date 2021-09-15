@@ -107,7 +107,7 @@ object Settings {
 
     val ScalaFix = Def.setting(
       Seq(
-        "ch.epfl.scala" %%% "scalafix-core" % scalaFix
+        ("ch.epfl.scala" %%% "scalafix-core" % scalaFix) //.cross(CrossVersion.for3Use2_13)
       )
     )
 

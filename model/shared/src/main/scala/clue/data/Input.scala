@@ -18,7 +18,6 @@ import io.circe._
 import io.circe.syntax._
 
 import scala.annotation.tailrec
-import scala.annotation.unchecked.uncheckedVariance
 
 sealed trait Input[+A] {
   def map[B](f: A => B): Input[B] =
@@ -86,7 +85,7 @@ object Input {
         x match {
           case Assign(ax) =>
             y match {
-              case Assign(ay) => ax === ax
+              case Assign(ay) => ax === ay
               case _          => false
             }
           case Ignore     =>

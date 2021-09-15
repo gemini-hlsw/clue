@@ -3,6 +3,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 inThisBuild(
   List(
     scalaVersion := "3.0.2",
+    crossScalaVersions ++= Seq("2.13.6", "3.0.2"),
     homepage := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
     testFrameworks += new TestFramework("munit.Framework")
@@ -11,22 +12,16 @@ inThisBuild(
 
 lazy val root = project
   .in(file("."))
-  .aggregate(modelJVM,
-             modelJS,
-             coreJVM,
-             coreJS,
-             scalaJS,
-             http4sJDK,
-             genRules,
-             genInput,
-             genOutput,
-             genTests
+  .aggregate(
+    List[ProjectReference](modelJVM, modelJS, coreJVM, coreJS, scalaJS, http4sJDK) ++
+      genRules.projectRefs: _* //++
+    // genInput.projectRefs ++
+    // genOutput.projectRefs ++
+    // genTests.projectRefs: _*
   )
   .settings(
     name := "clue",
-    publish := {},
-    publishLocal := {},
-    packagedArtifacts := Map.empty
+    publish / skip := true
   )
 
 lazy val model = crossProject(JVMPlatform, JSPlatform)
@@ -97,56 +92,65 @@ lazy val http4sJDKDemo = project
   )
   .dependsOn(http4sJDK)
 
-lazy val genRules = project
-  .in(file("gen/rules"))
-  .settings(
-    moduleName := "clue-generator",
-    libraryDependencies ++=
-      Settings.Libraries.Grackle.value ++
-        Settings.Libraries.ScalaFix.value ++
-        Settings.Libraries.DisciplineMUnit.value
-  )
-  .dependsOn(coreJVM)
+lazy val V = _root_.scalafix.sbt.BuildInfo
+
+lazy val rulesCrossVersions = Seq(V.scala213)
+// lazy val scala3Version      = "3.0.2"
+
+lazy val genRules =
+  // project
+  // .in(file("gen/rules"))
+  projectMatrix
+    .settings(
+      moduleName := "clue-generator",
+      libraryDependencies ++=
+        Settings.Libraries.Grackle.value ++
+          Settings.Libraries.ScalaFix.value ++
+          Settings.Libraries.DisciplineMUnit.value
+    )
+    // .dependsOn(coreJVM)
+    .defaultAxes(VirtualAxis.jvm)
+    .jvmPlatform(rulesCrossVersions)
 
 // Only necessary to fix inputs in place. Sometimes it gives a clearer picture than a diff.
 // ThisBuild / scalafixScalaBinaryVersion :=
 //   CrossVersion.binaryScalaVersion(scalaVersion.value)
 
-lazy val genInput = project
-  .in(file("gen/input"))
-  .settings(
-    publish / skip := true,
-    libraryDependencies ++=
-      Settings.Libraries.Monocle.value
-  )
-  .dependsOn(coreJVM)
-//.dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
+// lazy val genInput = project
+//   .in(file("gen/input"))
+//   .settings(
+//     publish / skip := true,
+//     libraryDependencies ++=
+//       Settings.Libraries.Monocle.value
+//   )
+//   .dependsOn(coreJVM)
+// //.dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
 
-lazy val genOutput = project
-  .in(file("gen/output"))
-  .settings(
-    publish / skip := true,
-    scalacOptions += "-Wconf:cat=unused:info",
-    libraryDependencies ++= Settings.Libraries.Monocle.value
-  )
-  .dependsOn(coreJVM)
+// lazy val genOutput = project
+//   .in(file("gen/output"))
+//   .settings(
+//     publish / skip := true,
+//     scalacOptions += "-Wconf:cat=unused:info",
+//     libraryDependencies ++= Settings.Libraries.Monocle.value
+//   )
+//   .dependsOn(coreJVM)
 
-lazy val genTests = project
-  .in(file("gen/tests"))
-  .settings(
-    publish / skip := true,
-    libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value,
-    scalafixTestkitOutputSourceDirectories :=
-      (genOutput / Compile / sourceDirectories).value,
-    scalafixTestkitInputSourceDirectories :=
-      (genInput / Compile / sourceDirectories).value,
-    scalafixTestkitInputClasspath :=
-      (genInput / Compile / fullClasspath).value :+
-        Attributed.blank((genInput / Compile / semanticdbTargetRoot).value),
-    Compile / compile :=
-      (Compile / compile)
-        .dependsOn(genInput / Compile / compile)
-        .value
-  )
-  .dependsOn(genRules)
-  .enablePlugins(ScalafixTestkitPlugin)
+// lazy val genTests = project
+//   .in(file("gen/tests"))
+//   .settings(
+//     publish / skip := true,
+//     libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value,
+//     scalafixTestkitOutputSourceDirectories :=
+//       (genOutput / Compile / sourceDirectories).value,
+//     scalafixTestkitInputSourceDirectories :=
+//       (genInput / Compile / sourceDirectories).value,
+//     scalafixTestkitInputClasspath :=
+//       (genInput / Compile / fullClasspath).value :+
+//         Attributed.blank((genInput / Compile / semanticdbTargetRoot).value),
+//     Compile / compile :=
+//       (Compile / compile)
+//         .dependsOn(genInput / Compile / compile)
+//         .value
+//   )
+//   .dependsOn(genRules)
+//   .enablePlugins(ScalafixTestkitPlugin)
