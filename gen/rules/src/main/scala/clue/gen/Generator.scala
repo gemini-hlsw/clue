@@ -129,10 +129,6 @@ trait Generator {
             DefaultMappings.getOrElse(nt.name,
                                       Type.Name(snakeToCamel(nameOverride.getOrElse(nt.name)))
             )
-          case grackle.NoType            =>
-            throw new Exception(
-              s"Could not resolve type for field [$name] (isInput: [$isInput]) - Is this a valid field present in the schema?"
-            )
         }
 
       ClassParam(name, resolveType(tpe))

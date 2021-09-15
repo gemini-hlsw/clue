@@ -24,9 +24,9 @@ lazy val root = project
       scalaJS.projectRefs ++
       http4sJDK.projectRefs ++
       genRules.projectRefs ++
-      genInput.projectRefs: _* // ++
-    // genOutput.projectRefs ++
-    // genTests.projectRefs: _*
+      genInput.projectRefs ++
+      genOutput.projectRefs ++
+      genTests.projectRefs: _*
   )
   .settings(
     name           := "clue",
@@ -115,8 +115,7 @@ lazy val genRules =
           Settings.Libraries.ScalaFix.value ++
           Settings.Libraries.DisciplineMUnit.value
     )
-    // .dependsOn(coreJVM)
-    // .defaultAxes(VirtualAxis.jvm)
+    .dependsOn(core)
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(rulesCrossVersions.head))
     .jvmPlatform(rulesCrossVersions)
 
@@ -137,31 +136,56 @@ lazy val genInput =
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
     .jvmPlatform(allVersions)
 
-// lazy val genOutput = project
-//   .in(file("gen/output"))
-//   .settings(
-//     publish / skip := true,
-//     scalacOptions += "-Wconf:cat=unused:info",
-//     libraryDependencies ++= Settings.Libraries.Monocle.value
-//   )
-//   .dependsOn(coreJVM)
+lazy val genOutput = projectMatrix
+  .in(file("gen/output"))
+  .settings(
+    publish / skip := true,
+    scalacOptions += "-Wconf:cat=unused:info",
+    libraryDependencies ++= Settings.Libraries.Monocle.value ++ Settings.Libraries.CirceGenericExtras.value
+  )
+  .dependsOn(core)
+  .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
+  .jvmPlatform(
+    // TODO Change to allVersions when we generate a substitute for circe generic extras in Scala 3 (https://github.com/circe/circe/pull/1800)
+    rulesCrossVersions
+  )
 
-// lazy val genTests = project
-//   .in(file("gen/tests"))
-//   .settings(
-//     publish / skip := true,
-//     libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value,
-//     scalafixTestkitOutputSourceDirectories :=
-//       (genOutput / Compile / sourceDirectories).value,
-//     scalafixTestkitInputSourceDirectories :=
-//       (genInput / Compile / sourceDirectories).value,
-//     scalafixTestkitInputClasspath :=
-//       (genInput / Compile / fullClasspath).value :+
-//         Attributed.blank((genInput / Compile / semanticdbTargetRoot).value),
-//     Compile / compile :=
-//       (Compile / compile)
-//         .dependsOn(genInput / Compile / compile)
-//         .value
-//   )
-//   .dependsOn(genRules)
-//   .enablePlugins(ScalafixTestkitPlugin)
+lazy val genTestsAggregate = Project("genTests", file("target/genTestsAggregate"))
+  .aggregate(genTests.projectRefs: _*)
+
+lazy val genTests = projectMatrix
+  .in(file("gen/tests"))
+  .settings(
+    publish / skip                         := true,
+    libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value,
+    scalafixTestkitOutputSourceDirectories :=
+      TargetAxis
+        .resolve(genOutput, Compile / unmanagedSourceDirectories)
+        .value,
+    scalafixTestkitInputSourceDirectories  :=
+      TargetAxis
+        .resolve(genInput, Compile / unmanagedSourceDirectories)
+        .value,
+    scalafixTestkitInputClasspath          :=
+      TargetAxis.resolve(genInput, Compile / fullClasspath).value,
+    scalafixTestkitInputScalacOptions      :=
+      TargetAxis.resolve(genInput, Compile / scalacOptions).value,
+    scalafixTestkitInputScalaVersion       :=
+      TargetAxis.resolve(genInput, Compile / scalaVersion).value
+  )
+  .dependsOn(genRules)
+  .enablePlugins(ScalafixTestkitPlugin)
+  .defaultAxes(
+    rulesCrossVersions.map(VirtualAxis.scalaABIVersion) :+ VirtualAxis.jvm: _*
+  )
+  // TODO Enable when we generate a substitute for circe generic extras in Scala 3 (https://github.com/circe/circe/pull/1800)
+  // .customRow(
+  //   scalaVersions = Seq(V.scala213),
+  //   axisValues = Seq(TargetAxis(scala3Version), VirtualAxis.jvm),
+  //   settings = Seq()
+  // )
+  .customRow(
+    scalaVersions = Seq(V.scala213),
+    axisValues = Seq(TargetAxis(V.scala213), VirtualAxis.jvm),
+    settings = Seq()
+  )

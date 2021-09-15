@@ -50,6 +50,12 @@ object Settings {
       ).map(_ % circe)
     )
 
+    val CirceGenericExtras = Def.setting(
+      Seq(
+        "io.circe" %%% "circe-generic-extras" % circe
+      )
+    )
+
     val DisciplineMUnit = Def.setting(
       Seq[ModuleID](
         "org.typelevel" %%% "discipline-munit" % disciplineMUnit % "test"
@@ -107,7 +113,7 @@ object Settings {
 
     val ScalaFix = Def.setting(
       Seq(
-        ("ch.epfl.scala" %%% "scalafix-core" % scalaFix) //.cross(CrossVersion.for3Use2_13)
+        ("ch.epfl.scala" %%% "scalafix-core" % scalaFix)
       )
     )
 
