@@ -3,13 +3,14 @@
 
 package clue.gen
 
-import scalafix.v1._
-import scala.meta._
-import cats.syntax.all._
-import metaconfig.Configured
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+import cats.syntax.all._
 import edu.gemini.grackle.QueryParser
+import metaconfig.Configured
+import scalafix.v1._
+
+import scala.meta._
 
 class GraphQLGen(config: GraphQLGenConfig)
     extends SemanticRule("GraphQLGen")

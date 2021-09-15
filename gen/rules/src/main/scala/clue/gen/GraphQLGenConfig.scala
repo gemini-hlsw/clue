@@ -3,11 +3,12 @@
 
 package clue.gen
 
-import cats.syntax.all._
+import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.Ref
-import cats.effect.Deferred
+import cats.syntax.all._
 import edu.gemini.grackle.Schema
+
 import java.io.File
 import scala.io.Source
 

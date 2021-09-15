@@ -3,11 +3,12 @@
 
 package clue.gen
 
-import cats.syntax.all._
 import cats.effect.unsafe.implicits.global
-import scala.meta._
-import edu.gemini.grackle.{ Term => _, Type => GType, _ }
+import cats.syntax.all._
 import edu.gemini.grackle.UntypedOperation._
+import edu.gemini.grackle.{Term => _, Type => GType, _}
+
+import scala.meta._
 
 trait QueryGen extends Generator {
 
