@@ -1,5 +1,3 @@
-// import sbtcrossproject.CrossPlugin.autoImport.crossProject
-
 inThisBuild(
   List(
     scalaVersion                  := "3.0.2",
