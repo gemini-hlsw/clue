@@ -111,7 +111,8 @@ lazy val genRules =
       libraryDependencies ++=
         Settings.Libraries.Grackle.value ++
           Settings.Libraries.ScalaFix.value ++
-          Settings.Libraries.DisciplineMUnit.value
+          Settings.Libraries.DisciplineMUnit.value,
+      scalacOptions ~= (_.filterNot(Set("-Vtype-diffs")))
     )
     .dependsOn(core)
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(rulesCrossVersions.head))
@@ -139,14 +140,11 @@ lazy val genOutput = projectMatrix
   .settings(
     publish / skip := true,
     scalacOptions += "-Wconf:cat=unused:info",
-    libraryDependencies ++= Settings.Libraries.Monocle.value ++ Settings.Libraries.CirceGenericExtras.value
+    libraryDependencies ++= Settings.Libraries.Monocle.value
   )
   .dependsOn(core)
   .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
-  .jvmPlatform(
-    // TODO Change to allVersions when we generate a substitute for circe generic extras in Scala 3 (https://github.com/circe/circe/pull/1800)
-    rulesCrossVersions
-  )
+  .jvmPlatform(allVersions)
 
 lazy val genTestsAggregate = Project("genTests", file("target/genTestsAggregate"))
   .aggregate(genTests.projectRefs: _*)
@@ -176,12 +174,11 @@ lazy val genTests = projectMatrix
   .defaultAxes(
     rulesCrossVersions.map(VirtualAxis.scalaABIVersion) :+ VirtualAxis.jvm: _*
   )
-  // TODO Enable when we generate a substitute for circe generic extras in Scala 3 (https://github.com/circe/circe/pull/1800)
-  // .customRow(
-  //   scalaVersions = Seq(V.scala213),
-  //   axisValues = Seq(TargetAxis(scala3Version), VirtualAxis.jvm),
-  //   settings = Seq()
-  // )
+  .customRow(
+    scalaVersions = Seq(V.scala213),
+    axisValues = Seq(TargetAxis(scala3Version), VirtualAxis.jvm),
+    settings = Seq()
+  )
   .customRow(
     scalaVersions = Seq(V.scala213),
     axisValues = Seq(TargetAxis(V.scala213), VirtualAxis.jvm),

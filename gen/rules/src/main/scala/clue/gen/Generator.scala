@@ -260,10 +260,9 @@ trait Generator {
   }
 
   protected case class Sum(
-    params:        List[ClassParam],
-    nested:        List[Class] = List.empty,
-    instances:     List[CaseClass],
-    discriminator: String
+    params:    List[ClassParam],
+    nested:    List[Class] = List.empty,
+    instances: List[CaseClass]
   )
 
   protected def paramToVal(param: Term.Param): Stat = {
@@ -370,7 +369,7 @@ trait Generator {
             scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
-            TypeType.Sum(sum.discriminator),
+            TypeType.Sum(sum.instances.map(_.name)),
             bodyMod = scala.Function.chain(addDefinitions ++ addLenses),
             nestPath = nestPath
           )(newBody)
@@ -445,7 +444,7 @@ trait Generator {
   protected object TypeType {
     case object CaseClass extends TypeType
     case class Enum(values: List[EnumValue]) extends TypeType
-    case class Sum(discriminator: String) extends TypeType
+    case class Sum(subtypeNames: List[String]) extends TypeType
   }
 
   protected def modifyModuleStatements(
@@ -508,14 +507,6 @@ trait Generator {
           """
     )
 
-    val codecConfDef = Option
-      .when(circeEncoder || circeDecoder)(typeType match {
-        case TypeType.Sum(discriminator) =>
-          q"implicit protected val jsonConfiguration: io.circe.generic.extras.Configuration = io.circe.generic.extras.Configuration.default.withDiscriminator($discriminator)".some
-        case _                           => none
-      })
-      .flatten
-
     val encoderDef = Option.when(circeEncoder)(typeType match {
       case TypeType.CaseClass        =>
         q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))"
@@ -526,32 +517,37 @@ trait Generator {
           )
         q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.Encoder.encodeString.contramap[$n]{..case $cases}"
       case TypeType.Sum(_)           =>
-        q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.generic.extras.semiauto.deriveConfiguredEncoder[$n]"
+        q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n]"
     })
 
     val decoderDef = Option.when(circeDecoder)(typeType match {
-      case TypeType.CaseClass        =>
+      case TypeType.CaseClass         =>
         q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
-      case TypeType.Enum(enumValues) =>
+      case TypeType.Enum(enumValues)  =>
         val cases: List[Case] =
           enumValues.map(enumValue =>
             p"case ${enumValue.asString} => Right(${Term.Name(enumValue.className)})"
           ) :+ p"""case other => Left(s"Invalid value [$$other]")"""
         q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.Decoder.decodeString.emap(_ match {..case $cases})"
-      case TypeType.Sum(_)           =>
-        q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.generic.extras.semiauto.deriveConfiguredDecoder[$n]"
+      case TypeType.Sum(subtypeNames) =>
+        val baseTerm: Term.Ref =
+          nestPath.fold[Term.Ref](Term.Name(name))(t => Term.Select(t, Term.Name(name)))
+
+        def subtypeDecoder(subtypeName: String): Term = {
+          val subType = Type.Select(baseTerm, Type.Name(subtypeName))
+          q"io.circe.Decoder[$subType].asInstanceOf[io.circe.Decoder[$n]]"
+        }
+
+        q"""implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = 
+               List[io.circe.Decoder[$n]](
+                ..${subtypeNames.map(subtypeDecoder)}
+               ).reduceLeft(_ or _)
+        """
     })
 
     modifyModuleStatements(
       name,
-      stats =>
-        bodyMod(stats) ++ List(eqDef,
-                               showDef,
-                               reuseDef,
-                               codecConfDef,
-                               encoderDef,
-                               decoderDef
-        ).flatten
+      stats => bodyMod(stats) ++ List(eqDef, showDef, reuseDef, encoderDef, decoderDef).flatten
     )
   }
 }

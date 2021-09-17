@@ -269,32 +269,16 @@ trait QueryGen extends Generator {
                                singleSubType._2.parAccum
               )
             case _                    =>
-              // More than one subtype. Needs discriminator.
-              // Figure out discriminator name. Could be renamed.
-              val discriminator = selections.collect {
-                case Select(TypeSelect, _, _)               => TypeSelect
-                case Rename(name, Select(TypeSelect, _, _)) => name
-              } match {
-                case field :: Nil => field
-                case _            =>
-                  abort(
-                    s"Multiple inline fragments require (unique) selection of $TypeSelect"
-                  ).unsafeRunSync()
-              }
-
-              val baseParams = baseAccumulator.parAccum.filterNot(_.name == discriminator)
+              val baseParams = baseAccumulator.parAccum
 
               val subTypes = subTypeAccumulators.collect { case (typeName, accumulator) =>
-                CaseClass(typeName,
-                          accumulator.parAccum.filterNot(_.name == discriminator),
-                          accumulator.classes
-                )
+                CaseClass(typeName, accumulator.parAccum, accumulator.classes)
               }
 
               ClassAccumulator(
                 baseAccumulator.classes,
                 baseParams,
-                Sum(baseParams, baseAccumulator.classes, subTypes, discriminator).some
+                Sum(baseParams, baseAccumulator.classes, subTypes).some
               )
           }
 

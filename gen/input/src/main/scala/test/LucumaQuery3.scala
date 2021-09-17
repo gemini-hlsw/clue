@@ -19,7 +19,6 @@ trait LucumaQuery3 extends GraphQLOperation[LucumaODB] {
           nodes {
             id
             observationTarget {
-              type: __typename
               ... on Target {
                 target_id: id
                 target_name: name

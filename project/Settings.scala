@@ -50,12 +50,6 @@ object Settings {
       ).map(_ % circe)
     )
 
-    val CirceGenericExtras = Def.setting(
-      Seq(
-        "io.circe" %%% "circe-generic-extras" % circe
-      )
-    )
-
     val DisciplineMUnit = Def.setting(
       Seq[ModuleID](
         "org.typelevel" %%% "discipline-munit" % disciplineMUnit % "test"

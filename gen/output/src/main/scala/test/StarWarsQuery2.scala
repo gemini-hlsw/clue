@@ -32,7 +32,6 @@ object Wrapper extends Something {
               ... on Droid {
                 primaryFunction
               }
-              __typename
             }
           }
         """
@@ -120,8 +119,7 @@ object Wrapper extends Something {
           import japgolly.scalajs.react.Reusability
           japgolly.scalajs.react.Reusability.derive
         }
-        implicit protected val jsonConfiguration: io.circe.generic.extras.Configuration = io.circe.generic.extras.Configuration.default.withDiscriminator("__typename")
-        implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = io.circe.generic.extras.semiauto.deriveConfiguredDecoder[Data.Character]
+        implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = List[io.circe.Decoder[Data.Character]](io.circe.Decoder[Data.Character.Human].asInstanceOf[io.circe.Decoder[Data.Character]], io.circe.Decoder[Data.Character.Droid].asInstanceOf[io.circe.Decoder[Data.Character]]).reduceLeft(_ or _)
       }
       implicit val character: monocle.Lens[Data, Option[Data.Character]] = monocle.macros.GenLens[Data](_.character)
       implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
