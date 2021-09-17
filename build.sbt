@@ -139,7 +139,11 @@ lazy val genOutput = projectMatrix
   .in(file("gen/output"))
   .settings(
     publish / skip := true,
-    scalacOptions += "-Wconf:cat=unused:info",
+    scalacOptions ++=
+      (scalaVersion.value match {
+        case `scala3Version` => Nil
+        case _               => List("-Wconf:cat=unused:info")
+      }),
     libraryDependencies ++= Settings.Libraries.Monocle.value
   )
   .dependsOn(core)
