@@ -8,11 +8,11 @@ import cats.Show
 
 sealed trait PersistentClientStatus
 object PersistentClientStatus {
-  final case object Connecting   extends PersistentClientStatus
-  final case object Connected    extends PersistentClientStatus
-  final case object Initializing extends PersistentClientStatus
-  final case object Initialized  extends PersistentClientStatus
-  final case object Disconnected extends PersistentClientStatus
+  case object Connecting   extends PersistentClientStatus
+  case object Connected    extends PersistentClientStatus
+  case object Initializing extends PersistentClientStatus
+  case object Initialized  extends PersistentClientStatus
+  case object Disconnected extends PersistentClientStatus
 
   implicit val eqStreamingClientStatus: Eq[PersistentClientStatus]     = Eq.fromUniversalEquals
   implicit val showStreamingClientStatus: Show[PersistentClientStatus] = Show.fromToString

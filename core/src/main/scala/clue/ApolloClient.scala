@@ -35,15 +35,15 @@ protected[clue] trait Emitter[F[_]] {
 // Client internal state for the FSM.
 // We keep a connectionId throughout all states to ensure that callback events (onClose, onMessage)
 // correpond to the current connection iteration. This is important in case of reconnections.
-protected sealed abstract class State[+F[_], +CP](val status: PersistentClientStatus) {
+protected sealed abstract class State[F[_], CP](val status: PersistentClientStatus) {
   val connectionId: ConnectionId
 }
 
 protected object State {
-  final case class Disconnected(connectionId: ConnectionId)
-      extends State[Nothing, Nothing](PersistentClientStatus.Disconnected)
-  final case class Connecting[F[_]](connectionId: ConnectionId, latch: Latch[F])
-      extends State[F, Nothing](PersistentClientStatus.Connecting)
+  final case class Disconnected[F[_], CP](connectionId: ConnectionId)
+      extends State[F, CP](PersistentClientStatus.Disconnected)
+  final case class Connecting[F[_], CP](connectionId: ConnectionId, latch: Latch[F])
+      extends State[F, CP](PersistentClientStatus.Connecting)
   final case class Connected[F[_], CP](
     connectionId: ConnectionId,
     connection:   PersistentConnection[F, CP]
@@ -62,13 +62,13 @@ protected object State {
     initPayload:   Map[String, Json]
   ) extends State[F, CP](PersistentClientStatus.Initialized)
   // Reestablishing = We are in the process of reconnecting + reinitializing after a low level error/close, but we haven't connected yet.
-  final case class Reestablishing[F[_]](
+  final case class Reestablishing[F[_], CP](
     connectionId:  ConnectionId,
     subscriptions: Map[String, Emitter[F]],
     initPayload:   Map[String, Json],
     connectLatch:  Latch[F],
     initLatch:     Latch[F]
-  ) extends State[F, Nothing](PersistentClientStatus.Connecting)
+  ) extends State[F, CP](PersistentClientStatus.Connecting)
 }
 
 class ApolloClient[F[_], S, CP, CE](
@@ -112,7 +112,8 @@ class ApolloClient[F[_], S, CP, CE](
       stateModify {
         case Disconnected(connectionId)                   =>
           Connecting(connectionId, newLatch) -> doConnect(connectionId, newLatch)
-        case s @ Connecting(_, latch)                     => s     -> (warn >> latch.get.rethrow)
+        case s @ Connecting(_, latch)                     =>
+          s -> (warn >> latch.get.rethrow)
         case s @ Reestablishing(_, _, _, connectLatch, _) =>
           s -> (warn >> connectLatch.get.rethrow)
         case state                                        => state -> warn
@@ -127,17 +128,16 @@ class ApolloClient[F[_], S, CP, CE](
 
     Latch[F].flatMap { newLatch =>
       stateModify {
-        case s @ (Disconnected(_) | Connecting(_, _))                => s     -> error
+        case s @ (Disconnected(_) | Connecting(_, _))                => s -> error
         case Connected(connectionId, connection)                     =>
           Initializing(connectionId, connection, Map.empty, payload, newLatch) ->
             doInitialize(payload, connection, newLatch)
-        case s @ Initializing(_, _, _, _, latch)                     => s     -> (warn >> latch.get.rethrow)
-        case s @ Reestablishing(_, _, _, _, initLatch)               => s     -> (warn >> initLatch.get.rethrow)
+        case s @ Initializing(_, _, _, _, latch)                     => s -> (warn >> latch.get.rethrow)
+        case s @ Reestablishing(_, _, _, _, initLatch)               => s -> (warn >> initLatch.get.rethrow)
         case Initialized(connectionId, connection, subscriptions, _) =>
           Initializing(connectionId, connection, subscriptions, payload, newLatch) ->
             (stopSubscriptions(connection, subscriptions) >>
               doInitialize(payload, connection, newLatch)).uncancelable
-        case state                                                   => state -> warn
       }
     }
   }

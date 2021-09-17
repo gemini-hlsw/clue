@@ -8,8 +8,8 @@
  */
 package test
 
-import clue.annotation.GraphQL
 import clue.GraphQLOperation
+import clue.annotation.GraphQL
 
 @GraphQL
 trait LucumaQuery extends GraphQLOperation[LucumaODB] {

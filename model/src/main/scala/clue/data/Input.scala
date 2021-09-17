@@ -51,9 +51,9 @@ sealed trait Input[+A] {
     }
 }
 
-final case object Ignore   extends Input[Nothing]
-final case object Unassign extends Input[Nothing]
-final case class Assign[A](value: A) extends Input[A]
+case object Ignore   extends Input[Nothing]
+case object Unassign extends Input[Nothing]
+final case class Assign[+A](value: A) extends Input[A]
 
 object Input {
   def apply[A](a: A): Input[A] = Assign(a)
@@ -83,6 +83,11 @@ object Input {
     new Eq[Input[A]] {
       def eqv(x: Input[A], y: Input[A]): Boolean =
         x match {
+          case Assign(ax) =>
+            y match {
+              case Assign(ay) => ax === ay
+              case _          => false
+            }
           case Ignore     =>
             y match {
               case Ignore => true
@@ -92,11 +97,6 @@ object Input {
             y match {
               case Unassign => true
               case _        => false
-            }
-          case Assign(ax) =>
-            y match {
-              case Assign(ay) => ax === ay
-              case _          => false
             }
         }
     }

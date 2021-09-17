@@ -3,10 +3,11 @@
 
 package clue.gen
 
-import scala.meta._
-import edu.gemini.grackle.Schema
 import edu.gemini.grackle.EnumType
 import edu.gemini.grackle.InputObjectType
+import edu.gemini.grackle.Schema
+
+import scala.meta._
 
 trait SchemaGen extends Generator {
   // Just make sure "object Scalars" exists.

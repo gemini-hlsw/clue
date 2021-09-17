@@ -3,11 +3,12 @@
 
 package clue.gen
 
-import scala.meta._
-import scala.reflect.ClassTag
 import clue.annotation._
 import scalafix.v1._
+
 import scala.annotation.StaticAnnotation
+import scala.meta._
+import scala.reflect.ClassTag
 
 // Adapted from simulacrum-scalafix
 class AnnotationPattern[T <: StaticAnnotation](implicit classTag: ClassTag[T]) {

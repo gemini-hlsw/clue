@@ -15,15 +15,8 @@ import org.typelevel.log4cats.Logger
  * A client that allows one-shot queries and mutations.
  */
 trait TransactionalClient[F[_], S] {
-  def request(
-    operation:     GraphQLOperation[S],
-    operationName: Option[String] = None
-  ): RequestApplied[operation.Variables, operation.Data] = {
-    import operation.implicits._
-    RequestApplied(operation, operationName)
-  }
 
-  case class RequestApplied[V, D] private (
+  case class RequestApplied[V, D] protected[TransactionalClient] (
     operation:           GraphQLOperation[S],
     operationName:       Option[String]
   )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
@@ -36,6 +29,14 @@ trait TransactionalClient[F[_], S] {
 
   object RequestApplied {
     implicit def withoutVariables[V, D](applied: RequestApplied[V, D]): F[D] = applied.apply
+  }
+
+  def request(
+    operation:     GraphQLOperation[S],
+    operationName: Option[String] = None
+  ): RequestApplied[operation.Variables, operation.Data] = {
+    import operation.implicits._
+    RequestApplied(operation, operationName)
   }
 
   protected def requestInternal[D: Decoder](
@@ -78,15 +79,8 @@ trait GraphQLSubscription[F[_], D] {
  * A client that allows subscriptions in addition to one-shot queries and mutations.
  */
 trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
-  def subscribe(
-    subscription:  GraphQLOperation[S],
-    operationName: Option[String] = None
-  ): SubscriptionApplied[subscription.Variables, subscription.Data] = {
-    import subscription.implicits._
-    SubscriptionApplied(subscription, operationName)
-  }
 
-  case class SubscriptionApplied[V, D] private (
+  case class SubscriptionApplied[V, D] protected[StreamingClient] (
     subscription:        GraphQLOperation[S],
     operationName:       Option[String] = None
   )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
@@ -101,6 +95,14 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
       applied: SubscriptionApplied[V, D]
     ): F[GraphQLSubscription[F, D]] =
       applied.apply
+  }
+
+  def subscribe(
+    subscription:  GraphQLOperation[S],
+    operationName: Option[String] = None
+  ): SubscriptionApplied[subscription.Variables, subscription.Data] = {
+    import subscription.implicits._
+    SubscriptionApplied(subscription, operationName)
   }
 
   protected def subscribeInternal[D: Decoder](
@@ -131,8 +133,8 @@ trait PersistentClient[F[_], CP, CE] {
 }
 
 /**
- * A client that keeps a connection open and initializable protocol with the server,
- * and allows GraphQL queries, mutations and subscriptions.
+ * A client that keeps a connection open and initializable protocol with the server, and allows
+ * GraphQL queries, mutations and subscriptions.
  */
 trait PersistentStreamingClient[F[_], S, CP, CE]
     extends StreamingClient[F, S]

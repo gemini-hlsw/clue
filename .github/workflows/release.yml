@@ -13,7 +13,7 @@ jobs:
           java-version: adopt@1.11
       - uses: olafurpg/setup-gpg@v3
       - name: Publish
-        run: sbt ci-release
+        run: sbt -v -J-Xmx4g ci-release
         env:
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
           PGP_SECRET: ${{ secrets.PGP_SECRET }}

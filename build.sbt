@@ -1,81 +1,83 @@
-import sbtcrossproject.CrossPlugin.autoImport.crossProject
-
 inThisBuild(
   List(
-    homepage := Some(url("https://github.com/gemini-hlsw/clue")),
+    scalaVersion                  := "3.0.2",
+    crossScalaVersions ++= Seq("2.13.6", "3.0.2"),
+    homepage                      := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
     testFrameworks += new TestFramework("munit.Framework")
   ) ++ lucumaPublishSettings
 )
 
+lazy val V = _root_.scalafix.sbt.BuildInfo
+
+lazy val rulesCrossVersions = Seq(V.scala213)
+lazy val scala3Version      = "3.0.2"
+lazy val allVersions        = rulesCrossVersions :+ scala3Version
+
 lazy val root = project
   .in(file("."))
-  .aggregate(modelJVM,
-             modelJS,
-             coreJVM,
-             coreJS,
-             scalaJS,
-             http4sJDK,
-             genRules,
-             genInput,
-             genOutput,
-             genTests
+  .aggregate(
+    model.projectRefs ++
+      core.projectRefs ++
+      scalaJS.projectRefs ++
+      http4sJDK.projectRefs ++
+      genRules.projectRefs ++
+      genInput.projectRefs ++
+      genOutput.projectRefs ++
+      genTests.projectRefs: _*
   )
   .settings(
-    name := "clue",
-    publish := {},
-    publishLocal := {},
-    packagedArtifacts := Map.empty
+    name           := "clue",
+    publish / skip := true
   )
 
-lazy val model = crossProject(JVMPlatform, JSPlatform)
-  .in(file("model"))
-  .settings(
-    moduleName := "clue-model",
-    libraryDependencies ++=
-      Settings.Libraries.Cats.value ++
-        Settings.Libraries.CatsTestkit.value ++
-        Settings.Libraries.Circe.value ++
-        Settings.Libraries.DisciplineMUnit.value
-  )
-  .jsSettings(
-    scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule))
-  )
+lazy val model =
+  projectMatrix
+    .in(file("model"))
+    .settings(
+      moduleName := "clue-model",
+      libraryDependencies ++=
+        Settings.Libraries.Cats.value ++
+          Settings.Libraries.CatsTestkit.value ++
+          Settings.Libraries.Circe.value ++
+          Settings.Libraries.DisciplineMUnit.value
+    )
+    .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
+    .jvmPlatform(allVersions)
+    .jsPlatform(allVersions,
+                List(scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)))
+    )
 
-lazy val modelJS = model.js
+lazy val core =
+  projectMatrix
+    .in(file("core"))
+    .settings(
+      moduleName := "clue-core",
+      libraryDependencies ++=
+        Settings.Libraries.Cats.value ++
+          Settings.Libraries.CatsEffect.value ++
+          Settings.Libraries.Fs2.value ++
+          Settings.Libraries.Log4Cats.value ++
+          Settings.Libraries.Http4sCore.value ++
+          Settings.Libraries.DisciplineMUnit.value
+    )
+    .dependsOn(model)
+    .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
+    .jvmPlatform(allVersions)
+    .jsPlatform(allVersions)
 
-lazy val modelJVM = model.jvm
-
-lazy val core = crossProject(JVMPlatform, JSPlatform)
-  .in(file("core"))
-  .settings(
-    moduleName := "clue-core",
-    libraryDependencies ++=
-      Settings.Libraries.Cats.value ++
-        Settings.Libraries.CatsEffect.value ++
-        Settings.Libraries.Fs2.value ++
-        Settings.Libraries.Log4Cats.value ++
-        Settings.Libraries.Http4sCore.value ++
-        Settings.Libraries.DisciplineMUnit.value,
-    addCompilerPlugin(("org.typelevel" %% "kind-projector" % "0.13.2").cross(CrossVersion.full))
-  )
-  .dependsOn(model)
-
-lazy val coreJS = core.js
-
-lazy val coreJVM = core.jvm
-
-lazy val scalaJS = project
+lazy val scalaJS = projectMatrix
   .in(file("scalajs"))
   .settings(
     moduleName := "clue-scalajs",
     libraryDependencies ++=
       Settings.Libraries.ScalaJSDom.value
   )
-  .dependsOn(coreJS)
-  .enablePlugins(ScalaJSPlugin)
+  .dependsOn(core)
+  .defaultAxes(VirtualAxis.js, VirtualAxis.scalaPartialVersion(scala3Version))
+  .jsPlatform(allVersions)
 
-lazy val http4sJDK = project
+lazy val http4sJDK = projectMatrix
   .in(file("http4s-jdk"))
   .settings(
     moduleName := "clue-http4s-jdk-client",
@@ -83,70 +85,105 @@ lazy val http4sJDK = project
       Settings.Libraries.Http4sCirce.value ++
         Settings.Libraries.Http4sJDKClient.value
   )
-  .dependsOn(coreJVM)
+  .dependsOn(core)
+  .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
+  .jvmPlatform(allVersions)
 
-lazy val http4sJDKDemo = project
+lazy val http4sJDKDemo = projectMatrix
   .in(file("http4s-jdk-demo"))
   .settings(
     moduleName := "clue-http4s-jdk-client-demo",
-    publish := false,
+    publish    := false,
     libraryDependencies ++= Seq(
       "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
       "org.slf4j"      % "slf4j-simple"   % "1.6.4"
     )
   )
   .dependsOn(http4sJDK)
+  .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
+  .jvmPlatform(allVersions)
 
-lazy val genRules = project
-  .in(file("gen/rules"))
-  .settings(
-    moduleName := "clue-generator",
-    libraryDependencies ++=
-      Settings.Libraries.Grackle.value ++
-        Settings.Libraries.ScalaFix.value ++
-        Settings.Libraries.DisciplineMUnit.value
-  )
-  .dependsOn(coreJVM)
+lazy val genRules =
+  projectMatrix
+    .in(file("gen/rules"))
+    .settings(
+      moduleName := "clue-generator",
+      libraryDependencies ++=
+        Settings.Libraries.Grackle.value ++
+          Settings.Libraries.ScalaFix.value ++
+          Settings.Libraries.DisciplineMUnit.value
+    )
+    .dependsOn(core)
+    .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(rulesCrossVersions.head))
+    .jvmPlatform(rulesCrossVersions)
 
 // Only necessary to fix inputs in place. Sometimes it gives a clearer picture than a diff.
 // ThisBuild / scalafixScalaBinaryVersion :=
 //   CrossVersion.binaryScalaVersion(scalaVersion.value)
 
-lazy val genInput = project
-  .in(file("gen/input"))
-  .settings(
-    publish / skip := true,
-    libraryDependencies ++=
-      Settings.Libraries.Monocle.value
-  )
-  .dependsOn(coreJVM)
-//.dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
+lazy val genInput =
+  projectMatrix
+    .in(file("gen/input"))
+    .settings(
+      publish / skip := true,
+      libraryDependencies ++=
+        Settings.Libraries.Monocle.value
+    )
+    .dependsOn(core)
+    //.dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
+    .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
+    .jvmPlatform(allVersions)
 
-lazy val genOutput = project
+lazy val genOutput = projectMatrix
   .in(file("gen/output"))
   .settings(
     publish / skip := true,
     scalacOptions += "-Wconf:cat=unused:info",
-    libraryDependencies ++= Settings.Libraries.Monocle.value
+    libraryDependencies ++= Settings.Libraries.Monocle.value ++ Settings.Libraries.CirceGenericExtras.value
   )
-  .dependsOn(coreJVM)
+  .dependsOn(core)
+  .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
+  .jvmPlatform(
+    // TODO Change to allVersions when we generate a substitute for circe generic extras in Scala 3 (https://github.com/circe/circe/pull/1800)
+    rulesCrossVersions
+  )
 
-lazy val genTests = project
+lazy val genTestsAggregate = Project("genTests", file("target/genTestsAggregate"))
+  .aggregate(genTests.projectRefs: _*)
+
+lazy val genTests = projectMatrix
   .in(file("gen/tests"))
   .settings(
-    publish / skip := true,
+    publish / skip                         := true,
     libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value,
     scalafixTestkitOutputSourceDirectories :=
-      (genOutput / Compile / sourceDirectories).value,
-    scalafixTestkitInputSourceDirectories :=
-      (genInput / Compile / sourceDirectories).value,
-    scalafixTestkitInputClasspath :=
-      (genInput / Compile / fullClasspath).value :+
-        Attributed.blank((genInput / Compile / semanticdbTargetRoot).value),
-    Compile / compile :=
-      (Compile / compile)
-        .dependsOn(genInput / Compile / compile)
-        .value
+      TargetAxis
+        .resolve(genOutput, Compile / unmanagedSourceDirectories)
+        .value,
+    scalafixTestkitInputSourceDirectories  :=
+      TargetAxis
+        .resolve(genInput, Compile / unmanagedSourceDirectories)
+        .value,
+    scalafixTestkitInputClasspath          :=
+      TargetAxis.resolve(genInput, Compile / fullClasspath).value,
+    scalafixTestkitInputScalacOptions      :=
+      TargetAxis.resolve(genInput, Compile / scalacOptions).value,
+    scalafixTestkitInputScalaVersion       :=
+      TargetAxis.resolve(genInput, Compile / scalaVersion).value
   )
   .dependsOn(genRules)
   .enablePlugins(ScalafixTestkitPlugin)
+  .defaultAxes(
+    rulesCrossVersions.map(VirtualAxis.scalaABIVersion) :+ VirtualAxis.jvm: _*
+  )
+  // TODO Enable when we generate a substitute for circe generic extras in Scala 3 (https://github.com/circe/circe/pull/1800)
+  // .customRow(
+  //   scalaVersions = Seq(V.scala213),
+  //   axisValues = Seq(TargetAxis(scala3Version), VirtualAxis.jvm),
+  //   settings = Seq()
+  // )
+  .customRow(
+    scalaVersions = Seq(V.scala213),
+    axisValues = Seq(TargetAxis(V.scala213), VirtualAxis.jvm),
+    settings = Seq()
+  )

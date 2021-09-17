@@ -22,7 +22,7 @@ import scala.concurrent.duration._
 
 object Demo extends IOApp.Simple {
 
-  object Query extends GraphQLOperation[Nothing] {
+  object Query extends GraphQLOperation[Unit] {
     type Data      = Json
     type Variables = Json
 
@@ -41,7 +41,7 @@ object Demo extends IOApp.Simple {
     override val dataDecoder: Decoder[Data] = Decoder[Json]
   }
 
-  object Subscription extends GraphQLOperation[Nothing] {
+  object Subscription extends GraphQLOperation[Unit] {
     type Data      = Json
     type Variables = Json
 
@@ -61,11 +61,11 @@ object Demo extends IOApp.Simple {
     Resource.make(Slf4jLogger.create[F])(_ => Applicative[F].unit)
 
   def withStreamingClient[F[_]: Async: Logger]
-    : Resource[F, PersistentStreamingClient[F, Nothing, _, _]] =
+    : Resource[F, PersistentStreamingClient[F, Unit, _, _]] =
     for {
       backend <- Http4sJDKWSBackend[F]
       uri      = uri"wss://lucuma-odb-development.herokuapp.com/ws"
-      sc      <- Resource.eval(ApolloWebSocketClient.of(uri)(Async[F], Logger[F], backend))
+      sc      <- Resource.eval(ApolloWebSocketClient.of[F, Unit](uri)(Async[F], Logger[F], backend))
       _       <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
     } yield sc
 

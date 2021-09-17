@@ -8,8 +8,8 @@
  */
 package test
 
-import clue.annotation.GraphQL
 import clue.GraphQLOperation
+import clue.annotation.GraphQL
 import test.StarWars
 
 @GraphQL

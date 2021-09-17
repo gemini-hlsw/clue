@@ -3,11 +3,12 @@
 
 package clue.gen
 
-import cats.syntax.all._
 import cats.effect.unsafe.implicits.global
-import scala.meta._
-import edu.gemini.grackle.{ Type => GType, Term => _, _ }
+import cats.syntax.all._
 import edu.gemini.grackle.UntypedOperation._
+import edu.gemini.grackle.{ Term => _, Type => GType, _ }
+
+import scala.meta._
 
 trait QueryGen extends Generator {
 
@@ -151,12 +152,12 @@ trait QueryGen extends Generator {
   }
 
   /**
-   * Recurse the query AST and collect the necessary [[CaseClass]]es to hold its results.
+   * Recurse the query AST and collect the necessary [[CaseClass]] es to hold its results.
    */
   protected def resolveData(
     schema:   Schema,
     algebra:  Query,
-    rootType: GType
+    rootType: Option[GType]
   ): CaseClass = {
     import Query._
 
@@ -169,40 +170,46 @@ trait QueryGen extends Generator {
 
     def go(
       currentAlgebra: Query,
-      currentType:    GType,
+      currentType:    Option[GType],
       nameOverride:   Option[String] = none
     ): ClassAccumulator =
       currentAlgebra match {
-        case Select(name, _, child)         =>
+        case Select(name, _, child) =>
           val paramName = nameOverride.getOrElse(name)
-          val nextType  = MetaTypes.getOrElse(name, currentType.field(name))
 
-          val accumulatorOpt =
-            nextType.underlyingObject match {
-              case NoType   => none
-              case baseType => go(child, baseType).some
+          MetaTypes
+            .get(name)
+            .orElse(currentType.flatMap(_.field(name)))
+            .fold(
+              throw new Exception(
+                s"Could not resolve type for field [$name] - Is this a valid field present in the schema?"
+              )
+            ) { nextType =>
+              val accumulatorOpt =
+                nextType.underlyingObject.map(baseType => go(child, baseType.some))
+
+              val (newClass, paramTypeNameOverride) =
+                accumulatorOpt.fold[(Option[Class], Option[String])]((none, none))(next =>
+                  next.sum.fold[(Option[Class], Option[String])](
+                    (CaseClass(paramName, next.parAccum, next.classes).some, paramName.some)
+                  )(sum => (SumClass(paramName, sum).some, paramName.some))
+                )
+
+              ClassAccumulator(
+                classes = newClass.toList,
+                parAccum = List(
+                  ClassParam.fromGrackleType(paramName,
+                                             nextType.dealias,
+                                             isInput = false,
+                                             paramTypeNameOverride
+                  )
+                )
+              )
             }
 
-          val (newClass, paramTypeNameOverride) =
-            accumulatorOpt.fold[(Option[Class], Option[String])]((none, none))(next =>
-              next.sum.fold[(Option[Class], Option[String])](
-                (CaseClass(paramName, next.parAccum, next.classes).some, paramName.some)
-              )(sum => (SumClass(paramName, sum).some, paramName.some))
-            )
-
-          ClassAccumulator(
-            classes = newClass.toList,
-            parAccum = List(
-              ClassParam.fromGrackleType(paramName,
-                                         nextType.dealias,
-                                         isInput = false,
-                                         paramTypeNameOverride
-              )
-            )
-          )
         case UntypedNarrow(typeName, child) =>
           // Single element in inline fragment
-          go(child, getType(typeName))
+          go(child, getType(typeName).some)
         case Rename(name, child)            =>
           go(child, currentType, name.some)
         case Group(selections)              =>
@@ -222,7 +229,7 @@ trait QueryGen extends Generator {
                 _._1 match {
                   case UntypedNarrow(typeName, _) =>
                     typeName.some // Selection in inline fragment, group by discriminator.some
-                  case _                          =>
+                  case _ =>
                     none // Selection in base group, group by none
                 }
               }
@@ -232,11 +239,11 @@ trait QueryGen extends Generator {
                 case (Some(typeName), subQueries) =>
                   (typeName.some, // Unwrap inline fragment selections
                    subQueries.collect { case (UntypedNarrow(_, child), idx) =>
-                     (go(child, getType(typeName)), idx)
+                     (go(child, getType(typeName).some), idx)
                    }
                   )
                 case (None, subQueries)           =>
-                  (none, (subQueries.map { case (q, idx) => (go(q, currentType), idx) }))
+                  (none, subQueries.map { case (q, idx) => (go(q, currentType), idx) })
               }
 
           val baseAccumulators    = hierarchyAccumulators.collectFirst { case (None, accumulators) =>
@@ -297,7 +304,7 @@ trait QueryGen extends Generator {
           ClassAccumulator()
       }
 
-    val algebraTypes = go(algebra, rootType.underlyingObject)
+    val algebraTypes = go(algebra, rootType.flatMap(_.underlyingObject))
 
     CaseClass("Data", algebraTypes.parAccum, algebraTypes.classes)
   }
@@ -326,14 +333,13 @@ trait QueryGen extends Generator {
           //     .asInstanceOf[ObjectType].fields).unsafeRunSync()
 
           val rootType = operation match {
-            // This is how things should look like.
+            // This is how things should look like, but for some reason it's not working.
             // case _: UntypedQuery        => schema.queryType
-            // case _: UntypedMutation     => schema.mutationType.getOrElse(GNoType)
-            // case _: UntypedSubscription => schema.subscriptionType.getOrElse(GNoType)
-            case _: UntypedQuery        => schemaType.field("query").asNamed.get
-            case _: UntypedMutation     => schemaType.field("mutation").asNamed.getOrElse(NoType)
-            case _: UntypedSubscription =>
-              schemaType.field("subscription").asNamed.getOrElse(NoType)
+            // case _: UntypedMutation     => schema.mutationType
+            // case _: UntypedSubscription => schema.subscriptionType
+            case _: UntypedQuery        => schemaType.field("query").flatMap(_.asNamed)
+            case _: UntypedMutation     => schemaType.field("mutation").flatMap(_.asNamed)
+            case _: UntypedSubscription => schemaType.field("subscription").flatMap(_.asNamed)
           }
 
           resolveData(schema, operation.query, rootType).addToParentBody(
@@ -347,7 +353,7 @@ trait QueryGen extends Generator {
       }
 
   private def isTermDefined(termName: String): List[Stat] => Boolean =
-    parentBody => {
+    parentBody =>
       parentBody.exists {
         // We are not checking in pattern assignments
         // case q"$_ val $tname: $_ = $_" => tname == tpe
@@ -356,7 +362,6 @@ trait QueryGen extends Generator {
         case Defn.Var(_, List(Pat.Var(Term.Name(name))), _, _) => name == termName
         case _                                                 => false
       }
-    }
 
   private def addValDef(
     valName: String,

@@ -9,8 +9,8 @@
  */
 package test
 
-import clue.annotation.GraphQL
 import clue.GraphQLOperation
+import clue.annotation.GraphQL
 import test.StarWars
 // gql: import japgolly.scalajs.react.Dummy._
 
