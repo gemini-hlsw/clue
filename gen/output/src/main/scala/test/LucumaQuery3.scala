@@ -21,7 +21,6 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
           nodes {
             id
             observationTarget {
-              type: __typename
               ... on Target {
                 target_id: id
                 target_name: name
@@ -66,8 +65,7 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
           }
           implicit val eqObservationTarget: cats.Eq[Data.Observations.Nodes.ObservationTarget] = cats.Eq.fromUniversalEquals
           implicit val showObservationTarget: cats.Show[Data.Observations.Nodes.ObservationTarget] = cats.Show.fromToString
-          implicit protected val jsonConfiguration: io.circe.generic.extras.Configuration = io.circe.generic.extras.Configuration.default.withDiscriminator("type")
-          implicit val jsonDecoderObservationTarget: io.circe.Decoder[Data.Observations.Nodes.ObservationTarget] = io.circe.generic.extras.semiauto.deriveConfiguredDecoder[Data.Observations.Nodes.ObservationTarget]
+          implicit val jsonDecoderObservationTarget: io.circe.Decoder[Data.Observations.Nodes.ObservationTarget] = List[io.circe.Decoder[Data.Observations.Nodes.ObservationTarget]](io.circe.Decoder[Data.Observations.Nodes.ObservationTarget.Target].asInstanceOf[io.circe.Decoder[Data.Observations.Nodes.ObservationTarget]], io.circe.Decoder[Data.Observations.Nodes.ObservationTarget.Asterism].asInstanceOf[io.circe.Decoder[Data.Observations.Nodes.ObservationTarget]]).reduceLeft(_ or _)
         }
         implicit val id: monocle.Lens[Data.Observations.Nodes, ObservationId] = monocle.macros.GenLens[Data.Observations.Nodes](_.id)
         implicit val observationTarget: monocle.Lens[Data.Observations.Nodes, Option[Data.Observations.Nodes.ObservationTarget]] = monocle.macros.GenLens[Data.Observations.Nodes](_.observationTarget)

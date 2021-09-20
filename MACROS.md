@@ -4,7 +4,7 @@
 
 Given the following schema, placed in `StarWars.graphql`:
 
-``` graphql
+```graphql
 type Query {
   hero(episode: Episode!): Character!
 }
@@ -42,7 +42,8 @@ type Droid implements Character {
 ```
 
 Defining:
-``` scala
+
+```scala
 import clue.macros._
 
 @GraphQLSchema
@@ -55,7 +56,8 @@ object StarWars {
 ```
 
 Will generate:
-``` scala
+
+```scala
 // For easy typing of operations and clients.
 sealed abstract trait StarWars
 object StarWars {
@@ -63,7 +65,7 @@ object StarWars {
   object Scalars {
     type Height = Int
   }
-  
+
   object Enums {
     sealed trait Episode
     object Episode {
@@ -93,7 +95,7 @@ object StarWars {
 
 And defining:
 
-``` scala
+```scala
 @GraphQL
 object BasicQuery extends GraphQLOperation[StarWars] {
   val document = """|
@@ -103,7 +105,7 @@ object BasicQuery extends GraphQLOperation[StarWars] {
       |    name
       |    ... on Human {
       |      homePlanet
-      |    }      
+      |    }
       |    friends {
       |      id
       |      name
@@ -111,14 +113,14 @@ object BasicQuery extends GraphQLOperation[StarWars] {
       |    ... on Droid {
       |      primaryFunction
       |    }
-      |    __typename      
       |  }
       |}""".stripMargin
 }
 ```
 
 Will generate:
-``` scala
+
+```scala
 object BasicQuery extends GraphQLOperation[StarWars] {
   import StarWars.Enums._
 
@@ -130,7 +132,7 @@ object BasicQuery extends GraphQLOperation[StarWars] {
       |    name
       |    ... on Human {
       |      homePlanet
-      |    }      
+      |    }
       |    friends {
       |      id
       |      name
@@ -138,7 +140,6 @@ object BasicQuery extends GraphQLOperation[StarWars] {
       |    ... on Droid {
       |      primaryFunction
       |    }
-      |    __typename  
       |  }
       |}""".stripMargin
 
@@ -196,7 +197,7 @@ object BasicQuery extends GraphQLOperation[StarWars] {
         implicit val showHuman: cats.Show[Data.Hero.Human] = cats.Show.fromToString
 
         // Circe typeclasses
-        implicit val jsonDecoderHuman: io.circe.Decoder[Data.Hero.Human] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Human]        
+        implicit val jsonDecoderHuman: io.circe.Decoder[Data.Hero.Human] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Human]
       }
 
       case class Droid(override val id: String, override val name: Option[String], override val friends: Option[List[Data.Hero.Friends]], primaryFunction: Option[String]) extends Hero
@@ -212,8 +213,8 @@ object BasicQuery extends GraphQLOperation[StarWars] {
         implicit val showDroid: cats.Show[Data.Hero.Droid] = cats.Show.fromToString
 
         // Circe typeclasses
-        implicit val jsonDecoderDroid: io.circe.Decoder[Data.Hero.Droid] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Droid]        
-      }      
+        implicit val jsonDecoderDroid: io.circe.Decoder[Data.Hero.Droid] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Droid]
+      }
 
       // Lenses (for sum type)
       val id: monocle.Lens[Data.Hero, String] = monocle.Lens[Data.Hero, String](_.id)(v => _ match {
@@ -227,15 +228,14 @@ object BasicQuery extends GraphQLOperation[StarWars] {
       val friends: monocle.Lens[Data.Hero, Option[List[Data.Hero.Friends]]] = monocle.Lens[Data.Hero, Option[List[Data.Hero.Friends]]](_.friends)(v => _ match {
         case s: Data.Hero.Human => s.copy(friends = v)
         case s: Data.Hero.Droid => s.copy(friends = v)
-      })       
+      })
 
       // Cats typeclasses
       implicit val eqHero: cats.Eq[Data.Hero] = cats.Eq.fromUniversalEquals
       implicit val showHero: cats.Show[Data.Hero] = cats.Show.fromToString
 
-      // Circe typeclasses. For sum types requires circe-generic-extras.
-      implicit private val jsonConfiguration: io.circe.generic.extras.Configuration = io.circe.generic.extras.Configuration.default.withDiscriminator("__typename");
-      implicit val jsonDecoderHero: io.circe.Decoder[Data.Hero] = io.circe.generic.extras.semiauto.deriveConfiguredDecoder[Data.Hero]      
+      // Circe typeclasses.
+      implicit val jsonDecoderHero: io.circe.Decoder[Data.Hero] = List[io.circe.Decoder[Data.Hero]](io.circe.Decoder[Data.Hero.Human].asInstanceOf[io.circe.Decoder[Data.Hero]], io.circe.Decoder[Data.Hero.Droid].asInstanceOf[io.circe.Decoder[Data.Hero]]).reduceLeft(_ or _)
     }
 
     // Lenses
@@ -266,22 +266,22 @@ The macro expander can be customized in two ways:
 You can pass options via `-Xmacro-settings:key=value[,key=value...]` parameters passed to the compiler (you can pass multiple such parameters, separate options with commas, or a combination of both).
 
 Possible options are:
-* `clue.schemaDir=<absolute path>` - Tells the macro where to look for schema `.graphql` files. Multiple directories can be passed by specifying this option multiple times.
-* `clue.cats.eq=true|false` - Whether to generate `cats.Eq` instances for generated classes. They will just be `Eq.fromUniversalEquals`. `true` by default.
-* `clue.cats.show=true|false` - Whether to generate `cats.Show` instances for generated classes. They will just be `Show.fromToString`. `true` by default.
-* `clue.monocle.lenses=true|false` - Whether to generate `monocle.Lens` vals for class members. `true` by default.
-* `clue.scalajs-react.reusability=true|false` - Whether to generate `japgolly.scalajs.react.Reusability` instances for generated classes. They will be `Reusability.derive`. `false` by default.
+
+- `clue.schemaDir=<absolute path>` - Tells the macro where to look for schema `.graphql` files. Multiple directories can be passed by specifying this option multiple times.
+- `clue.cats.eq=true|false` - Whether to generate `cats.Eq` instances for generated classes. They will just be `Eq.fromUniversalEquals`. `true` by default.
+- `clue.cats.show=true|false` - Whether to generate `cats.Show` instances for generated classes. They will just be `Show.fromToString`. `true` by default.
+- `clue.monocle.lenses=true|false` - Whether to generate `monocle.Lens` vals for class members. `true` by default.
+- `clue.scalajs-react.reusability=true|false` - Whether to generate `japgolly.scalajs.react.Reusability` instances for generated classes. They will be `Reusability.derive`. `false` by default.
 
 ### Via annotation parameters
 
 Both annotations support the following parameters, which will override compiler option settings.
 
-* `eq: Boolean`
-* `show: Boolean`
-* `lenses: Boolean`
-* `reuse: Boolean`
+- `eq: Boolean`
+- `show: Boolean`
+- `lenses: Boolean`
+- `reuse: Boolean`
 
 Additionally, the following parameter can be used in both annotations to dump the generated code to the console or to the IDE (if it supports it):
 
-* `debug: Boolean`
-
+- `debug: Boolean`

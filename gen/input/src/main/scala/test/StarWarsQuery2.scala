@@ -31,7 +31,6 @@ object Wrapper /* gql: extends Something */ {
             ... on Droid {
               primaryFunction
             }
-            __typename
           }
         }
       """

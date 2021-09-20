@@ -28,7 +28,6 @@ trait StarWarsQuery extends GraphQLOperation[StarWars] {
             ... on Droid {
               primaryFunction
             }
-            __typename
           }
         }
       """

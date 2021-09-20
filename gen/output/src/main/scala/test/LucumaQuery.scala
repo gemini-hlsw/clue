@@ -25,7 +25,6 @@ object LucumaQuery extends GraphQLOperation[LucumaODB] {
               id
               name
               tracking {
-                tracktype: __typename
                 ... on Sidereal {
                   epoch
                 }
@@ -69,8 +68,7 @@ object LucumaQuery extends GraphQLOperation[LucumaODB] {
             }
             implicit val eqTracking: cats.Eq[Data.Program.Targets.Nodes.Tracking] = cats.Eq.fromUniversalEquals
             implicit val showTracking: cats.Show[Data.Program.Targets.Nodes.Tracking] = cats.Show.fromToString
-            implicit protected val jsonConfiguration: io.circe.generic.extras.Configuration = io.circe.generic.extras.Configuration.default.withDiscriminator("tracktype")
-            implicit val jsonDecoderTracking: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking] = io.circe.generic.extras.semiauto.deriveConfiguredDecoder[Data.Program.Targets.Nodes.Tracking]
+            implicit val jsonDecoderTracking: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking] = List[io.circe.Decoder[Data.Program.Targets.Nodes.Tracking]](io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Sidereal].asInstanceOf[io.circe.Decoder[Data.Program.Targets.Nodes.Tracking]], io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Nonsidereal].asInstanceOf[io.circe.Decoder[Data.Program.Targets.Nodes.Tracking]]).reduceLeft(_ or _)
           }
           implicit val id: monocle.Lens[Data.Program.Targets.Nodes, TargetId] = monocle.macros.GenLens[Data.Program.Targets.Nodes](_.id)
           implicit val name: monocle.Lens[Data.Program.Targets.Nodes, NonEmptyString] = monocle.macros.GenLens[Data.Program.Targets.Nodes](_.name)
