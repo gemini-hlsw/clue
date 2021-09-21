@@ -69,6 +69,9 @@ object Demo extends IOApp.Simple {
       _       <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
     } yield sc
 
+  // TODO Invoke mutations in another fiber
+  // TODO "sbt run" is not working in Scala 3 (ClassNotFoundException: clue.http4sjdk-demo.Demo)
+
   def run =
     withLogger[IO].use { implicit logger =>
       withStreamingClient[IO].use { implicit client =>
