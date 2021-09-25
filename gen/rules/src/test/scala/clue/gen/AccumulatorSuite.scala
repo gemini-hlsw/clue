@@ -12,7 +12,7 @@ import org.scalacheck.Arbitrary._
 
 class AccumulatorSuite extends DisciplineSuite {
 
-  val genAccumulator: Gen[Accumulator[Int, Int, Int]] =
+  val genAccumulator: Gen[Accumulator[Int, Int, Int]]                      =
     for {
       classes  <- arbitrary[List[Int]]
       parAccum <- arbitrary[List[Int]]
@@ -23,7 +23,7 @@ class AccumulatorSuite extends DisciplineSuite {
     genAccumulator
   )
 
-  implicit val eqAccumulator: Eq[Accumulator[Int, Int, Int]] =
+  implicit val eqAccumulator: Eq[Accumulator[Int, Int, Int]]               =
     Eq.by(x => (x.classes, x.parAccum, x.sum))
 
   checkAll("Monoid[Accumulator]", MonoidTests[Accumulator[Int, Int, Int]].monoid)

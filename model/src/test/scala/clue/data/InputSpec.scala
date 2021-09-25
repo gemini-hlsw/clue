@@ -32,12 +32,12 @@ object SomeInput {
       )
   )
 
-  implicit val someInputArb: Arbitrary[SomeInput] =
+  implicit val someInputArb: Arbitrary[SomeInput]   =
     Arbitrary(
       arbitrary[Input[Int]].map(SomeInput.apply)
     )
 
-  implicit val someInputEq: Eq[SomeInput] = Eq.fromUniversalEquals
+  implicit val someInputEq: Eq[SomeInput]           = Eq.fromUniversalEquals
 }
 
 class InputSpec extends DisciplineSuite {

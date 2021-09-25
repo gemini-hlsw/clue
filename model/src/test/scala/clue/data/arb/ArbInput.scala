@@ -9,7 +9,7 @@ import Gen._
 import clue.data._
 
 trait ArbInput {
-  implicit def arbInput[A: Arbitrary]: Arbitrary[Input[A]] =
+  implicit def arbInput[A: Arbitrary]: Arbitrary[Input[A]]                                     =
     Arbitrary(
       oneOf(
         Gen.const(Ignore),

@@ -30,7 +30,7 @@ package object clue {
 
   type WebSocketCloseEvent = Either[Throwable, WebSocketCloseParams]
 
-  final implicit class StringOps(val str: String) extends AnyVal {
+  final implicit class StringOps(val str: String)     extends AnyVal {
     def error[A]: Either[Throwable, A] =
       new Exception(str).asLeft[A]
 
@@ -75,7 +75,7 @@ package clue {
     def never: WebSocketReconnectionStrategy = ReconnectionStrategy.never
   }
 
-  protected[clue] object Latch {
+  protected[clue] object Latch         {
     def apply[F[_]: Concurrent]: F[Latch[F]] =
       Deferred[F, Either[Throwable, Unit]]
   }
@@ -84,7 +84,7 @@ package clue {
     def next: ConnectionId = new ConnectionId(value + 1)
   }
 
-  protected[clue] object ConnectionId {
+  protected[clue] object ConnectionId  {
     val Zero: ConnectionId = new ConnectionId(0)
 
     implicit val eqConnectionId: Eq[ConnectionId] = Eq.by(_.value)
