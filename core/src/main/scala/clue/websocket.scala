@@ -7,8 +7,8 @@ import cats.syntax.all._
 
 case class WebSocketCloseParams(code: Option[Int] = none, reason: Option[String] = none)
 object WebSocketCloseParams {
-  def apply(code:   Int): WebSocketCloseParams = WebSocketCloseParams(code = code.some)
-  def apply(reason: String): WebSocketCloseParams = WebSocketCloseParams(reason = reason.some)
-  def apply(code:   Int, reason: String): WebSocketCloseParams =
+  def apply(code: Int): WebSocketCloseParams                 = WebSocketCloseParams(code = code.some)
+  def apply(reason: String): WebSocketCloseParams            = WebSocketCloseParams(reason = reason.some)
+  def apply(code: Int, reason: String): WebSocketCloseParams =
     WebSocketCloseParams(code = code.some, reason = reason.some)
 }

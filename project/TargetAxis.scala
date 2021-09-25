@@ -21,8 +21,8 @@ object TargetAxis {
    * with a scalaVersion matching the one declared in that TargetAxis, and resolve `key`.
    */
   def resolve[T](
-    matrix:                                   ProjectMatrix,
-    key:                                      TaskKey[T]
+    matrix: ProjectMatrix,
+    key:    TaskKey[T]
   ): Def.Initialize[Task[T]] =
     Def.taskDyn {
       val sv      = targetScalaVersion(virtualAxes.value)

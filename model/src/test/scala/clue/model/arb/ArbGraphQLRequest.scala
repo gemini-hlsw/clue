@@ -10,7 +10,7 @@ import org.scalacheck.Arbitrary._
 
 trait ArbGraphQLRequest {
 
-  val arbVariables: Arbitrary[Json] =
+  val arbVariables: Arbitrary[Json]                         =
     Arbitrary {
       arbitrary[List[(String, String)]].map { lst =>
         val kvs = lst.map { case (k, v) => (k, Json.fromString(v)) }

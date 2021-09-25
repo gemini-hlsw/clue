@@ -15,10 +15,10 @@ import scala.meta._
 trait Generator {
   protected val TypeSelect = "__typename"
 
-  protected val DefaultMappings: Map[String, Type] =
+  protected val DefaultMappings: Map[String, Type]                             =
     Map("ID" -> t"String", "uuid" -> t"java.util.UUID")
 
-  protected val MetaTypes: Map[String, GType]      =
+  protected val MetaTypes: Map[String, GType] =
     // "__schema" | "__type"
     Map(TypeSelect -> ScalarType("String", "Type Discriminator".some))
 
@@ -30,7 +30,7 @@ trait Generator {
   }
   import DefineType._
 
-  protected def mustDefineType(typeName: String): List[Stat] => DefineType =
+  protected def mustDefineType(typeName: String): List[Stat] => DefineType     =
     parentBody => {
       val (extensionDefinitions, newParentBody) =
         parentBody.partitionMap {
@@ -56,7 +56,7 @@ trait Generator {
       }
     }
 
-  private def nestedTypeTree(nestTree: Term.Ref, tpe: Type): Type =
+  private def nestedTypeTree(nestTree: Term.Ref, tpe: Type): Type              =
     tpe match {
       case named @ Type.Name(_)   => Type.Select(nestTree, named)
       // case Type.Select?
@@ -111,7 +111,7 @@ trait Generator {
     }
   }
 
-  protected object ClassParam {
+  protected object ClassParam  {
     def fromGrackleType(
       name:         String,
       tpe:          grackle.Type,
@@ -154,7 +154,7 @@ trait Generator {
       nestedTypes ++ nested.flatMap(c => nextNestPath(nestPath).map(path => c.name -> path))
 
     def addToParentBody(
-      catsEq: Boolean,
+      catsEq:            Boolean,
       catsShow:          Boolean,
       monocleLenses:     Boolean,
       scalaJSReactReuse: Boolean,
@@ -429,7 +429,7 @@ trait Generator {
           )
       }
 
-  protected def snakeToCamel(s: String): String = {
+  protected def snakeToCamel(s: String): String     = {
     val wordPattern: Pattern = Pattern.compile("[a-zA-Z0-9]+(_|$)")
     val unscream             = if (!s.exists(_.isLower)) s.toLowerCase else s
     wordPattern.matcher(unscream).replaceAll(_.group.stripSuffix("_").capitalize)
@@ -442,8 +442,8 @@ trait Generator {
 
   protected sealed trait TypeType
   protected object TypeType {
-    case object CaseClass extends TypeType
-    case class Enum(values: List[EnumValue]) extends TypeType
+    case object CaseClass                      extends TypeType
+    case class Enum(values: List[EnumValue])   extends TypeType
     case class Sum(subtypeNames: List[String]) extends TypeType
   }
 

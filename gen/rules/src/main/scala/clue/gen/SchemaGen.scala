@@ -11,7 +11,7 @@ import scala.meta._
 
 trait SchemaGen extends Generator {
   // Just make sure "object Scalars" exists.
-  protected val addScalars: List[Stat] => List[Stat] =
+  protected val addScalars: List[Stat] => List[Stat]                                          =
     addModuleDefs("Scalars",
                   catsEq = false,
                   catsShow = false,
@@ -19,7 +19,7 @@ trait SchemaGen extends Generator {
                   bodyMod = _ :+ q"def ignoreUnusedImportScalars(): Unit = ()"
     )
 
-  protected def addEnums(schema: Schema, config: GraphQLGenConfig): List[Stat] => List[Stat] =
+  protected def addEnums(schema: Schema, config: GraphQLGenConfig): List[Stat] => List[Stat]  =
     addModuleDefs(
       "Enums",
       catsEq = false,

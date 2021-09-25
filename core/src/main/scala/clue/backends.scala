@@ -33,9 +33,9 @@ trait PersistentBackendHandler[F[_], CE] {
  * CP = Close Parameters, sent by client when close is requested.
  */
 trait PersistentConnection[F[_], CP] {
-  def send(msg:                    StreamingMessage.FromClient): F[Unit]
+  def send(msg: StreamingMessage.FromClient): F[Unit]
   final def close(closeParameters: CP): F[Unit] = closeInternal(closeParameters.some)
-  final def close(): F[Unit] = closeInternal(none)
+  final def close(): F[Unit]                    = closeInternal(none)
   protected[clue] def closeInternal(closeParameters: Option[CP]): F[Unit]
 }
 

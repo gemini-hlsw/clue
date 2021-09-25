@@ -5,7 +5,7 @@ package japgolly.scalajs.react
 
 import scala.annotation.unused
 
-object Dummy {
+object Dummy       {
   trait Something
 
   implicit val anyReuse: Reusability[Any] = Reusability[Any]()
