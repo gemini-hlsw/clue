@@ -6,10 +6,13 @@ package clue.gen
 import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.Ref
+import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Schema
 
 import java.io.File
+import java.io.FileInputStream
+import java.io.InputStream
 import scala.io.Source
 
 final case class GraphQLGenConfig(
@@ -29,38 +32,44 @@ final case class GraphQLGenConfig(
   private def retrieveSchema(schemaName: String): IO[Schema] = {
     val fileName = s"$schemaName.graphql"
 
-    def findSchemaFile: IO[File] =
+    val findSchemaStream: IO[InputStream] =
       IO(
         schemaDirs
           .collectFirstSome { dir =>
             val dirFile    = new File(dir)
             val schemaFile = new File(dirFile, fileName)
 
-            // println(schemaFile.getAbsolutePath())
-
-            Option(schemaFile).filter(_.exists)
+            // Attempt to open with ClassLoader. If it fails, go directly to file system.
+            Option(getClass.getResourceAsStream(schemaFile.getPath))
+              .orElse(
+                Option(schemaFile).filter(_.exists).map(f => new FileInputStream(f))
+              )
           }
           .toRight(
             new Exception(s"No schema [$fileName] found in paths [${schemaDirs.mkString(", ")}]")
           )
       ).rethrow
 
-    findSchemaFile.flatMap { file =>
-      IO(Source.fromFile(file).getLines().mkString("\n")).flatMap { schemaString =>
-        val schema = Schema(schemaString)
-        if (schema.isLeft)
-          abort(
-            s"Could not parse schema at [$fileName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
-          )
-        else
-          IO.whenA(schema.isBoth)(
-            log(
-              s"Warning when parsing schema [$fileName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+    findSchemaStream.flatMap(stream =>
+      Resource
+        .fromAutoCloseable(IO(Source.fromInputStream(stream)))
+        .use(source => IO(source.getLines().mkString("\n")))
+        .flatMap { schemaString =>
+          val schema = Schema(schemaString)
+
+          if (schema.isLeft)
+            abort(
+              s"Could not parse schema at [$fileName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
             )
-          ) >>
-            IO.pure(schema.right.get)
-      }
-    }
+          else
+            IO.whenA(schema.isBoth)(
+              log(
+                s"Warning when parsing schema [$fileName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+              )
+            ) >>
+              IO.pure(schema.right.get)
+        }
+    )
   }
 
   def getSchema(name: String): IO[Schema] =
