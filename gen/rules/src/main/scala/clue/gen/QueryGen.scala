@@ -93,10 +93,16 @@ trait QueryGen extends Generator {
     val inputs = compileVarDefs(schema, vars)
 
     if (inputs.isLeft)
-      abort(s"Error resolving operation input variables types [$vars]: [${inputs.left}]]")
+      abort(
+        s"Error resolving operation input variables types [${vars
+          .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
+      )
         .unsafeRunSync()
     if (inputs.isBoth)
-      log(s"Warning resolving operation input variables types [$vars]: [${inputs.left}]]")
+      log(
+        s"Warning resolving operation input variables types [${vars
+          .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
+      )
         .unsafeRunSync()
 
     CaseClass(
