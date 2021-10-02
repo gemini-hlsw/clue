@@ -19,7 +19,7 @@ trait ArbFromClient {
       arbitrary[Map[String, Json]](arbJsonStringMap).map(ConnectionInit(_))
     }
 
-  implicit val arbStart: Arbitrary[Start]                   =
+  implicit val arbStart: Arbitrary[Start] =
     Arbitrary {
       for {
         i <- arbitrary[String]
@@ -27,12 +27,12 @@ trait ArbFromClient {
       } yield Start(i, p)
     }
 
-  implicit val arbStop: Arbitrary[Stop]                     =
+  implicit val arbStop: Arbitrary[Stop] =
     Arbitrary {
       arbitrary[String].map(Stop(_))
     }
 
-  implicit val arbFromClient: Arbitrary[FromClient]         =
+  implicit val arbFromClient: Arbitrary[FromClient] =
     Arbitrary {
       Gen.oneOf[FromClient](
         arbitrary[ConnectionInit],

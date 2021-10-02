@@ -39,7 +39,7 @@ protected sealed abstract class State[F[_], CP](val status: PersistentClientStat
   val connectionId: ConnectionId
 }
 
-protected object State                                                              {
+protected object State {
   final case class Disconnected[F[_], CP](connectionId: ConnectionId)
       extends State[F, CP](PersistentClientStatus.Disconnected)
   final case class Connecting[F[_], CP](connectionId: ConnectionId, latch: Latch[F])
@@ -99,13 +99,13 @@ class ApolloClient[F[_], S, CP, CE](
       }
 
   // <ApolloClient>
-  override def status: F[PersistentClientStatus]                           =
+  override def status: F[PersistentClientStatus] =
     connectionStatus.get
 
-  override def statusStream: fs2.Stream[F, PersistentClientStatus]         =
+  override def statusStream: fs2.Stream[F, PersistentClientStatus] =
     connectionStatus.discrete
 
-  override def connect(): F[Unit]                                          = {
+  override def connect(): F[Unit] = {
     val warn = "connect() called while already connected or attempting to connect.".warnF
 
     Latch[F].flatMap { newLatch =>
@@ -142,7 +142,7 @@ class ApolloClient[F[_], S, CP, CE](
     }
   }
 
-  override def terminate(): F[Unit]                                        = {
+  override def terminate(): F[Unit] = {
     val error = "terminate() called while uninitialized.".raiseError.void
     val warn  = "terminate() called while initializing.".warnF
 
@@ -165,7 +165,7 @@ class ApolloClient[F[_], S, CP, CE](
     // .uncancelable // TODO We have waiting effects, we need to handle interruptions.
   }
 
-  final def disconnect(closeParameters: CP): F[Unit]                       = disconnectInternal(closeParameters.some)
+  final def disconnect(closeParameters: CP): F[Unit] = disconnectInternal(closeParameters.some)
 
   final def disconnect(): F[Unit] = disconnectInternal(none)
 
@@ -198,7 +198,7 @@ class ApolloClient[F[_], S, CP, CE](
     }.uncancelable
   }
 
-  override def reestablish(): F[Unit]                                  =
+  override def reestablish(): F[Unit] =
     Latch[F].flatMap { newConnectLatch =>
       Latch[F].flatMap { newInitLatch =>
         stateModify {

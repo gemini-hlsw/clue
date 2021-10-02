@@ -39,7 +39,7 @@ object GraphQLError {
     def int(element: Int): PathElement =
       IntPathElement(element)
 
-    def string(element: String): PathElement    =
+    def string(element: String): PathElement =
       StringPathElement(element)
 
     implicit val EqPathElement: Eq[PathElement] =

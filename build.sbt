@@ -14,7 +14,7 @@ lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val scala3Version      = "3.0.2"
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-lazy val root          = project
+lazy val root = project
   .in(file("."))
   .aggregate(
     model.projectRefs ++
@@ -31,7 +31,7 @@ lazy val root          = project
     publish / skip := true
   )
 
-lazy val model         =
+lazy val model =
   projectMatrix
     .in(file("model"))
     .settings(
@@ -48,7 +48,7 @@ lazy val model         =
                 List(scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)))
     )
 
-lazy val core          =
+lazy val core =
   projectMatrix
     .in(file("core"))
     .settings(
@@ -66,7 +66,7 @@ lazy val core          =
     .jvmPlatform(allVersions)
     .jsPlatform(allVersions)
 
-lazy val scalaJS       = projectMatrix
+lazy val scalaJS = projectMatrix
   .in(file("scalajs"))
   .settings(
     moduleName := "clue-scalajs",
@@ -77,7 +77,7 @@ lazy val scalaJS       = projectMatrix
   .defaultAxes(VirtualAxis.js, VirtualAxis.scalaPartialVersion(scala3Version))
   .jsPlatform(allVersions)
 
-lazy val http4sJDK     = projectMatrix
+lazy val http4sJDK = projectMatrix
   .in(file("http4s-jdk"))
   .settings(
     moduleName := "clue-http4s-jdk-client",
@@ -103,7 +103,7 @@ lazy val http4sJDKDemo = projectMatrix
   .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
   .jvmPlatform(allVersions)
 
-lazy val genRules      =
+lazy val genRules =
   projectMatrix
     .in(file("gen/rules"))
     .settings(
@@ -122,7 +122,7 @@ lazy val genRules      =
 // ThisBuild / scalafixScalaBinaryVersion :=
 //   CrossVersion.binaryScalaVersion(scalaVersion.value)
 
-lazy val genInput          =
+lazy val genInput =
   projectMatrix
     .in(file("gen/input"))
     .settings(
@@ -135,7 +135,7 @@ lazy val genInput          =
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
     .jvmPlatform(allVersions)
 
-lazy val genOutput         = projectMatrix
+lazy val genOutput = projectMatrix
   .in(file("gen/output"))
   .settings(
     publish / skip := true,
@@ -153,7 +153,7 @@ lazy val genOutput         = projectMatrix
 lazy val genTestsAggregate = Project("genTests", file("target/genTestsAggregate"))
   .aggregate(genTests.projectRefs: _*)
 
-lazy val genTests          = projectMatrix
+lazy val genTests = projectMatrix
   .in(file("gen/tests"))
   .settings(
     publish / skip                         := true,

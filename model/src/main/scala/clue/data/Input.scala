@@ -51,7 +51,7 @@ sealed trait Input[+A] {
     }
 }
 
-case object Ignore extends Input[Nothing]
+case object Ignore                    extends Input[Nothing]
 case object Unassign                  extends Input[Nothing]
 final case class Assign[+A](value: A) extends Input[A]
 
@@ -73,13 +73,13 @@ object Input {
       case None    => Ignore
     }
 
-  def orUnassign[A](opt: Option[A]): Input[A]     =
+  def orUnassign[A](opt: Option[A]): Input[A] =
     opt match {
       case Some(a) => Assign(a)
       case None    => Unassign
     }
 
-  implicit def inputEq[A: Eq]: Eq[Input[A]]       =
+  implicit def inputEq[A: Eq]: Eq[Input[A]] =
     new Eq[Input[A]] {
       def eqv(x: Input[A], y: Input[A]): Boolean =
         x match {
@@ -109,9 +109,9 @@ object Input {
       }
     }
 
-  private val IgnoreValue: Json                   = Json.fromString("clue.data.Ignore")
+  private val IgnoreValue: Json = Json.fromString("clue.data.Ignore")
 
-  val dropIgnoreFolder: Json.Folder[Json]                  = new Json.Folder[Json] {
+  val dropIgnoreFolder: Json.Folder[Json] = new Json.Folder[Json] {
     def onNull: Json                       = Json.Null
     def onBoolean(value: Boolean): Json    = Json.fromBoolean(value)
     def onNumber(value: JsonNumber): Json  = Json.fromJsonNumber(value)
@@ -152,7 +152,7 @@ object Input {
         case Assign(Right(b)) => Assign(b)
       }
 
-    override def flatMap[A, B](fa: Input[A])(f: A => Input[B]): Input[B]                         =
+    override def flatMap[A, B](fa: Input[A])(f: A => Input[B]): Input[B] =
       fa.flatMap(f)
 
     override def traverse[F[_], A, B](
@@ -164,7 +164,7 @@ object Input {
         case Assign(a) => F.map(f(a))(Assign(_))
       }
 
-    override def foldLeft[A, B](fa: Input[A], b: B)(f: (B, A) => B): B                           =
+    override def foldLeft[A, B](fa: Input[A], b: B)(f: (B, A) => B): B =
       fa match {
         case Ignore    => b
         case Unassign  => b
@@ -178,9 +178,9 @@ object Input {
         case Assign(a) => f(a, lb)
       }
 
-    override def functor: Functor[Input]                                                         = this
+    override def functor: Functor[Input] = this
 
-    override def align[A, B](fa: Input[A], fb: Input[B]): Input[Ior[A, B]]                   =
+    override def align[A, B](fa: Input[A], fb: Input[B]): Input[Ior[A, B]] =
       alignWith(fa, fb)(identity)
 
     override def alignWith[A, B, C](fa: Input[A], fb: Input[B])(f: Ior[A, B] => C): Input[C] =

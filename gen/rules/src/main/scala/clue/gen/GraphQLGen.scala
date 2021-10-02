@@ -23,7 +23,7 @@ class GraphQLGen(config: GraphQLGenConfig)
       .getOrElse("GraphQLGen")(this.config)
       .map(newConfig => new GraphQLGen(newConfig))
 
-  private def indented(asTree: Tree)(lines: String): String               = {
+  private def indented(asTree: Tree)(lines: String): String = {
     val indentCols    = asTree.pos match {
       case range: Position.Range => range.startColumn
       case _                     => 0
@@ -32,7 +32,7 @@ class GraphQLGen(config: GraphQLGenConfig)
     newLineIndent + lines.replaceAll("\\n", newLineIndent)
   }
 
-  override def fix(implicit doc: SemanticDocument): Patch                 = {
+  override def fix(implicit doc: SemanticDocument): Patch = {
     val importPatch: List[IO[Patch]] =
       doc.tokens.collect {
         case token @ Token.Comment(value) if value.trim.startsWith("gql:") =>

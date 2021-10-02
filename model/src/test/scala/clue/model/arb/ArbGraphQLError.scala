@@ -11,7 +11,7 @@ trait ArbGraphQLError {
 
   import GraphQLError.{ Location, PathElement }
 
-  implicit val arbPathElement: Arbitrary[PathElement]       =
+  implicit val arbPathElement: Arbitrary[PathElement] =
     Arbitrary {
       Gen.oneOf(
         arbitrary[Int].map(PathElement.int),
@@ -27,7 +27,7 @@ trait ArbGraphQLError {
       } yield Location(line, column)
     }
 
-  implicit val arbGraphQLError: Arbitrary[GraphQLError]     =
+  implicit val arbGraphQLError: Arbitrary[GraphQLError] =
     Arbitrary {
       for {
         message    <- arbitrary[String]

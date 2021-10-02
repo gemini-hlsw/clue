@@ -87,14 +87,14 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
     } yield connection
 }
 
-object WebSocketJSBackend          {
+object WebSocketJSBackend {
   def apply[F[_]: Async: Logger](dispatcher: Dispatcher[F]): WebSocketJSBackend[F] =
     new WebSocketJSBackend[F](dispatcher)
 }
 
 final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
     extends WebSocketConnection[F] {
-  override def send(msg: StreamingMessage.FromClient): F[Unit]                       =
+  override def send(msg: StreamingMessage.FromClient): F[Unit] =
     Sync[F].delay(ws.send(msg.asJson.toString))
 
   override def closeInternal(closeParameters: Option[WebSocketCloseParams]): F[Unit] =
