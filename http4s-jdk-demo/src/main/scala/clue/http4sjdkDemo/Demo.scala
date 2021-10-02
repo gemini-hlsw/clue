@@ -29,7 +29,7 @@ object Demo extends IOApp.Simple {
     type Data      = Json
     type Variables = Json
 
-    override val document: String               = """
+    override val document: String = """
     |query {
     |  observations(programId: "p-2") {
     |    nodes {
@@ -49,7 +49,7 @@ object Demo extends IOApp.Simple {
     type Data      = Json
     type Variables = Json
 
-    override val document: String               = """
+    override val document: String = """
     |subscription {
     |  observationEdit(programId:"p-2") {
     |    id

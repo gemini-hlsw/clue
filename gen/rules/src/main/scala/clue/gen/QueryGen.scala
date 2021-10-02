@@ -31,7 +31,7 @@ trait QueryGen extends Generator {
   // kicked in after macro expansion, and not before.
   // Actually(3)... We are out of luck, scalafix doesn't see macro expansions:
   // https://scalacenter.github.io/scalafix/docs/developers/semantic-tree.html#macros
-  protected def extractDocument(stats: List[Stat]): Option[String]       =
+  protected def extractDocument(stats: List[Stat]): Option[String] =
     stats.collectFirst {
       case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
           if valName == "document" =>
@@ -141,7 +141,7 @@ trait QueryGen extends Generator {
 
   protected type ClassAccumulator = Accumulator[Class, ClassParam, Sum]
 
-  protected object ClassAccumulator                                                {
+  protected object ClassAccumulator {
     def apply(
       classes:  List[Class] = List.empty,
       parAccum: List[ClassParam] = List.empty,
@@ -385,14 +385,14 @@ trait QueryGen extends Generator {
         )
         .getOrElse(parentBody)
 
-  protected val addVarEncoder: List[Stat] => List[Stat]              =
+  protected val addVarEncoder: List[Stat] => List[Stat] =
     addValRefIntoModule("varEncoder",
                         "Variables",
                         "jsonEncoderVariables",
                         t"io.circe.Encoder[Variables]"
     )
 
-  protected val addDataDecoder: List[Stat] => List[Stat]             =
+  protected val addDataDecoder: List[Stat] => List[Stat] =
     addValRefIntoModule("dataDecoder", "Data", "jsonDecoderData", t"io.circe.Decoder[Data]")
 
   protected def addConvenienceMethod(

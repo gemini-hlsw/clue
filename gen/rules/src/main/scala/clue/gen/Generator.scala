@@ -15,7 +15,7 @@ import scala.meta._
 trait Generator {
   protected val TypeSelect = "__typename"
 
-  protected val DefaultMappings: Map[String, Type]                             =
+  protected val DefaultMappings: Map[String, Type] =
     Map("ID" -> t"String", "uuid" -> t"java.util.UUID")
 
   protected val MetaTypes: Map[String, GType] =
@@ -30,7 +30,7 @@ trait Generator {
   }
   import DefineType._
 
-  protected def mustDefineType(typeName: String): List[Stat] => DefineType     =
+  protected def mustDefineType(typeName: String): List[Stat] => DefineType =
     parentBody => {
       val (extensionDefinitions, newParentBody) =
         parentBody.partitionMap {
@@ -56,7 +56,7 @@ trait Generator {
       }
     }
 
-  private def nestedTypeTree(nestTree: Term.Ref, tpe: Type): Type              =
+  private def nestedTypeTree(nestTree: Term.Ref, tpe: Type): Type =
     tpe match {
       case named @ Type.Name(_)   => Type.Select(nestTree, named)
       // case Type.Select?
@@ -111,7 +111,7 @@ trait Generator {
     }
   }
 
-  protected object ClassParam  {
+  protected object ClassParam {
     def fromGrackleType(
       name:         String,
       tpe:          grackle.Type,
@@ -429,7 +429,7 @@ trait Generator {
           )
       }
 
-  protected def snakeToCamel(s: String): String     = {
+  protected def snakeToCamel(s: String): String = {
     val wordPattern: Pattern = Pattern.compile("[a-zA-Z0-9]+(_|$)")
     val unscream             = if (!s.exists(_.isLower)) s.toLowerCase else s
     wordPattern.matcher(unscream).replaceAll(_.group.stripSuffix("_").capitalize)
