@@ -1,5 +1,5 @@
-import sbt.Def
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
+import sbt.Def
 import sbt.librarymanagement._
 
 object Settings {
@@ -11,8 +11,9 @@ object Settings {
     val disciplineMUnit = "1.0.9"
     val fs2             = "3.1.5"
     val grackle         = "0.1.9"
-    val http4s          = "1.0.0-M27"
-    val http4sJDKClient = "0.6.0-M4"
+    val http4s          = "0.23.6"
+    val http4sDom       = "0.1.0"
+    val http4sJDKClient = "0.5.0"
     val jawn            = "1.1.1"
     val log4Cats        = "2.1.1"
     val monocle         = "3.1.0"
@@ -74,6 +75,18 @@ object Settings {
       )
     )
 
+    val Http4sCore = Def.setting(
+      Seq(
+        "org.http4s" %%% "http4s-core" % http4s
+      )
+    )
+
+    val Http4sDom = Def.setting(
+      Seq(
+        "org.http4s" %%% "http4s-dom" % http4sDom
+      )
+    )
+
     val Http4sJDKClient = Def.setting(
       Seq(
         "org.http4s" %%% "http4s-jdk-http-client" % http4sJDKClient
@@ -115,12 +128,6 @@ object Settings {
       Seq(
         "ch.epfl.scala" %%% "scalafix-testkit" % scalaFix % "test"
       ).map(_.cross(CrossVersion.full))
-    )
-
-    val Http4sCore = Def.setting(
-      Seq(
-        "org.http4s" %%% "http4s-core" % http4s
-      )
     )
   }
 
