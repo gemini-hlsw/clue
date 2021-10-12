@@ -1,18 +1,18 @@
+lazy val V = _root_.scalafix.sbt.BuildInfo
+
+lazy val scala2Version      = V.scala213
+lazy val scala3Version      = "3.0.2"
+lazy val rulesCrossVersions = Seq(V.scala213)
+lazy val allVersions        = rulesCrossVersions :+ scala3Version
+
 inThisBuild(
   List(
-    scalaVersion                  := "3.0.2",
-    crossScalaVersions ++= Seq("2.13.6", "3.0.2"),
+    scalaVersion                  := scala2Version,
     homepage                      := Some(url("https://github.com/gemini-hlsw/clue")),
     Global / onChangedBuildSource := ReloadOnSourceChanges,
     testFrameworks += new TestFramework("munit.Framework")
   ) ++ lucumaPublishSettings
 )
-
-lazy val V = _root_.scalafix.sbt.BuildInfo
-
-lazy val rulesCrossVersions = Seq(V.scala213)
-lazy val scala3Version      = "3.0.2"
-lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
 lazy val root = project
   .in(file("."))
@@ -71,11 +71,13 @@ lazy val scalaJS = projectMatrix
   .settings(
     moduleName := "clue-scalajs",
     libraryDependencies ++=
-      Settings.Libraries.ScalaJSDom.value
+      Settings.Libraries.ScalaJSDom.value ++
+        Settings.Libraries.Http4sDom.value
   )
   .dependsOn(core)
   .defaultAxes(VirtualAxis.js, VirtualAxis.scalaPartialVersion(scala3Version))
-  .jsPlatform(allVersions)
+  // .jsPlatform(allVersions) Revert this when http4s-dom supports Scala 3
+  .jsPlatform(rulesCrossVersions)
 
 lazy val http4sJDK = projectMatrix
   .in(file("http4s-jdk"))
