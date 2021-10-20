@@ -10,6 +10,7 @@ import io.circe._
 import io.circe.parser._
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
+import org.http4s.Headers
 
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
 // {
@@ -17,7 +18,8 @@ import org.typelevel.log4cats.Logger
 //   "errors": [ ... ]
 // }
 class TransactionalClientImpl[F[_]: MonadThrow: TransactionalBackend: Logger, S](
-  uri: Uri
+  uri:     Uri,
+  headers: Headers
 ) extends clue.TransactionalClient[F, S] {
   override protected def requestInternal[D: Decoder](
     document:      String,
@@ -25,7 +27,7 @@ class TransactionalClientImpl[F[_]: MonadThrow: TransactionalBackend: Logger, S]
     variables:     Option[Json] = None
   ): F[D] =
     TransactionalBackend[F]
-      .request(uri, GraphQLRequest(document, operationName, variables))
+      .request(uri, GraphQLRequest(document, operationName, variables), headers)
       .map { response =>
         parse(response).flatMap { json =>
           val cursor = json.hcursor

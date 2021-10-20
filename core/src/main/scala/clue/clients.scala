@@ -10,6 +10,7 @@ import io.circe._
 import io.circe.syntax._
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
+import org.http4s.Headers
 
 /**
  * A client that allows one-shot queries and mutations.
@@ -47,7 +48,7 @@ trait TransactionalClient[F[_], S] {
 }
 
 object TransactionalClient {
-  def of[F[_], S](uri: Uri, name: String = "")(implicit
+  def of[F[_], S](uri: Uri, name: String = "", headers: Headers = Headers.empty)(implicit
     F:                 MonadError[F, Throwable],
     backend:           TransactionalBackend[F],
     logger:            Logger[F]
@@ -55,7 +56,7 @@ object TransactionalClient {
     val logPrefix = s"clue.TransactionalClient[${if (name.isEmpty) uri else name}]"
 
     Applicative[F].pure(
-      new TransactionalClientImpl[F, S](uri)(
+      new TransactionalClientImpl[F, S](uri, headers)(
         F,
         backend,
         logger.withModifiedString(s => s"$logPrefix $s")
