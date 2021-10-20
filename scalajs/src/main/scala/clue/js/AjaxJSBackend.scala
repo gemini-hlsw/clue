@@ -32,7 +32,8 @@ final class AjaxJSBackend[F[_]: Async](method: AjaxMethod) extends Transactional
     headers: Headers
   ): F[String] =
     Async[F].async_ { cb =>
-      val headersʹ =  headers.headers.map { case h => h.name.toString -> h.value } .toMap // is this sufficient?
+      val headersʹ =
+        headers.headers.map { case h => h.name.toString -> h.value }.toMap // is this sufficient?
       method match {
         case AjaxMethod.POST =>
           Ajax

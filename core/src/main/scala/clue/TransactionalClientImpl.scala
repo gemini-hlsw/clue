@@ -18,7 +18,7 @@ import org.http4s.Headers
 //   "errors": [ ... ]
 // }
 class TransactionalClientImpl[F[_]: MonadThrow: TransactionalBackend: Logger, S](
-  uri: Uri,
+  uri:     Uri,
   headers: Headers
 ) extends clue.TransactionalClient[F, S] {
   override protected def requestInternal[D: Decoder](
