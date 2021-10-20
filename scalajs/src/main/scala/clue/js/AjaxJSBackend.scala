@@ -48,7 +48,7 @@ final class AjaxJSBackend[F[_]: Async](method: AjaxMethod) extends Transactional
           val op        = request.operationName.foldMap(o => s"&operationName=$o")
           Ajax
             .get(
-              url = URIUtils.encodeURI(s"$uri?query=${request.query}$variables$op")
+              url = URIUtils.encodeURI(s"$uri?query=${request.query.trim.replaceAll(" +", " ")}$variables$op")
             )
             .onComplete {
               case Success(r) => cb(Right(r.responseText))
