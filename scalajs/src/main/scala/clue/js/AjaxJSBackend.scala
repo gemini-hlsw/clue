@@ -16,6 +16,7 @@ import scala.scalajs.js.URIUtils
 import scala.concurrent.ExecutionContext.Implicits._
 import scala.util.Failure
 import scala.util.Success
+import org.http4s.Headers
 
 sealed trait AjaxMethod extends Product with Serializable
 
@@ -27,16 +28,18 @@ object AjaxMethod {
 final class AjaxJSBackend[F[_]: Async](method: AjaxMethod) extends TransactionalBackend[F] {
   def request(
     uri:     Uri,
-    request: GraphQLRequest
+    request: GraphQLRequest,
+    headers: Headers
   ): F[String] =
     Async[F].async_ { cb =>
+      val headersʹ =  headers.headers.map { case h => h.name.toString -> h.value } .toMap // is this sufficient?
       method match {
         case AjaxMethod.POST =>
           Ajax
             .post(
               url = uri.toString,
               data = request.asJson.toString,
-              headers = Map("Content-Type" -> "application/json")
+              headers = headersʹ + ("Content-Type" -> "application/json")
             )
             .onComplete {
               case Success(r) => cb(Right(r.responseText))
@@ -48,7 +51,8 @@ final class AjaxJSBackend[F[_]: Async](method: AjaxMethod) extends Transactional
           val op        = request.operationName.foldMap(o => s"&operationName=$o")
           Ajax
             .get(
-              url = URIUtils.encodeURI(s"$uri?query=${request.query}$variables$op")
+              url = URIUtils.encodeURI(s"$uri?query=${request.query}$variables$op"),
+              headers = headersʹ
             )
             .onComplete {
               case Success(r) => cb(Right(r.responseText))

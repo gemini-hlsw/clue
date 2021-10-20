@@ -18,6 +18,7 @@ import org.http4s.headers._
 import org.http4s.jdkhttpclient.JdkHttpClient
 
 import java.net.http.HttpClient
+import org.http4s.Headers
 
 final class Http4sJDKBackend[F[_]: Async](val client: Client[F]) extends TransactionalBackend[F] {
 
@@ -26,10 +27,11 @@ final class Http4sJDKBackend[F[_]: Async](val client: Client[F]) extends Transac
 
   def request(
     uri:     Uri,
-    request: GraphQLRequest
+    request: GraphQLRequest,
+    headers: Headers
   ): F[String] =
     client.expect[String](
-      POST(request.asJson, uri).withContentType(`Content-Type`(MediaType.application.json))
+      POST(request.asJson, uri, headers).withContentType(`Content-Type`(MediaType.application.json))
     )
 }
 
