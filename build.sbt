@@ -133,7 +133,7 @@ lazy val genInput =
         Settings.Libraries.Monocle.value
     )
     .dependsOn(core)
-    //.dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
+    // .dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
     .jvmPlatform(allVersions)
 
