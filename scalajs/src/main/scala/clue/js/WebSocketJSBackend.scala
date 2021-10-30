@@ -13,10 +13,10 @@ import clue.model.StreamingMessage
 import clue.model.json._
 import io.circe.syntax._
 import org.http4s.Uri
-import org.scalajs.dom.raw.CloseEvent
-import org.scalajs.dom.raw.Event
-import org.scalajs.dom.raw.MessageEvent
-import org.scalajs.dom.raw.WebSocket
+import org.scalajs.dom.CloseEvent
+import org.scalajs.dom.Event
+import org.scalajs.dom.MessageEvent
+import org.scalajs.dom.WebSocket
 import org.typelevel.log4cats.Logger
 
 /**
