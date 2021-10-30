@@ -9,16 +9,16 @@ object Settings {
     val catsEffect      = "3.2.9"
     val circe           = "0.14.1"
     val disciplineMUnit = "1.0.9"
-    val fs2             = "3.1.6"
+    val fs2             = "3.2.2"
     val grackle         = "0.1.9"
     val http4s          = "0.23.6"
-    val http4sDom       = "0.1.0"
+    val http4sDom       = "0.2.0"
     val http4sJDKClient = "0.5.0"
     val jawn            = "1.1.1"
     val log4Cats        = "2.1.1"
     val monocle         = "3.1.0"
     val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
-    val scalaJSDom      = "1.2.0"
+    val scalaJSDom      = "2.0.0"
   }
 
   object Libraries {
