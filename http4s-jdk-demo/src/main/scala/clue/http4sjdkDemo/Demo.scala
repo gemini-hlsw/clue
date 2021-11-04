@@ -22,20 +22,31 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scala.concurrent.duration._
 import clue.TransactionalClient
 import scala.util.Random
+import clue.SubQuery
 
 object Demo extends IOApp.Simple {
+
+  object ObsSubQuery extends SubQuery[Json] {
+
+    override def subDocument: String = """
+    |      id
+    |      name
+    |      status
+    |""".stripMargin
+
+    override implicit def jsonDecoder: Decoder[Json] = Decoder[Json]
+
+  }
 
   object Query extends GraphQLOperation[Unit] {
     type Data      = Json
     type Variables = Json
 
-    override val document: String = """
+    override val document: String = gql"""
     |query {
     |  observations(programId: "p-2") {
     |    nodes {
-    |      id
-    |      name
-    |      status
+    |      $ObsSubQuery
     |    }
     |  }
     |}""".stripMargin
