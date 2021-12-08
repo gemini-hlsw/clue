@@ -11,7 +11,7 @@ object Settings {
     val disciplineMUnit = "1.0.9"
     val fs2             = "3.2.3"
     val grackle         = "0.1.9"
-    val http4s          = "0.23.6"
+    val http4s          = "0.23.7"
     val http4sDom       = "0.2.0"
     val http4sJDKClient = "0.5.0"
     val jawn            = "1.1.1"
