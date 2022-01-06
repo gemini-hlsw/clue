@@ -5,20 +5,21 @@ import sbt.librarymanagement._
 object Settings {
 
   object LibraryVersions {
-    val cats            = "2.7.0"
-    val catsEffect      = "3.2.9"
-    val circe           = "0.14.1"
-    val disciplineMUnit = "1.0.9"
-    val fs2             = "3.2.3"
-    val grackle         = "0.1.9"
-    val http4s          = "0.23.7"
-    val http4sDom       = "0.2.0"
-    val http4sJDKClient = "0.5.0"
-    val jawn            = "1.1.1"
-    val log4Cats        = "2.1.1"
-    val monocle         = "3.1.0"
-    val scalaFix        = scalafix.sbt.BuildInfo.scalafixVersion
-    val scalaJSDom      = "2.1.0"
+    val cats                     = "2.7.0"
+    val catsEffect               = "3.3.3"
+    val circe                    = "0.14.1"
+    val disciplineMUnit          = "1.0.9"
+    val fs2                      = "3.2.4"
+    val grackle                  = "0.1.9"
+    val http4s                   = "0.23.7"
+    val http4sDom                = "0.2.0"
+    val http4sJDKClient          = "0.5.0"
+    val jawn                     = "1.3.2"
+    val log4Cats                 = "2.1.1"
+    val monocle                  = "3.1.0"
+    val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
+    val scalaJSDom               = "2.1.0"
+    val scalaJSMacrotaskExecutor = "1.0.0"
   }
 
   object Libraries {
@@ -112,12 +113,6 @@ object Settings {
       )
     )
 
-    val ScalaJSDom = Def.setting(
-      Seq(
-        ("org.scala-js" %%% "scalajs-dom" % scalaJSDom)
-      )
-    )
-
     val ScalaFix = Def.setting(
       Seq(
         ("ch.epfl.scala" %%% "scalafix-core" % scalaFix)
@@ -129,6 +124,19 @@ object Settings {
         "ch.epfl.scala" %%% "scalafix-testkit" % scalaFix % "test"
       ).map(_.cross(CrossVersion.full))
     )
+
+    val ScalaJSDom = Def.setting(
+      Seq(
+        ("org.scala-js" %%% "scalajs-dom" % scalaJSDom)
+      )
+    )
+
+    val ScalaJSMacrotaskExecutor = Def.setting(
+      Seq(
+        ("org.scala-js" %%% "scala-js-macrotask-executor" % scalaJSMacrotaskExecutor)
+      )
+    )
+
   }
 
 }

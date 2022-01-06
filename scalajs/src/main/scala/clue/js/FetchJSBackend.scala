@@ -16,7 +16,7 @@ import org.scalajs.dom.HttpMethod
 import org.scalajs.dom.RequestInit
 import org.scalajs.dom.{ Headers => FetchHeaders }
 
-import scala.concurrent.ExecutionContext.Implicits._
+import org.scalajs.macrotaskexecutor.MacrotaskExecutor.Implicits._
 import scala.scalajs.js.URIUtils
 import scala.util.Failure
 import scala.util.Success
@@ -27,16 +27,16 @@ object FetchMethod {
   case object POST extends FetchMethod
 }
 
-final class FetchJSBackend[F[_]: Async](method: FetchMethod) extends TransactionalBackend[F] {
+final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod) extends TransactionalBackend[F] {
   def request(
-    uri:     Uri,
-    request: GraphQLRequest,
-    headers: Headers
+    uri:          Uri,
+    request:      GraphQLRequest,
+    fetchHeaders: Headers
   ): F[String] =
     Async[F].async_ { cb =>
       val headersʹ = new FetchHeaders()
-      headers.headers.foreach(h => headersʹ.append(h.name.toString, h.value))
-      val fetch    = method match {
+      fetchHeaders.headers.foreach(h => headersʹ.append(h.name.toString, h.value))
+      val fetch    = fetchMethod match {
         case FetchMethod.POST =>
           headersʹ.set("Content-Type", "application/json")
           Fetch
