@@ -72,12 +72,12 @@ lazy val scalaJS = projectMatrix
     moduleName := "clue-scalajs",
     libraryDependencies ++=
       Settings.Libraries.ScalaJSDom.value ++
-        Settings.Libraries.Http4sDom.value
+        Settings.Libraries.Http4sDom.value ++
+        Settings.Libraries.ScalaJSMacrotaskExecutor.value
   )
   .dependsOn(core)
   .defaultAxes(VirtualAxis.js, VirtualAxis.scalaPartialVersion(scala3Version))
-  // .jsPlatform(allVersions) Revert this when http4s-dom supports Scala 3
-  .jsPlatform(rulesCrossVersions)
+  .jsPlatform(allVersions)
 
 lazy val http4sJDK = projectMatrix
   .in(file("http4s-jdk"))
