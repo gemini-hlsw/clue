@@ -5,10 +5,11 @@ lazy val scala3Version      = "3.1.1"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-ThisBuild / tlBaseVersion       := "0.20"
-ThisBuild / tlCiReleaseBranches := Seq("master")
-ThisBuild / scalaVersion        := scala2Version
-Global / onChangedBuildSource   := ReloadOnSourceChanges
+ThisBuild / tlBaseVersion              := "0.20"
+ThisBuild / tlCiReleaseBranches        := Seq("master")
+ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
+ThisBuild / scalaVersion               := scala2Version
+Global / onChangedBuildSource          := ReloadOnSourceChanges
 
 lazy val root = tlCrossRootProject
   .aggregate(
