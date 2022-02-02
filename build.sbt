@@ -34,7 +34,8 @@ lazy val model =
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
           Settings.Libraries.Circe.value ++
-          Settings.Libraries.DisciplineMUnit.value
+          Settings.Libraries.DisciplineMUnit.value ++
+          Settings.Libraries.MUnit.value
     )
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
     .jvmPlatform(allVersions)
@@ -51,7 +52,8 @@ lazy val core =
           Settings.Libraries.Fs2.value ++
           Settings.Libraries.Log4Cats.value ++
           Settings.Libraries.Http4sCore.value ++
-          Settings.Libraries.DisciplineMUnit.value,
+          Settings.Libraries.DisciplineMUnit.value ++
+          Settings.Libraries.MUnit.value,
       scalacOptions += "-language:implicitConversions"
     )
     .dependsOn(model)
@@ -106,7 +108,8 @@ lazy val genRules =
       libraryDependencies ++=
         Settings.Libraries.Grackle.value ++
           Settings.Libraries.ScalaFix.value ++
-          Settings.Libraries.DisciplineMUnit.value,
+          Settings.Libraries.DisciplineMUnit.value ++
+          Settings.Libraries.MUnit.value,
       scalacOptions ~= (_.filterNot(Set("-Vtype-diffs")))
     )
     .dependsOn(core)

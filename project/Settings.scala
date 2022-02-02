@@ -17,6 +17,7 @@ object Settings {
     val jawn                     = "1.3.2"
     val log4Cats                 = "2.1.1"
     val monocle                  = "3.1.0"
+    val munit                    = "0.7.29"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom               = "2.1.0"
     val scalaJSMacrotaskExecutor = "1.0.0"
@@ -110,6 +111,12 @@ object Settings {
       Seq(
         "dev.optics" %%% "monocle-core"  % monocle,
         "dev.optics" %%% "monocle-macro" % monocle
+      )
+    )
+
+    val MUnit = Def.setting(
+      Seq[ModuleID](
+        "org.scalameta" %%% "munit" % munit % "test"
       )
     )
 
