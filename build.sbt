@@ -138,7 +138,8 @@ lazy val genOutput = projectMatrix
   .enablePlugins(NoPublishPlugin)
   .settings(
     scalacOptions ++= { if (tlIsScala3.value) Nil else List("-Wconf:cat=unused:info") },
-    libraryDependencies ++= Settings.Libraries.Monocle.value
+    libraryDependencies ++= Settings.Libraries.Monocle.value,
+    tlFatalWarnings := false
   )
   .dependsOn(core)
   .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
