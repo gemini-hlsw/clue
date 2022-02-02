@@ -5,30 +5,24 @@ lazy val scala3Version      = "3.1.1"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-inThisBuild(
-  List(
-    scalaVersion                  := scala2Version,
-    homepage                      := Some(url("https://github.com/gemini-hlsw/clue")),
-    Global / onChangedBuildSource := ReloadOnSourceChanges,
-    testFrameworks += new TestFramework("munit.Framework")
-  ) ++ lucumaPublishSettings
-)
+ThisBuild / tlBaseVersion       := "0.20"
+ThisBuild / tlCiReleaseBranches := Seq("master")
+ThisBuild / scalaVersion        := scala2Version
+Global / onChangedBuildSource   := ReloadOnSourceChanges
 
-lazy val root = project
-  .in(file("."))
+lazy val root = tlCrossRootProject
   .aggregate(
-    model.projectRefs ++
-      core.projectRefs ++
-      scalaJS.projectRefs ++
-      http4sJDK.projectRefs ++
-      genRules.projectRefs ++
-      genInput.projectRefs ++
-      genOutput.projectRefs ++
-      genTests.projectRefs: _*
+    model,
+    core,
+    scalaJS,
+    http4sJDK,
+    genRules,
+    genInput,
+    genOutput,
+    genTests
   )
   .settings(
-    name           := "clue",
-    publish / skip := true
+    name := "clue"
   )
 
 lazy val model =
@@ -93,9 +87,9 @@ lazy val http4sJDK = projectMatrix
 
 lazy val http4sJDKDemo = projectMatrix
   .in(file("http4s-jdk-demo"))
+  .enablePlugins(NoPublishPlugin)
   .settings(
     moduleName := "clue-http4s-jdk-client-demo",
-    publish    := false,
     libraryDependencies ++= Seq(
       "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
       "org.slf4j"      % "slf4j-simple"   % "1.6.4"
@@ -127,8 +121,8 @@ lazy val genRules =
 lazy val genInput =
   projectMatrix
     .in(file("gen/input"))
+    .enablePlugins(NoPublishPlugin)
     .settings(
-      publish / skip := true,
       libraryDependencies ++=
         Settings.Libraries.Monocle.value
     )
@@ -139,13 +133,9 @@ lazy val genInput =
 
 lazy val genOutput = projectMatrix
   .in(file("gen/output"))
+  .enablePlugins(NoPublishPlugin)
   .settings(
-    publish / skip := true,
-    scalacOptions ++=
-      (scalaVersion.value match {
-        case `scala3Version` => Nil
-        case _               => List("-Wconf:cat=unused:info")
-      }),
+    scalacOptions ++= { if (tlIsScala3.value) Nil else List("-Wconf:cat=unused:info") },
     libraryDependencies ++= Settings.Libraries.Monocle.value
   )
   .dependsOn(core)
@@ -157,8 +147,8 @@ lazy val genTestsAggregate = Project("genTests", file("target/genTestsAggregate"
 
 lazy val genTests = projectMatrix
   .in(file("gen/tests"))
+  .enablePlugins(NoPublishPlugin)
   .settings(
-    publish / skip                         := true,
     libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value,
     scalafixTestkitOutputSourceDirectories :=
       TargetAxis
