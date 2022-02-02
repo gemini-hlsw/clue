@@ -12,6 +12,8 @@ import org.http4s.Uri
 import org.typelevel.log4cats.Logger
 import org.http4s.Headers
 
+import scala.language.implicitConversions
+
 /**
  * A client that allows one-shot queries and mutations.
  */
