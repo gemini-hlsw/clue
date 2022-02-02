@@ -34,13 +34,12 @@ lazy val model =
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
           Settings.Libraries.Circe.value ++
-          Settings.Libraries.DisciplineMUnit.value
+          Settings.Libraries.DisciplineMUnit.value,
+      scalacOptions += "-language:implicitConversions"
     )
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
     .jvmPlatform(allVersions)
-    .jsPlatform(allVersions,
-                List(scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)))
-    )
+    .jsPlatform(allVersions)
 
 lazy val core =
   projectMatrix
