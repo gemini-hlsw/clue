@@ -95,13 +95,13 @@ trait QueryGen extends Generator {
     if (inputs.isLeft)
       abort(
         s"Error resolving operation input variables types [${vars
-          .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
+            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
       )
         .unsafeRunSync()
     if (inputs.isBoth)
       log(
         s"Warning resolving operation input variables types [${vars
-          .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
+            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
       )
         .unsafeRunSync()
 
