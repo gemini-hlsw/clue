@@ -63,6 +63,9 @@ package object clue {
 
     def warnF[F[_]](msg: String)(implicit logger: Logger[F]): F[Unit] =
       logger.warn(t)(msg)
+
+    def debugF[F[_]](msg: String)(implicit logger: Logger[F]): F[Unit] =
+      logger.debug(t)(msg)
   }
 }
 
