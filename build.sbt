@@ -13,6 +13,10 @@ Global / onChangedBuildSource          := ReloadOnSourceChanges
 
 ThisBuild / coverageEnabled := false // TODO figure out how to make it work with projectmatrix
 
+lazy val mimaSettings = Seq(
+  mimaPreviousArtifacts ~= { _.filterNot(_.revision == "0.20.1") } // botched
+)
+
 lazy val root = tlCrossRootProject
   .aggregate(
     model,
@@ -33,6 +37,7 @@ lazy val model =
     .in(file("model"))
     .settings(
       moduleName := "clue-model",
+      mimaSettings,
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
@@ -49,6 +54,7 @@ lazy val core =
     .in(file("core"))
     .settings(
       moduleName := "clue-core",
+      mimaSettings,
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsEffect.value ++
@@ -68,6 +74,7 @@ lazy val scalaJS = projectMatrix
   .in(file("scalajs"))
   .settings(
     moduleName      := "clue-scalajs",
+    mimaSettings,
     coverageEnabled := false,
     libraryDependencies ++=
       Settings.Libraries.ScalaJSDom.value ++
@@ -109,6 +116,7 @@ lazy val genRules =
     .in(file("gen/rules"))
     .settings(
       moduleName := "clue-generator",
+      mimaSettings,
       libraryDependencies ++=
         Settings.Libraries.Grackle.value ++
           Settings.Libraries.ScalaFix.value ++
