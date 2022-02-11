@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue
@@ -39,5 +39,8 @@ class TransactionalClientImpl[F[_]: MonadThrow: TransactionalBackend: Logger, S]
         }
       }
       .rethrow
-      .onError { case t: Throwable => t.logF("Error in query: ") }
+      .onError {
+        case re: ResponseException => re.debugF("Query returned errors:")
+        case other                 => other.warnF("Error executing query:")
+      }
 }

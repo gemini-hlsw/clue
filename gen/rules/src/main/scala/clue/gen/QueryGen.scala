@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue.gen
@@ -95,13 +95,13 @@ trait QueryGen extends Generator {
     if (inputs.isLeft)
       abort(
         s"Error resolving operation input variables types [${vars
-          .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
+            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
       )
         .unsafeRunSync()
     if (inputs.isBoth)
       log(
         s"Warning resolving operation input variables types [${vars
-          .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
+            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
       )
         .unsafeRunSync()
 
@@ -235,7 +235,7 @@ trait QueryGen extends Generator {
                 _._1 match {
                   case UntypedNarrow(typeName, _) =>
                     typeName.some // Selection in inline fragment, group by discriminator.some
-                  case _ =>
+                  case _                          =>
                     none // Selection in base group, group by none
                 }
               }

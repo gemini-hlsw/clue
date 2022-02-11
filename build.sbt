@@ -1,34 +1,35 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
 lazy val scala2Version      = V.scala213
-lazy val scala3Version      = "3.1.0"
+lazy val scala3Version      = "3.1.1"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-inThisBuild(
-  List(
-    scalaVersion                  := scala2Version,
-    homepage                      := Some(url("https://github.com/gemini-hlsw/clue")),
-    Global / onChangedBuildSource := ReloadOnSourceChanges,
-    testFrameworks += new TestFramework("munit.Framework")
-  ) ++ lucumaPublishSettings
+ThisBuild / tlBaseVersion              := "0.20"
+ThisBuild / tlCiReleaseBranches        := Seq("master")
+ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
+ThisBuild / scalaVersion               := scala2Version
+Global / onChangedBuildSource          := ReloadOnSourceChanges
+
+ThisBuild / coverageEnabled := false // TODO figure out how to make it work with projectmatrix
+
+lazy val mimaSettings = Seq(
+  mimaPreviousArtifacts ~= { _.filterNot(_.revision == "0.20.1") } // botched
 )
 
-lazy val root = project
-  .in(file("."))
+lazy val root = tlCrossRootProject
   .aggregate(
-    model.projectRefs ++
-      core.projectRefs ++
-      scalaJS.projectRefs ++
-      http4sJDK.projectRefs ++
-      genRules.projectRefs ++
-      genInput.projectRefs ++
-      genOutput.projectRefs ++
-      genTests.projectRefs: _*
+    model,
+    core,
+    scalaJS,
+    http4sJDK,
+    genRules,
+    genInput,
+    genOutput,
+    genTests
   )
   .settings(
-    name           := "clue",
-    publish / skip := true
+    name := "clue"
   )
 
 lazy val model =
@@ -36,30 +37,33 @@ lazy val model =
     .in(file("model"))
     .settings(
       moduleName := "clue-model",
+      mimaSettings,
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
           Settings.Libraries.Circe.value ++
-          Settings.Libraries.DisciplineMUnit.value
+          Settings.Libraries.DisciplineMUnit.value ++
+          Settings.Libraries.MUnit.value
     )
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
     .jvmPlatform(allVersions)
-    .jsPlatform(allVersions,
-                List(scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)))
-    )
+    .jsPlatform(allVersions)
 
 lazy val core =
   projectMatrix
     .in(file("core"))
     .settings(
       moduleName := "clue-core",
+      mimaSettings,
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsEffect.value ++
           Settings.Libraries.Fs2.value ++
           Settings.Libraries.Log4Cats.value ++
           Settings.Libraries.Http4sCore.value ++
-          Settings.Libraries.DisciplineMUnit.value
+          Settings.Libraries.DisciplineMUnit.value ++
+          Settings.Libraries.MUnit.value,
+      scalacOptions += "-language:implicitConversions"
     )
     .dependsOn(model)
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
@@ -69,7 +73,9 @@ lazy val core =
 lazy val scalaJS = projectMatrix
   .in(file("scalajs"))
   .settings(
-    moduleName := "clue-scalajs",
+    moduleName      := "clue-scalajs",
+    mimaSettings,
+    coverageEnabled := false,
     libraryDependencies ++=
       Settings.Libraries.ScalaJSDom.value ++
         Settings.Libraries.Http4sDom.value ++
@@ -83,6 +89,7 @@ lazy val http4sJDK = projectMatrix
   .in(file("http4s-jdk"))
   .settings(
     moduleName := "clue-http4s-jdk-client",
+    mimaSettings,
     libraryDependencies ++=
       Settings.Libraries.Http4sCirce.value ++
         Settings.Libraries.Http4sJDKClient.value
@@ -93,9 +100,9 @@ lazy val http4sJDK = projectMatrix
 
 lazy val http4sJDKDemo = projectMatrix
   .in(file("http4s-jdk-demo"))
+  .enablePlugins(NoPublishPlugin)
   .settings(
     moduleName := "clue-http4s-jdk-client-demo",
-    publish    := false,
     libraryDependencies ++= Seq(
       "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
       "org.slf4j"      % "slf4j-simple"   % "1.6.4"
@@ -110,10 +117,12 @@ lazy val genRules =
     .in(file("gen/rules"))
     .settings(
       moduleName := "clue-generator",
+      mimaSettings,
       libraryDependencies ++=
         Settings.Libraries.Grackle.value ++
           Settings.Libraries.ScalaFix.value ++
-          Settings.Libraries.DisciplineMUnit.value,
+          Settings.Libraries.DisciplineMUnit.value ++
+          Settings.Libraries.MUnit.value,
       scalacOptions ~= (_.filterNot(Set("-Vtype-diffs")))
     )
     .dependsOn(core)
@@ -127,8 +136,8 @@ lazy val genRules =
 lazy val genInput =
   projectMatrix
     .in(file("gen/input"))
+    .enablePlugins(NoPublishPlugin)
     .settings(
-      publish / skip := true,
       libraryDependencies ++=
         Settings.Libraries.Monocle.value
     )
@@ -139,14 +148,11 @@ lazy val genInput =
 
 lazy val genOutput = projectMatrix
   .in(file("gen/output"))
+  .enablePlugins(NoPublishPlugin)
   .settings(
-    publish / skip := true,
-    scalacOptions ++=
-      (scalaVersion.value match {
-        case `scala3Version` => Nil
-        case _               => List("-Wconf:cat=unused:info")
-      }),
-    libraryDependencies ++= Settings.Libraries.Monocle.value
+    scalacOptions ++= { if (tlIsScala3.value) Nil else List("-Wconf:cat=unused:info") },
+    libraryDependencies ++= Settings.Libraries.Monocle.value,
+    tlFatalWarnings := false
   )
   .dependsOn(core)
   .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
@@ -157,8 +163,8 @@ lazy val genTestsAggregate = Project("genTests", file("target/genTestsAggregate"
 
 lazy val genTests = projectMatrix
   .in(file("gen/tests"))
+  .enablePlugins(NoPublishPlugin)
   .settings(
-    publish / skip                         := true,
     libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value,
     scalafixTestkitOutputSourceDirectories :=
       TargetAxis

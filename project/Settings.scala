@@ -6,17 +6,18 @@ object Settings {
 
   object LibraryVersions {
     val cats                     = "2.7.0"
-    val catsEffect               = "3.3.4"
+    val catsEffect               = "3.3.5"
     val circe                    = "0.14.1"
     val disciplineMUnit          = "1.0.9"
     val fs2                      = "3.2.4"
     val grackle                  = "0.1.9"
-    val http4s                   = "0.23.7"
+    val http4s                   = "0.23.9"
     val http4sDom                = "0.2.0"
     val http4sJDKClient          = "0.5.0"
     val jawn                     = "1.3.2"
     val log4Cats                 = "2.1.1"
     val monocle                  = "3.1.0"
+    val munit                    = "0.7.29"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom               = "2.1.0"
     val scalaJSMacrotaskExecutor = "1.0.0"
@@ -110,6 +111,12 @@ object Settings {
       Seq(
         "dev.optics" %%% "monocle-core"  % monocle,
         "dev.optics" %%% "monocle-macro" % monocle
+      )
+    )
+
+    val MUnit = Def.setting(
+      Seq[ModuleID](
+        "org.scalameta" %%% "munit" % munit % "test"
       )
     )
 

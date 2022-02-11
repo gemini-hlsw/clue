@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue
@@ -574,7 +574,7 @@ class ApolloClient[F[_], S, CP, CE](
     }
 
     def emitError(json: Json): F[Unit] = {
-      val error = new ResponseException(json.asArray.fold(List(json))(_.toList))
+      val error = new ResponseException(json.hcursor.get[List[Json]]("errors").getOrElse(Nil))
       // TODO When an Error message is received, we terminate the stream and halt the subscription. Do we want that?
       queue.offer(error.asLeft)
     }

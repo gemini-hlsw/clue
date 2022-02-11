@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2021 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue.gen
@@ -237,7 +237,7 @@ trait Generator {
             val thisType  = qualifiedNestedType(nestPath, Type.Name(camelName))
             val childType = param.typeTree(nextPath, nextTypes)
             q"implicit val ${Pat.Var(Term.Name(param.name))}:  monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term
-              .Name(param.name)})"
+                .Name(param.name)})"
           // q"val ${Term.Name(param.name)}: monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term.Name(param.name)})"
           }
           moduleBody ++ lensesDef
