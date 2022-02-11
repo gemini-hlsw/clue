@@ -574,7 +574,7 @@ class ApolloClient[F[_], S, CP, CE](
     }
 
     def emitError(json: Json): F[Unit] = {
-      val error = new ResponseException(json.asArray.fold(List(json))(_.toList))
+      val error = new ResponseException(json.hcursor.get[List[Json]]("errors").getOrElse(Nil))
       // TODO When an Error message is received, we terminate the stream and halt the subscription. Do we want that?
       queue.offer(error.asLeft)
     }

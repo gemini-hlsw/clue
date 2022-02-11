@@ -39,5 +39,8 @@ class TransactionalClientImpl[F[_]: MonadThrow: TransactionalBackend: Logger, S]
         }
       }
       .rethrow
-      .onError { case t: Throwable => t.logF("Error in query: ") }
+      .onError {
+        case re: ResponseException => re.debugF("Query returned errors:")
+        case other                 => other.warnF("Error executing query:")
+      }
 }
