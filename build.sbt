@@ -1,7 +1,9 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-lazy val scala2Version      = V.scala213
-lazy val scala3Version      = "3.1.1"
+lazy val scala2Version = V.scala213
+lazy val scala3Version = "3.1.1"
+ThisBuild / crossScalaVersions     := Seq(scala2Version, scala3Version)
+ThisBuild / tlSkipIrrelevantScalas := true
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
@@ -65,7 +67,8 @@ lazy val core =
 lazy val scalaJS = projectMatrix
   .in(file("scalajs"))
   .settings(
-    moduleName := "clue-scalajs",
+    moduleName      := "clue-scalajs",
+    coverageEnabled := false,
     libraryDependencies ++=
       Settings.Libraries.ScalaJSDom.value ++
         Settings.Libraries.Http4sDom.value ++
