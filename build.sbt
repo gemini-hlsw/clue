@@ -89,6 +89,7 @@ lazy val http4sJDK = projectMatrix
   .in(file("http4s-jdk"))
   .settings(
     moduleName := "clue-http4s-jdk-client",
+    mimaSettings,
     libraryDependencies ++=
       Settings.Libraries.Http4sCirce.value ++
         Settings.Libraries.Http4sJDKClient.value
