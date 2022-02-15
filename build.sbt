@@ -1,7 +1,9 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-lazy val scala2Version      = V.scala213
-lazy val scala3Version      = "3.1.1"
+lazy val scala2Version = V.scala213
+lazy val scala3Version = "3.1.1"
+ThisBuild / crossScalaVersions     := Seq(scala2Version, scala3Version)
+ThisBuild / tlSkipIrrelevantScalas := true
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
@@ -10,8 +12,6 @@ ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
 ThisBuild / scalaVersion               := scala2Version
 Global / onChangedBuildSource          := ReloadOnSourceChanges
-
-ThisBuild / coverageEnabled := false // TODO figure out how to make it work with projectmatrix
 
 lazy val mimaSettings = Seq(
   mimaPreviousArtifacts ~= { _.filterNot(_.revision == "0.20.1") } // botched
