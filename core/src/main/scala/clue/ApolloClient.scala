@@ -574,7 +574,12 @@ class ApolloClient[F[_], S, CP, CE](
     }
 
     def emitError(json: Json): F[Unit] = {
-      val error = new ResponseException(json.hcursor.get[List[Json]]("errors").getOrElse(Nil))
+      // Should `json` be the full response with an `errors` field or just the actual errors?
+      // Above in `onMessage` we strip them out
+      //       case Right(StreamingMessage.FromServer.DataJson(subscriptionId, data, errors)) =>
+      // and pass just the errors to `emitError`
+//      val error = new ResponseException(json.hcursor.get[List[Json]]("errors").getOrElse(Nil))
+      val error = new ResponseException(json.asArray.fold(List(json))(_.toList))
       // TODO When an Error message is received, we terminate the stream and halt the subscription. Do we want that?
       queue.offer(error.asLeft)
     }
