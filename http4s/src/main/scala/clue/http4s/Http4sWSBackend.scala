@@ -50,9 +50,9 @@ final class Http4sWSBackend[F[_]: Concurrent](client: WSClient[F]) extends WebSo
               }
             case ExitCase.Errored(t) => handler.onClose(connectionId, t.asLeft) >> release // TODO
             case ExitCase.Canceled   =>
-                handler.onClose(connectionId,
-                                new GraphQLException(s"WS listener canceled. URI: [$uri]").asLeft
-                ) >> release // TODO
+              handler.onClose(connectionId,
+                              new GraphQLException(s"WS listener canceled. URI: [$uri]").asLeft
+              ) >> release // TODO
           }
           .compile
           .drain
@@ -73,7 +73,6 @@ final class Http4sWSConnection[F[_]: Concurrent /*: Sync: Logger*/ ](
     conn.send(WSFrame.Text(msg.asJson.toString))
 
   // In high-level WS, we cannot specify close code.
-  override def closeInternal(closeParameters: Option[WebSocketCloseParams]): F[Unit] = {
+  override def closeInternal(closeParameters: Option[WebSocketCloseParams]): F[Unit] =
     Concurrent[F].unit // TODO
-  }
 }
