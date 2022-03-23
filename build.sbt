@@ -11,9 +11,6 @@ ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_
 ThisBuild / scalaVersion               := scala2Version
 Global / onChangedBuildSource          := ReloadOnSourceChanges
 
-resolvers +=
-  "Sonatype S01 OSS Snapshots".at("https://s01.oss.sonatype.org/content/repositories/snapshots")
-
 ThisBuild / coverageEnabled := false // TODO figure out how to make it work with projectmatrix
 
 lazy val mimaSettings = Seq(
