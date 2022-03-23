@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package clue.http4sjdk
+package clue.http4s
 
 import cats.effect._
 import clue._
@@ -15,12 +15,9 @@ import org.http4s.circe._
 import org.http4s.client.Client
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.headers._
-import org.http4s.jdkhttpclient.JdkHttpClient
-
-import java.net.http.HttpClient
 import org.http4s.Headers
 
-final class Http4sJDKBackend[F[_]: Async](val client: Client[F]) extends TransactionalBackend[F] {
+final class Http4sBackend[F[_]: Concurrent](val client: Client[F]) extends TransactionalBackend[F] {
 
   object dsl extends Http4sClientDsl[F]
   import dsl._
@@ -35,11 +32,7 @@ final class Http4sJDKBackend[F[_]: Async](val client: Client[F]) extends Transac
     )
 }
 
-object Http4sJDKBackend {
-  def apply[F[_]: Async]: Resource[F, Http4sJDKBackend[F]] =
-    JdkHttpClient.simple[F].map(new Http4sJDKBackend[F](_))
-
-  def fromHttpClient[F[_]: Async](client: HttpClient): Resource[F, Http4sJDKBackend[F]] =
-    JdkHttpClient[F](client).map(new Http4sJDKBackend(_))
-
+object Http4sBackend {
+  def apply[F[_]: Concurrent](client: Client[F]): Http4sBackend[F] =
+    new Http4sBackend[F](client)
 }
