@@ -11,8 +11,6 @@ ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_
 ThisBuild / scalaVersion               := scala2Version
 Global / onChangedBuildSource          := ReloadOnSourceChanges
 
-ThisBuild / coverageEnabled := false // TODO figure out how to make it work with projectmatrix
-
 lazy val mimaSettings = Seq(
   mimaPreviousArtifacts ~= { _.filterNot(_.revision == "0.20.1") } // botched
 )
