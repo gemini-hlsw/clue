@@ -5,7 +5,7 @@ lazy val scala3Version      = "3.1.1"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-ThisBuild / tlBaseVersion              := "0.20"
+ThisBuild / tlBaseVersion              := "0.21"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
 ThisBuild / scalaVersion               := scala2Version
@@ -20,7 +20,7 @@ lazy val root = tlCrossRootProject
     model,
     core,
     scalaJS,
-    http4sJDK,
+    http4s,
     genRules,
     genInput,
     genOutput,
@@ -83,14 +83,14 @@ lazy val scalaJS = projectMatrix
   .defaultAxes(VirtualAxis.js, VirtualAxis.scalaPartialVersion(scala3Version))
   .jsPlatform(allVersions)
 
-lazy val http4sJDK = projectMatrix
-  .in(file("http4s-jdk"))
+lazy val http4s = projectMatrix
+  .in(file("http4s"))
   .settings(
-    moduleName := "clue-http4s-jdk-client",
+    moduleName := "clue-http4s",
     mimaSettings,
     libraryDependencies ++=
       Settings.Libraries.Http4sCirce.value ++
-        Settings.Libraries.Http4sJDKClient.value
+        Settings.Libraries.Http4sClient.value
   )
   .dependsOn(core)
   .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
@@ -104,9 +104,9 @@ lazy val http4sJDKDemo = projectMatrix
     libraryDependencies ++= Seq(
       "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
       "org.slf4j"      % "slf4j-simple"   % "1.6.4"
-    )
+    ) ++ Settings.Libraries.Http4sJDKClient.value
   )
-  .dependsOn(http4sJDK)
+  .dependsOn(http4s)
   .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
   .jvmPlatform(allVersions)
 

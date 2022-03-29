@@ -13,12 +13,13 @@ import cats.syntax.all._
 import clue.ApolloWebSocketClient
 import clue.GraphQLOperation
 import clue.PersistentStreamingClient
-import clue.http4sjdk.Http4sJDKWSBackend
+import clue.http4s.Http4sWSBackend
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.generic.semiauto._
 import org.http4s.implicits._
+import org.http4s.jdkhttpclient.JdkWSClient
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -86,7 +87,8 @@ object Demo extends IOApp.Simple {
   def withStreamingClient[F[_]: Async: Logger]
     : Resource[F, PersistentStreamingClient[F, Unit, _, _]] =
     for {
-      backend <- Http4sJDKWSBackend[F]
+      client <- JdkWSClient.simple
+      backend = Http4sWSBackend(client)
       uri      = uri"wss://lucuma-odb-development.herokuapp.com/ws"
       sc      <- Resource.eval(ApolloWebSocketClient.of[F, Unit](uri)(Async[F], Logger[F], backend))
       _       <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())

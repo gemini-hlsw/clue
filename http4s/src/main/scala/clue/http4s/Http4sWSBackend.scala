@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package clue.http4sjdk
+package clue.http4s
 
 import cats.effect.Resource.ExitCase
 import cats.effect._
@@ -13,14 +13,12 @@ import clue.model.json._
 import io.circe.syntax._
 import org.http4s.Headers
 import org.http4s.Uri
-import org.http4s.jdkhttpclient._
-
-import java.net.http.HttpClient
+import org.http4s.client.websocket._
 
 /**
- * Streaming backend for http4s-JDK WebSocket.
+ * Streaming backend for http4s WebSocket client.
  */
-final class Http4sJDKWSBackend[F[_]: Async](client: WSClient[F]) extends WebSocketBackend[F] {
+final class Http4sWSBackend[F[_]: Concurrent](client: WSClient[F]) extends WebSocketBackend[F] {
 
   override def connect(
     uri:          Uri,
@@ -29,14 +27,14 @@ final class Http4sJDKWSBackend[F[_]: Async](client: WSClient[F]) extends WebSock
   ): F[PersistentConnection[F, WebSocketCloseParams]] =
     client
       .connectHighLevel(
-        WSRequest(uri, headers = Headers("Sec-WebSocket-Protocol" -> "graphql-ws"))
+        WSRequest(uri).withHeaders(Headers("Sec-WebSocket-Protocol" -> "graphql-ws"))
       )
-      .allocated
+      .allocated // TODO replace with allocatedCase
       .flatMap { case (connection, release) =>
         connection.receiveStream
           .evalTap {
             case WSFrame.Text(data, _) => handler.onMessage(connectionId, data)
-            case WSFrame.Binary(_, _)  => Async[F].unit
+            case WSFrame.Binary(_, _)  => Concurrent[F].unit
           }
           .onFinalizeCase {
             case ExitCase.Succeeded  =>
@@ -48,39 +46,33 @@ final class Http4sJDKWSBackend[F[_]: Async](client: WSClient[F]) extends WebSock
                       s"Unexpected clean close for WS without close frame. URI: [$uri]"
                     )
                   )
-                handler.onClose(connectionId, event) >> release
+                handler.onClose(connectionId, event) >> release // TODO
               }
-            case ExitCase.Errored(t) => handler.onClose(connectionId, t.asLeft) >> release
+            case ExitCase.Errored(t) => handler.onClose(connectionId, t.asLeft) >> release // TODO
             case ExitCase.Canceled   =>
-              connection.sendClose() >>
-                handler.onClose(connectionId,
-                                new GraphQLException(s"WS listener canceled. URI: [$uri]").asLeft
-                ) >> release
+              handler.onClose(connectionId,
+                              new GraphQLException(s"WS listener canceled. URI: [$uri]").asLeft
+              ) >> release // TODO
           }
           .compile
           .drain
           .start
-          .as(new Http4sJDKWSConnection(connection))
+          .as(new Http4sWSConnection(connection))
       }
 }
 
-object Http4sJDKWSBackend {
-  def apply[F[_]: Async]: Resource[F, Http4sJDKWSBackend[F]] =
-    JdkWSClient.simple[F].map(new Http4sJDKWSBackend(_))
-
-  def fromHttpClient[F[_]: Async](client: HttpClient): Resource[F, Http4sJDKWSBackend[F]] =
-    JdkWSClient[F](client).map(new Http4sJDKWSBackend(_))
+object Http4sWSBackend {
+  def apply[F[_]: Concurrent](client: WSClient[F]): Http4sWSBackend[F] =
+    new Http4sWSBackend(client)
 }
 
-final class Http4sJDKWSConnection[F[_] /*: Sync: Logger*/ ](
+final class Http4sWSConnection[F[_]: Concurrent /*: Sync: Logger*/ ](
   private val conn: WSConnectionHighLevel[F]
 ) extends WebSocketConnection[F] {
   override def send(msg: StreamingMessage.FromClient): F[Unit] =
     conn.send(WSFrame.Text(msg.asJson.toString))
 
   // In high-level WS, we cannot specify close code.
-  override def closeInternal(closeParameters: Option[WebSocketCloseParams]): F[Unit] = {
-    val params = closeParameters.getOrElse(WebSocketCloseParams())
-    conn.sendClose(params.reason.orEmpty)
-  }
+  override def closeInternal(closeParameters: Option[WebSocketCloseParams]): F[Unit] =
+    Concurrent[F].unit // TODO
 }
