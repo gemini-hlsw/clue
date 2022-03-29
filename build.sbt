@@ -7,6 +7,7 @@ lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
 ThisBuild / tlBaseVersion              := "0.21"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
+ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
 ThisBuild / scalaVersion               := scala2Version
 Global / onChangedBuildSource          := ReloadOnSourceChanges
@@ -100,7 +101,8 @@ lazy val http4sJDKDemo = projectMatrix
   .in(file("http4s-jdk-demo"))
   .enablePlugins(NoPublishPlugin)
   .settings(
-    moduleName := "clue-http4s-jdk-client-demo",
+    moduleName   := "clue-http4s-jdk-client-demo",
+    tlJdkRelease := Some(11),
     libraryDependencies ++= Seq(
       "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
       "org.slf4j"      % "slf4j-simple"   % "1.6.4"
