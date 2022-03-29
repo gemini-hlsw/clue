@@ -430,9 +430,14 @@ trait Generator {
       }
 
   protected def snakeToCamel(s: String): String = {
-    val wordPattern: Pattern = Pattern.compile("[a-zA-Z0-9]+(_|$)")
+    val wordPattern: Pattern = Pattern.compile("([a-zA-Z0-9]+)(?:_|$)")
     val unscream             = if (!s.exists(_.isLower)) s.toLowerCase else s
-    wordPattern.matcher(unscream).replaceAll(_.group.stripSuffix("_").capitalize)
+    val matcher              = wordPattern.matcher(unscream)
+    val sb                   = new StringBuffer
+    while (matcher.find())
+      matcher.appendReplacement(sb, matcher.group(1).capitalize)
+    matcher.appendTail(sb)
+    sb.toString
   }
 
   protected case class EnumValue(asString: String, className: String)
