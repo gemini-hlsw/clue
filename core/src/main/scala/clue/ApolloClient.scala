@@ -8,6 +8,7 @@ import cats.effect.Temporal
 import cats.effect._
 import cats.effect.implicits._
 import cats.effect.std.Queue
+import cats.effect.std.UUIDGen
 import cats.syntax.all._
 import clue.GraphQLSubscription
 import clue.model.GraphQLRequest
@@ -593,7 +594,7 @@ class ApolloClient[F[_], S, CP, CE](
   ): F[(String, QueueEmitter[D])] =
     for {
       queue  <- Queue.unbounded[F, Either[Throwable, Option[D]]]
-      id     <- F.delay(UUID.randomUUID().toString)
+      id     <- UUIDGen.randomString[F]
       emitter = QueueEmitter(queue, request)
     } yield (id, emitter)
 
