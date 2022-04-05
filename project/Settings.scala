@@ -21,10 +21,17 @@ object Settings {
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom               = "2.1.0"
     val scalaJSMacrotaskExecutor = "1.0.0"
+    val scalaJSSecureRandom      = "1.0.0"
   }
 
   object Libraries {
     import LibraryVersions._
+
+    val SecureRandom = Def.setting(
+      Seq(
+        "org.scala-js" %%% "scalajs-java-securerandom" % scalaJSSecureRandom
+      )
+    )
 
     val Cats = Def.setting(
       Seq(

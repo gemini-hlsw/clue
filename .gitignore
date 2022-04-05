@@ -34,3 +34,6 @@ metals.sbt
 
 # VSCode plugins
 node_modules
+
+# direnv
+.direnv/
