@@ -8,9 +8,9 @@ import cats.syntax.all._
 import clue.model.GraphQLRequest
 import io.circe._
 import io.circe.parser._
+import org.http4s.Headers
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
-import org.http4s.Headers
 
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
 // {

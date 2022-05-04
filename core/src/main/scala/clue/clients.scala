@@ -5,12 +5,13 @@ package clue
 
 import cats.Applicative
 import cats.MonadError
+import cats.effect.Resource
 import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
+import org.http4s.Headers
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
-import org.http4s.Headers
 
 /**
  * A client that allows one-shot queries and mutations.
@@ -65,17 +66,6 @@ object TransactionalClient {
   }
 }
 
-/*
- * A subscription, as seen from the client.
- */
-trait GraphQLSubscription[F[_], D] {
-  // Subscription data stream.
-  val stream: fs2.Stream[F, D]
-
-  // Can be called by the client to stop the subscription.
-  def stop(): F[Unit]
-}
-
 /**
  * A client that allows subscriptions in addition to one-shot queries and mutations.
  */
@@ -85,16 +75,16 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
     subscription:        GraphQLOperation[S],
     operationName:       Option[String] = None
   )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
-    def apply(variables: V): F[GraphQLSubscription[F, D]] =
+    def apply(variables: V): Resource[F, fs2.Stream[F, D]] =
       subscribeInternal[D](subscription.document, operationName, variables.asJson.some)
 
-    def apply: F[GraphQLSubscription[F, D]] =
+    def apply: Resource[F, fs2.Stream[F, D]] =
       subscribeInternal[D](subscription.document, operationName)
   }
   object SubscriptionApplied {
     implicit def withoutVariables[V, D](
       applied: SubscriptionApplied[V, D]
-    ): F[GraphQLSubscription[F, D]] =
+    ): Resource[F, fs2.Stream[F, D]] =
       applied.apply
   }
 
@@ -110,7 +100,7 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None
-  ): F[GraphQLSubscription[F, D]]
+  ): Resource[F, fs2.Stream[F, D]]
 }
 
 /**

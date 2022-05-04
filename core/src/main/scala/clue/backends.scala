@@ -6,8 +6,8 @@ package clue
 import cats.syntax.all._
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
-import org.http4s.Uri
 import org.http4s.Headers
+import org.http4s.Uri
 
 /*
  * One-shot backend.

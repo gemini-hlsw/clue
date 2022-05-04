@@ -226,8 +226,8 @@ class ApolloClient[F[_], S, CP, CE](
     subscription:  String,
     operationName: Option[String],
     variables:     Option[Json]
-  ): F[GraphQLSubscription[F, D]] =
-    startSubscription(subscription, operationName, variables)(implicitly[Decoder[D]])
+  ): Resource[F, fs2.Stream[F, D]] =
+    subscriptionResource(subscription, operationName, variables)(implicitly[Decoder[D]])
 
   // <TransactionalClient>
   override protected def requestInternal[D: Decoder](
@@ -599,6 +599,15 @@ class ApolloClient[F[_], S, CP, CE](
     } yield (id, emitter)
 
   // TODO Handle interruptions in subscription and query.
+
+  private def subscriptionResource[D: Decoder](
+    subscription:  String,
+    operationName: Option[String],
+    variables:     Option[Json]
+  ): Resource[F, fs2.Stream[F, D]] =
+    Resource
+      .make(startSubscription[D](subscription, operationName, variables))(_.stop())
+      .map(_.stream)
 
   private def startSubscription[D: Decoder](
     subscription:  String,
