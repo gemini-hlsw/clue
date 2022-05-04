@@ -13,6 +13,7 @@ import cats.syntax.all._
 import clue.ApolloWebSocketClient
 import clue.GraphQLOperation
 import clue.PersistentStreamingClient
+import clue.TransactionalClient
 import clue.http4s.Http4sWSBackend
 import io.circe.Decoder
 import io.circe.Encoder
@@ -24,7 +25,6 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.duration._
-import clue.TransactionalClient
 import scala.util.Random
 
 object Demo extends IOApp.Simple {
@@ -38,7 +38,7 @@ object Demo extends IOApp.Simple {
     |  observations(programId: "p-2") {
     |    nodes {
     |      id
-    |      name
+    |      title
     |      status
     |    }
     |  }
@@ -89,9 +89,9 @@ object Demo extends IOApp.Simple {
     for {
       client <- JdkWSClient.simple
       backend = Http4sWSBackend(client)
-      uri      = uri"wss://lucuma-odb-development.herokuapp.com/ws"
-      sc      <- Resource.eval(ApolloWebSocketClient.of[F, Unit](uri)(Async[F], Logger[F], backend))
-      _       <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
+      uri     = uri"wss://lucuma-odb-development.herokuapp.com/ws"
+      sc     <- Resource.eval(ApolloWebSocketClient.of[F, Unit](uri)(Async[F], Logger[F], backend))
+      _      <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
     } yield sc
 
   val allStatus =
@@ -118,16 +118,16 @@ object Demo extends IOApp.Simple {
     withLogger[IO].use { implicit logger =>
       withStreamingClient[IO].use { implicit client =>
         for {
-          result       <- client.request(Query)
-          _            <- IO.println(result)
-          subscription <- client.subscribe(Subscription)
-          fiber        <- subscription.stream.evalTap(_ => IO.println("UPDATE!")).compile.drain.start
-          _            <- mutator(client, (result \\ "id").map(_.as[String].toOption.get)).start
-          _            <- IO.sleep(10.seconds)
-          _            <- subscription.stop()
-          _            <- fiber.join
-          result       <- client.request(Query)
-          _            <- IO.println(result)
+          result          <- client.request(Query)
+          _               <- IO.println(result)
+          (stream, close) <- client.subscribe(Subscription).allocated
+          fiber           <- stream.evalTap(_ => IO.println("UPDATE!")).compile.drain.start
+          _               <- mutator(client, (result \\ "id").map(_.as[String].toOption.get)).start
+          _               <- IO.sleep(10.seconds)
+          _               <- close
+          _               <- fiber.join
+          result          <- client.request(Query)
+          _               <- IO.println(result)
 
         } yield ()
       }
