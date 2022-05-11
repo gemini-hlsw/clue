@@ -107,6 +107,7 @@ lazy val genRules =
       libraryDependencies ++=
         Settings.Libraries.Grackle.value ++
           Settings.Libraries.ScalaFix.value ++
+          Settings.Libraries.CatsTestkit.value ++
           Settings.Libraries.DisciplineMUnit.value ++
           Settings.Libraries.MUnit.value,
       scalacOptions ~= (_.filterNot(Set("-Vtype-diffs")))
