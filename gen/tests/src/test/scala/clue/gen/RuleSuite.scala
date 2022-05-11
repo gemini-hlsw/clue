@@ -9,6 +9,8 @@ import org.scalatest.{ Args, FunSuiteLike }
 class RuleSuite extends AbstractSemanticRuleSuite() with FunSuiteLike {
   // run is defined in both AbstractSemanticRuleSuite and FunSuiteLike
   // Scala 3 requires us to explicitly specify which impl to use
+  // run is defined in both AbstractSemanticRuleSuite and FunSuiteLike
+  // Scala 3 requires us to explicitly specify which impl to use
   override def run(testName: Option[String], args: Args) =
     super[AbstractSemanticRuleSuite].run(testName, args)
 
