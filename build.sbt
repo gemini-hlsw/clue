@@ -62,6 +62,7 @@ lazy val core =
 
 lazy val scalaJS = project
   .in(file("scalajs"))
+  .enablePlugins(ScalaJSPlugin)
   .settings(
     moduleName      := "clue-scalajs",
     coverageEnabled := false,
