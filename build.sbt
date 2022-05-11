@@ -10,11 +10,8 @@ ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
 ThisBuild / scalaVersion               := scala2Version
+ThisBuild / crossScalaVersions         := allVersions
 Global / onChangedBuildSource          := ReloadOnSourceChanges
-
-lazy val mimaSettings = Seq(
-  mimaPreviousArtifacts ~= { _.filterNot(_.revision == "0.20.1") } // botched
-)
 
 lazy val root = tlCrossRootProject
   .aggregate(
@@ -32,11 +29,11 @@ lazy val root = tlCrossRootProject
   )
 
 lazy val model =
-  projectMatrix
+  crossProject(JVMPlatform, JSPlatform)
+    .crossType(CrossType.Pure)
     .in(file("model"))
     .settings(
       moduleName := "clue-model",
-      mimaSettings,
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
@@ -44,16 +41,13 @@ lazy val model =
           Settings.Libraries.DisciplineMUnit.value ++
           Settings.Libraries.MUnit.value
     )
-    .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
-    .jvmPlatform(allVersions)
-    .jsPlatform(allVersions)
 
 lazy val core =
-  projectMatrix
+  crossProject(JVMPlatform, JSPlatform)
+    .crossType(CrossType.Pure)
     .in(file("core"))
     .settings(
       moduleName := "clue-core",
-      mimaSettings,
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsEffect.value ++
@@ -65,39 +59,32 @@ lazy val core =
       scalacOptions += "-language:implicitConversions"
     )
     .dependsOn(model)
-    .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
-    .jvmPlatform(allVersions)
-    .jsPlatform(allVersions)
 
-lazy val scalaJS = projectMatrix
+lazy val scalaJS = project
   .in(file("scalajs"))
   .settings(
     moduleName      := "clue-scalajs",
-    mimaSettings,
     coverageEnabled := false,
     libraryDependencies ++=
       Settings.Libraries.ScalaJSDom.value ++
         Settings.Libraries.Http4sDom.value ++
         Settings.Libraries.ScalaJSMacrotaskExecutor.value
   )
-  .dependsOn(core)
-  .defaultAxes(VirtualAxis.js, VirtualAxis.scalaPartialVersion(scala3Version))
-  .jsPlatform(allVersions)
+  .dependsOn(core.js)
 
-lazy val http4s = projectMatrix
-  .in(file("http4s"))
-  .settings(
-    moduleName := "clue-http4s",
-    mimaSettings,
-    libraryDependencies ++=
-      Settings.Libraries.Http4sCirce.value ++
-        Settings.Libraries.Http4sClient.value
-  )
-  .dependsOn(core)
-  .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
-  .jvmPlatform(allVersions)
+lazy val http4s =
+  crossProject(JVMPlatform, JSPlatform)
+    .crossType(CrossType.Pure)
+    .in(file("http4s"))
+    .settings(
+      moduleName := "clue-http4s",
+      libraryDependencies ++=
+        Settings.Libraries.Http4sCirce.value ++
+          Settings.Libraries.Http4sClient.value
+    )
+    .dependsOn(core)
 
-lazy val http4sJDKDemo = projectMatrix
+lazy val http4sJDKDemo = project
   .in(file("http4s-jdk-demo"))
   .enablePlugins(NoPublishPlugin)
   .settings(
@@ -108,16 +95,14 @@ lazy val http4sJDKDemo = projectMatrix
       "org.slf4j"      % "slf4j-simple"   % "1.6.4"
     ) ++ Settings.Libraries.Http4sJDKClient.value
   )
-  .dependsOn(http4s)
-  .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
-  .jvmPlatform(allVersions)
+  .dependsOn(http4s.jvm)
 
 lazy val genRules =
-  projectMatrix
+  project
     .in(file("gen/rules"))
     .settings(
-      moduleName := "clue-generator",
-      mimaSettings,
+      moduleName         := "clue-generator",
+      crossScalaVersions := rulesCrossVersions,
       libraryDependencies ++=
         Settings.Libraries.Grackle.value ++
           Settings.Libraries.ScalaFix.value ++
@@ -125,27 +110,23 @@ lazy val genRules =
           Settings.Libraries.MUnit.value,
       scalacOptions ~= (_.filterNot(Set("-Vtype-diffs")))
     )
-    .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(rulesCrossVersions.head))
-    .jvmPlatform(rulesCrossVersions)
 
 // Only necessary to fix inputs in place. Sometimes it gives a clearer picture than a diff.
 // ThisBuild / scalafixScalaBinaryVersion :=
 //   CrossVersion.binaryScalaVersion(scalaVersion.value)
 
 lazy val genInput =
-  projectMatrix
+  project
     .in(file("gen/input"))
     .enablePlugins(NoPublishPlugin)
     .settings(
       libraryDependencies ++=
         Settings.Libraries.Monocle.value
     )
-    .dependsOn(core)
-    // .dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
-    .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
-    .jvmPlatform(allVersions)
+    .dependsOn(core.jvm)
+// .dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
 
-lazy val genOutput = projectMatrix
+lazy val genOutput = project
   .in(file("gen/output"))
   .enablePlugins(NoPublishPlugin)
   .settings(
@@ -153,45 +134,19 @@ lazy val genOutput = projectMatrix
     libraryDependencies ++= Settings.Libraries.Monocle.value,
     tlFatalWarnings := false
   )
-  .dependsOn(core)
-  .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(scala3Version))
-  .jvmPlatform(allVersions)
+  .dependsOn(core.jvm)
 
-lazy val genTestsAggregate = Project("genTests", file("target/genTestsAggregate"))
-  .aggregate(genTests.projectRefs: _*)
-
-lazy val genTests = projectMatrix
+lazy val genTests = project
   .in(file("gen/tests"))
-  .enablePlugins(NoPublishPlugin)
+  .enablePlugins(ScalafixTestkitPlugin, NoPublishPlugin)
   .settings(
-    libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value,
-    scalafixTestkitOutputSourceDirectories :=
-      TargetAxis
-        .resolve(genOutput, Compile / unmanagedSourceDirectories)
-        .value,
-    scalafixTestkitInputSourceDirectories  :=
-      TargetAxis
-        .resolve(genInput, Compile / unmanagedSourceDirectories)
-        .value,
-    scalafixTestkitInputClasspath          :=
-      TargetAxis.resolve(genInput, Compile / fullClasspath).value,
-    scalafixTestkitInputScalacOptions      :=
-      TargetAxis.resolve(genInput, Compile / scalacOptions).value,
-    scalafixTestkitInputScalaVersion       :=
-      TargetAxis.resolve(genInput, Compile / scalaVersion).value
+    libraryDependencies ~= (_.filterNot(_.name == "scalafix-testkit")),
+    libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value
+      .map(_.cross(CrossVersion.constant(V.scala213))),
+    scalafixTestkitOutputSourceDirectories := (genOutput / Compile / unmanagedSourceDirectories).value,
+    scalafixTestkitInputSourceDirectories  := (genInput / Compile / unmanagedSourceDirectories).value,
+    scalafixTestkitInputClasspath          := (genInput / Compile / fullClasspath).value,
+    scalafixTestkitInputScalacOptions      := (genInput / Compile / scalacOptions).value,
+    scalafixTestkitInputScalaVersion       := (genInput / Compile / scalaVersion).value
   )
   .dependsOn(genRules)
-  .enablePlugins(ScalafixTestkitPlugin)
-  .defaultAxes(
-    rulesCrossVersions.map(VirtualAxis.scalaABIVersion) :+ VirtualAxis.jvm: _*
-  )
-  .customRow(
-    scalaVersions = Seq(V.scala213),
-    axisValues = Seq(TargetAxis(scala3Version), VirtualAxis.jvm),
-    settings = Seq()
-  )
-  .customRow(
-    scalaVersions = Seq(V.scala213),
-    axisValues = Seq(TargetAxis(V.scala213), VirtualAxis.jvm),
-    settings = Seq()
-  )

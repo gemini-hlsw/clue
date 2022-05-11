@@ -4,8 +4,11 @@
 package fix
 
 import scalafix.testkit.AbstractSemanticRuleSuite
-import org.scalatest.FunSuiteLike
+import org.scalatest.{ Args, FunSuiteLike }
 
 class RuleSuite extends AbstractSemanticRuleSuite() with FunSuiteLike {
+  override def run(testName: Option[String], args: Args) =
+    super[AbstractSemanticRuleSuite].run(testName, args)
+
   runAllTests()
 }
