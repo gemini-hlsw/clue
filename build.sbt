@@ -56,7 +56,7 @@ lazy val core =
           Settings.Libraries.Http4sCore.value ++
           Settings.Libraries.DisciplineMUnit.value ++
           Settings.Libraries.MUnit.value,
-      scalacOptions += "-language:implicitConversions"
+      scalacOptions ++= { if (tlIsScala3.value) Nil else List("-language:implicitConversions") }
     )
     .dependsOn(model)
 
