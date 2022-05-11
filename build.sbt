@@ -125,7 +125,6 @@ lazy val genRules =
           Settings.Libraries.MUnit.value,
       scalacOptions ~= (_.filterNot(Set("-Vtype-diffs")))
     )
-    .dependsOn(core)
     .defaultAxes(VirtualAxis.jvm, VirtualAxis.scalaPartialVersion(rulesCrossVersions.head))
     .jvmPlatform(rulesCrossVersions)
 
