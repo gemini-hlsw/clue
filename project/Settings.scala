@@ -12,7 +12,7 @@ object Settings {
     val fs2                      = "3.2.7"
     val grackle                  = "0.1.9"
     val http4s                   = "0.23.11"
-    val http4sDom                = "0.2.1"
+    val http4sDom                = "0.2.2"
     val http4sJDKClient          = "0.7.0"
     val jawn                     = "1.3.2"
     val log4Cats                 = "2.3.1"
