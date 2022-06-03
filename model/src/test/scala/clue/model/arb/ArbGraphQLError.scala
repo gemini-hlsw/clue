@@ -4,12 +4,12 @@
 package clue.model
 package arb
 
-import org.scalacheck._
 import org.scalacheck.Arbitrary._
+import org.scalacheck._
 
 trait ArbGraphQLError {
 
-  import GraphQLError.{ Location, PathElement }
+  import GraphQLError.{Location, PathElement}
 
   implicit val arbPathElement: Arbitrary[PathElement] =
     Arbitrary {

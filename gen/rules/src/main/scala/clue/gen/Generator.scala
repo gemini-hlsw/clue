@@ -7,7 +7,7 @@ package clue.gen
 import cats.syntax.all._
 import edu.gemini.grackle
 import edu.gemini.grackle.ScalarType
-import edu.gemini.grackle.{ Type => GType }
+import edu.gemini.grackle.{Type => GType}
 
 import java.util.regex.Pattern
 import scala.meta._

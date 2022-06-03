@@ -6,7 +6,7 @@ package clue.gen
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all._
 import edu.gemini.grackle.UntypedOperation._
-import edu.gemini.grackle.{ Term => _, Type => GType, _ }
+import edu.gemini.grackle.{Term => _, Type => GType, _}
 
 import scala.meta._
 
@@ -55,7 +55,7 @@ trait QueryGen extends Generator {
   //
   // START COPIED FROM GRACKLE.
   //
-  import Query.{ Skip => _, _ }
+  import Query.{Skip => _, _}
   protected[this] def compileVarDefs(
     schema:         Schema,
     untypedVarDefs: UntypedVarDefs

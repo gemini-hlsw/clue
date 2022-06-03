@@ -14,7 +14,7 @@ import org.http4s.Uri
 import org.scalajs.dom.Fetch
 import org.scalajs.dom.HttpMethod
 import org.scalajs.dom.RequestInit
-import org.scalajs.dom.{ Headers => FetchHeaders }
+import org.scalajs.dom.{Headers => FetchHeaders}
 import org.scalajs.macrotaskexecutor.MacrotaskExecutor.Implicits._
 
 import scala.scalajs.js.URIUtils

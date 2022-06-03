@@ -4,21 +4,22 @@
 package clue.data
 
 import cats.Eq
-import munit.DisciplineSuite
-import arb.ArbInput._
-import cats.syntax.all._
 import cats.kernel.laws.discipline.EqTests
-import org.scalacheck.Prop.forAll
+import cats.laws.discipline.SemigroupalTests.Isomorphisms
 import cats.laws.discipline._
 import cats.laws.discipline.arbitrary._
-import cats.laws.discipline.SemigroupalTests.Isomorphisms
+import cats.syntax.all._
 import clue.data.syntax._
 import io.circe._
+import io.circe.generic.semiauto._
 import io.circe.testing.CodecTests
+import io.circe.testing.instances._
+import munit.DisciplineSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
-import io.circe.testing.instances._
-import io.circe.generic.semiauto._
+import org.scalacheck.Prop.forAll
+
+import arb.ArbInput._
 
 case class SomeInput(value: Input[Int] = Ignore)
 object SomeInput {
