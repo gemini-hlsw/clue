@@ -15,13 +15,80 @@ pull_request_rules:
   - status-success=Build and Test (ubuntu-latest, 2.13.8, temurin@11, rootJS)
   - status-success=Build and Test (ubuntu-latest, 2.13.8, temurin@11, rootJVM)
   - status-success=Build and Test (ubuntu-latest, 2.13.8, temurin@17, rootJVM)
+  - status-success=Build and Test (ubuntu-latest, 3.1.2, temurin@11, rootJS)
+  - status-success=Build and Test (ubuntu-latest, 3.1.2, temurin@11, rootJVM)
+  - status-success=Build and Test (ubuntu-latest, 3.1.2, temurin@17, rootJVM)
   actions:
     merge: {}
-- name: Label genTestsAggregate PRs
+- name: Label core PRs
   conditions:
-  - files~=^target/genTestsAggregate/
+  - files~=^core/
   actions:
     label:
       add:
-      - genTestsAggregate
+      - core
+      remove: []
+- name: Label http4s PRs
+  conditions:
+  - files~=^http4s/
+  actions:
+    label:
+      add:
+      - http4s
+      remove: []
+- name: Label http4s-jdk-demo PRs
+  conditions:
+  - files~=^http4s-jdk-demo/
+  actions:
+    label:
+      add:
+      - http4s-jdk-demo
+      remove: []
+- name: Label input PRs
+  conditions:
+  - files~=^gen/input/
+  actions:
+    label:
+      add:
+      - input
+      remove: []
+- name: Label model PRs
+  conditions:
+  - files~=^model/
+  actions:
+    label:
+      add:
+      - model
+      remove: []
+- name: Label output PRs
+  conditions:
+  - files~=^gen/output/
+  actions:
+    label:
+      add:
+      - output
+      remove: []
+- name: Label rules PRs
+  conditions:
+  - files~=^gen/rules/
+  actions:
+    label:
+      add:
+      - rules
+      remove: []
+- name: Label scalajs PRs
+  conditions:
+  - files~=^scalajs/
+  actions:
+    label:
+      add:
+      - scalajs
+      remove: []
+- name: Label tests PRs
+  conditions:
+  - files~=^gen/tests/
+  actions:
+    label:
+      add:
+      - tests
       remove: []
