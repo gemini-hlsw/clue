@@ -5,8 +5,8 @@ package clue.model.arb
 
 import clue.model.GraphQLRequest
 import io.circe._
-import org.scalacheck._
 import org.scalacheck.Arbitrary._
+import org.scalacheck._
 
 trait ArbGraphQLRequest {
 

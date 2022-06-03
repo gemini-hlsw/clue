@@ -3,9 +3,9 @@
 
 package clue.model.arb
 
+import io.circe.Json
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
-import io.circe.Json
 import org.scalacheck.Gen
 
 trait ArbJson {

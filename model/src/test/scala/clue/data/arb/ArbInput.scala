@@ -3,10 +3,11 @@
 
 package clue.data.arb
 
+import clue.data._
 import org.scalacheck._
+
 import Arbitrary._
 import Gen._
-import clue.data._
 
 trait ArbInput {
   implicit def arbInput[A: Arbitrary]: Arbitrary[Input[A]] =

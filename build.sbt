@@ -121,6 +121,7 @@ lazy val genInput =
   project
     .in(file("gen/input"))
     .enablePlugins(NoPublishPlugin)
+    .disablePlugins(ScalafixPlugin)
     .settings(
       libraryDependencies ++=
         Settings.Libraries.Monocle.value
@@ -131,6 +132,7 @@ lazy val genInput =
 lazy val genOutput = project
   .in(file("gen/output"))
   .enablePlugins(NoPublishPlugin)
+  .disablePlugins(ScalafixPlugin)
   .settings(
     scalacOptions ++= { if (tlIsScala3.value) Nil else List("-Wconf:cat=unused:info") },
     libraryDependencies ++= Settings.Libraries.Monocle.value,
@@ -141,6 +143,7 @@ lazy val genOutput = project
 lazy val genTests = project
   .in(file("gen/tests"))
   .enablePlugins(ScalafixTestkitPlugin, NoPublishPlugin)
+  .disablePlugins(ScalafixPlugin)
   .settings(
     libraryDependencies ~= (_.filterNot(_.name == "scalafix-testkit")),
     libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value

@@ -3,12 +3,12 @@
 
 package clue.gen
 
-import munit._
 import cats._
 import cats.kernel.laws.discipline.MonoidTests
-import org.scalacheck.Gen
+import munit._
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
+import org.scalacheck.Gen
 
 class AccumulatorSuite extends DisciplineSuite {
 
