@@ -9,7 +9,7 @@ import org.scalacheck.Arbitrary._
 
 trait ArbGraphQLError {
 
-  import GraphQLError.{ Location, PathElement }
+  import GraphQLError.{Location, PathElement}
 
   implicit val arbPathElement: Arbitrary[PathElement] =
     Arbitrary {

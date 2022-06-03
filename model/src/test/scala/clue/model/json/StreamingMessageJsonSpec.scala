@@ -3,7 +3,7 @@
 
 package clue.model.json
 
-import clue.model.StreamingMessage.{ FromClient, FromServer }
+import clue.model.StreamingMessage.{FromClient, FromServer}
 import clue.model.arb._
 import io.circe.testing.instances._
 import io.circe.testing.CodecTests

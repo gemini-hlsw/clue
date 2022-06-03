@@ -4,7 +4,7 @@
 package fix
 
 import scalafix.testkit.AbstractSemanticRuleSuite
-import org.scalatest.{ Args, FunSuiteLike }
+import org.scalatest.{Args, FunSuiteLike}
 
 class RuleSuite extends AbstractSemanticRuleSuite() with FunSuiteLike {
   // run is defined in both AbstractSemanticRuleSuite and FunSuiteLike
