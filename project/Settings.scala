@@ -128,7 +128,7 @@ object Settings {
 
     val ScalaFix = Def.setting(
       Seq(
-        ("ch.epfl.scala" %%% "scalafix-core" % scalaFix)
+        "ch.epfl.scala" %%% "scalafix-core" % scalaFix
       )
     )
 
@@ -140,13 +140,13 @@ object Settings {
 
     val ScalaJSDom = Def.setting(
       Seq(
-        ("org.scala-js" %%% "scalajs-dom" % scalaJSDom)
+        "org.scala-js" %%% "scalajs-dom" % scalaJSDom
       )
     )
 
     val ScalaJSMacrotaskExecutor = Def.setting(
       Seq(
-        ("org.scala-js" %%% "scala-js-macrotask-executor" % scalaJSMacrotaskExecutor)
+        "org.scala-js" %%% "scala-js-macrotask-executor" % scalaJSMacrotaskExecutor
       )
     )
 
