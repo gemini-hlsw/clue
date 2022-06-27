@@ -20,7 +20,7 @@ object Settings {
     val munit                    = "0.7.29"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom               = "2.2.0"
-    val scalaJSMacrotaskExecutor = "1.0.0"
+    val scalaJSMacrotaskExecutor = "1.1.0"
   }
 
   object Libraries {
