@@ -94,7 +94,7 @@ class ApolloClient[F[_], S, CP, CE](
         newState -> ((oldState, newState, action))
       }
       .flatMap { case (oldState, newState, action) =>
-        s"State Modified [$oldState] ==> [$newState]".debugF >>
+        s"State Modified [$oldState] ==> [$newState]".traceF >>
           connectionStatus.set(newState.status) >>
           action
       }
@@ -549,7 +549,6 @@ class ApolloClient[F[_], S, CP, CE](
       }
 
   private def createSubscription[D](
-    connection:         PersistentConnection[F, CP],
     subscriptionStream: Stream[F, D],
     subscriptionId:     String
   ): GraphQLSubscription[F, D] = new GraphQLSubscription[F, D] {
@@ -558,7 +557,7 @@ class ApolloClient[F[_], S, CP, CE](
     override def stop(): F[Unit] =
       for {
         _ <- haltSubscription(subscriptionId)
-        _ <- connection.send(StreamingMessage.FromClient.Stop(subscriptionId))
+        _ <- sendStop(subscriptionId)
       } yield ()
   }
 
@@ -582,7 +581,7 @@ class ApolloClient[F[_], S, CP, CE](
 //      val error = new ResponseException(json.hcursor.get[List[Json]]("errors").getOrElse(Nil))
       val error = new ResponseException(json.asArray.fold(List(json))(_.toList))
       // TODO When an Error message is received, we terminate the stream and halt the subscription. Do we want that?
-      queue.offer(error.asLeft)
+      s"Emitting error $error".traceF >> queue.offer(error.asLeft)
     }
 
     val halt: F[Unit] =
@@ -606,7 +605,10 @@ class ApolloClient[F[_], S, CP, CE](
     variables:     Option[Json]
   ): Resource[F, fs2.Stream[F, D]] =
     Resource
-      .make(startSubscription[D](subscription, operationName, variables))(_.stop())
+      .make(startSubscription[D](subscription, operationName, variables))(
+        _.stop()
+          .handleErrorWith(_.logF("Error stopping subscription"))
+      )
       .map(_.stream)
 
   private def startSubscription[D: Decoder](
@@ -615,39 +617,47 @@ class ApolloClient[F[_], S, CP, CE](
     variables:     Option[Json]
   ): F[GraphQLSubscription[F, D]] =
     state.get.flatMap {
-      case Initialized(_, connection, _, _)      =>
+      case Initialized(_, _, _, _)               =>
         val request = GraphQLRequest(subscription, operationName, variables)
 
         buildQueue[D](request).map { case (id, emitter) =>
           def acquire: F[Unit] =
-            stateModify {
-              case Initialized(cid, c, subscriptions, i)                          =>
-                Initialized(cid, c, subscriptions + (id -> emitter), i) -> F.unit
-              case s @ Initializing(_, _, _, _, latch)                            =>
-                s -> (latch.get.rethrow >> acquire)
-              case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
-                Reestablishing(cid, subscriptions + (id -> emitter), i, connectLatch, initLatch) ->
-                  F.unit
-              case s @ _                                                          =>
-                s -> s"UNEXPECTED acquire for subscription [$id]. State is: [$s]".raiseError.void
-            }
+            s"Acquiring queue for subscription [$id]".debugF >>
+              stateModify {
+                case Initialized(cid, c, subscriptions, i)                          =>
+                  Initialized(cid, c, subscriptions + (id -> emitter), i) -> F.unit
+                case s @ Initializing(_, _, _, _, latch)                            =>
+                  s -> (latch.get.rethrow >> acquire)
+                case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
+                  Reestablishing(
+                    cid,
+                    subscriptions + (id -> emitter),
+                    i,
+                    connectLatch,
+                    initLatch
+                  ) ->
+                    F.unit
+                case s @ _                                                          =>
+                  s -> s"UNEXPECTED acquire for subscription [$id]. State is: [$s]".raiseError.void
+              }
 
           def release: F[Unit] =
-            stateModify {
-              case Initialized(cid, c, subscriptions, i)                          =>
-                Initialized(cid, c, subscriptions - id, i) -> F.unit
-              case s @ Initializing(_, _, _, _, latch)                            =>
-                s -> (latch.get.rethrow >> release)
-              case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
-                Reestablishing(cid, subscriptions - id, i, connectLatch, initLatch) ->
-                  F.unit
-              case s @ (Connected(_, _) | Disconnected(_))                        =>
-                // It's OK to call release when Connected or Disconnected.
-                // It may happen if protocol was terminated or client disconnected and we are halting streams.
-                s -> F.unit
-              case s @ _                                                          =>
-                s -> s"UNEXPECTED release for subscription [$id]. State is: [$s]".raiseError.void
-            }
+            s"Releasing queue for subscription[$id]".debugF >>
+              stateModify {
+                case Initialized(cid, c, subscriptions, i)                          =>
+                  Initialized(cid, c, subscriptions - id, i) -> F.unit
+                case s @ Initializing(_, _, _, _, latch)                            =>
+                  s -> (latch.get.rethrow >> release)
+                case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
+                  Reestablishing(cid, subscriptions - id, i, connectLatch, initLatch) ->
+                    F.unit
+                case s @ (Connected(_, _) | Disconnected(_))                        =>
+                  // It's OK to call release when Connected or Disconnected.
+                  // It may happen if protocol was terminated or client disconnected and we are halting streams.
+                  s -> F.unit
+                case s @ _                                                          =>
+                  s -> s"UNEXPECTED release for subscription [$id]. State is: [$s]".raiseError.void
+              }
 
           def sendStart: F[Unit] = state.get.flatMap {
             // The connection may have changed since we created the subscription, so we re-get it.
@@ -661,21 +671,23 @@ class ApolloClient[F[_], S, CP, CE](
               s"UNEXPECTED sendStart for subscription [$id]. State is: [$s]".raiseError.void
           }
 
-          val bracket =
-            Stream.bracket(
-              s"Acquiring queue for subscription [$id]".debugF >> acquire
-            )(_ => s"Releasing queue for subscription[$id]".debugF >> release)
-
-          val stream = bracket.flatMap(_ =>
-            (
+          val stream =
+            (Stream.eval(acquire) >>
               Stream.eval(sendStart) >>
-                Stream
-                  .fromQueueUnterminated(emitter.queue)
-                  .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".debugF)
-            ).rethrow.unNoneTerminate
-          )
+              Stream
+                .fromQueueUnterminated(emitter.queue)
+                .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".debugF)
+                .rethrow // TODO We actually have to manually stop if we receive an error
+                .unNoneTerminate)
+              .onFinalizeCase(c =>
+                s"Stream for subscription [$id] finalized with ExitCase [$c]".debugF >>
+                  (c match { // If canceled, we don't want to clean up. Other fibers may be evaluating the stream. Clients can explicitly call `stop()`.
+                    case Resource.ExitCase.Canceled => F.unit
+                    case _                          => release
+                  })
+              )
 
-          createSubscription(connection, stream, id)
+          createSubscription(stream, id)
         }
       case Initializing(_, _, _, _, latch)       =>
         latch.get.rethrow >> startSubscription(subscription, operationName, variables)
@@ -684,6 +696,16 @@ class ApolloClient[F[_], S, CP, CE](
       case _                                     =>
         "NOT INITIALIZED".raiseError
     }
+
+  private def sendStop(subscriptionId: String): F[Unit] =
+    state.get.flatMap {
+      // The connection may have changed since we created the subscription, so we re-get it.
+      case Initialized(_, currentConnection, _, _) =>
+        currentConnection.send(StreamingMessage.FromClient.Stop(subscriptionId))
+      case s @ _                                   =>
+        s"UNEXPECTED sendStop for subscription [$subscriptionId]. State is: [$s]".raiseError.void
+    }
+
   // </GraphQLStreamingClient Helpers>
 }
 
