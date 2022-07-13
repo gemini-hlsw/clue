@@ -6,7 +6,7 @@ object Settings {
 
   object LibraryVersions {
     val cats                     = "2.8.0"
-    val catsEffect               = "3.3.13"
+    val catsEffect               = "3.3.14"
     val circe                    = "0.14.2"
     val disciplineMUnit          = "1.0.9"
     val fs2                      = "3.2.10"
