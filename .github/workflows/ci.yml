@@ -107,10 +107,6 @@ jobs:
         if: matrix.java == 'temurin@11'
         run: sbt 'project ${{ matrix.project }}' '++${{ matrix.scala }}' mimaReportBinaryIssues
 
-      - name: Generate API documentation
-        if: matrix.java == 'temurin@11'
-        run: sbt 'project ${{ matrix.project }}' '++${{ matrix.scala }}' doc
-
       - name: Aggregate coverage reports
         run: sbt 'project ${{ matrix.project }}' '++${{ matrix.scala }}' coverageReport coverageAggregate
 
