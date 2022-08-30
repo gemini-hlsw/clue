@@ -131,7 +131,7 @@ lazy val genInput =
 
 lazy val genOutput = project
   .in(file("gen/output"))
-  .enablePlugins(NoPublishPlugin)
+  .enablePlugins(NoPublishPlugin, ScalaJSPlugin)
   .disablePlugins(ScalafixPlugin)
   .settings(
     scalacOptions ++= { if (tlIsScala3.value) Nil else List("-Wconf:cat=unused:info") },

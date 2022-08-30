@@ -22,7 +22,8 @@ final case class GraphQLGenConfig(
   monocleLenses:     Boolean = true,
   scalaJSReactReuse: Boolean = false,
   circeEncoder:      Boolean = true,
-  circeDecoder:      Boolean = true
+  circeDecoder:      Boolean = true,
+  jsClasses:         Boolean = false
 ) {
   private val schemas: Ref[IO, Map[String, Deferred[IO, Schema]]] = Ref.unsafe(Map.empty)
 

@@ -135,7 +135,8 @@ trait QueryGen extends Generator {
             config.monocleLenses,
             scalaJSReactReuse = false,
             circeEncoder = true,
-            forceModule = true
+            forceModule = true,
+            jsClasses = config.jsClasses
           )(parentBody)
       }
 
@@ -338,7 +339,8 @@ trait QueryGen extends Generator {
             config.monocleLenses,
             config.scalaJSReactReuse,
             circeDecoder = true,
-            forceModule = true
+            forceModule = true,
+            jsClasses = config.jsClasses
           )(parentBody)
       }
 

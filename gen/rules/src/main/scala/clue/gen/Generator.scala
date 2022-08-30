@@ -163,7 +163,8 @@ trait Generator {
       forceModule:       Boolean = false,
       nestPath:          Option[Term.Ref] = None,
       nestedTypes:       Map[String, Term.Ref] = Map.empty,
-      extending:         Option[String] = None
+      extending:         Option[String] = None,
+      jsClasses:         Boolean = false
     ): List[Stat] => List[Stat]
   }
 
@@ -173,19 +174,23 @@ trait Generator {
   protected[this] def addCaseClassDef(
     name:      String,
     pars:      List[Term.Param],
-    extending: Option[String] = None
+    extending: Option[String] = None,
+    jsClasses: Boolean = false
   ): List[Stat] => (List[Stat], Boolean) =
     parentBody =>
       mustDefineType(name)(parentBody) match {
         case Skip                                =>
           (parentBody, false)
         case Define(newParentBody, early, inits) =>
-          val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
-          (newParentBody :+
-             //  q"case class ${Type.Name(name)}(..$pars) extends ..$earlyDefs with ..$allParents",
-             q"case class ${Type.Name(name)}(..$pars) extends {..$early} with ..$allInits",
-           true
-          )
+          val allInits  = inits ++ extending.map(t => init"${Type.Name(t)}()")
+          val caseclass = if (jsClasses) {
+            require(early.isEmpty)
+            q"sealed trait ${Type.Name(name)} extends scalajs.js.Object with ..$allInits { ..${pars.map(paramToVal)} }"
+          } else {
+            //  q"case class ${Type.Name(name)}(..$pars) extends ..$earlyDefs with ..$allParents",
+            q"case class ${Type.Name(name)}(..$pars) extends {..$early} with ..$allInits"
+          }
+          (newParentBody :+ caseclass, true)
       }
 
   /**
@@ -209,14 +214,19 @@ trait Generator {
       forceModule:       Boolean = false,
       nestPath:          Option[Term.Ref] = None,
       nestedTypes:       Map[String, Term.Ref] = Map.empty,
-      extending:         Option[String] = None
+      extending:         Option[String] = None,
+      jsClasses:         Boolean = false
     ): List[Stat] => List[Stat] =
       parentBody => {
         val nextPath: Option[Term.Ref]       = nextNestPath(nestPath)
         val nextTypes: Map[String, Term.Ref] = nextNestedTypes(nested, nestPath, nestedTypes)
 
         val (newBody, wasMissing) =
-          addCaseClassDef(camelName, params.map(_.toTree(nextPath, nextTypes)), extending)(
+          addCaseClassDef(camelName,
+                          params.map(_.toTree(nextPath, nextTypes, asVals = jsClasses)),
+                          extending,
+                          jsClasses = jsClasses
+          )(
             parentBody
           )
 
@@ -228,7 +238,8 @@ trait Generator {
             scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
-            nestPath = nextPath
+            nestPath = nextPath,
+            jsClasses = jsClasses
           )
         )
 
@@ -275,17 +286,22 @@ trait Generator {
   protected def addSumTrait(
     name:      String,
     pars:      List[Term.Param],
-    extending: Option[String] = None
+    extending: Option[String] = None,
+    jsAny:     Boolean = false
   ): List[Stat] => (List[Stat], Boolean) = { parentBody =>
     mustDefineType(name)(parentBody) match {
       case Skip                                =>
         (parentBody, false)
       case Define(newParentBody, early, inits) =>
+        require(early.isEmpty)
         val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
-        (newParentBody :+
-           q"sealed trait ${Type.Name(name)} extends { ..$early } with ..$allInits { ..${pars.map(paramToVal)} }",
-         true
-        )
+        val sumtrait = if (jsAny) {
+          require(early.isEmpty)
+          q"sealed trait ${Type.Name(name)} extends scalajs.js.Any with ..$allInits { ..${pars.map(paramToVal)} }"
+        } else {
+          q"sealed trait ${Type.Name(name)} extends { ..$early } with ..$allInits { ..${pars.map(paramToVal)} }"
+        }
+        (newParentBody :+ sumtrait, true)
     }
   }
 
@@ -304,7 +320,8 @@ trait Generator {
       forceModule:       Boolean,
       nestPath:          Option[Term.Ref] = None,
       nestedTypes:       Map[String, Term.Ref] = Map.empty,
-      extending:         Option[String] = None
+      extending:         Option[String] = None,
+      jsClasses:         Boolean = false
     ): List[Stat] => List[Stat] =
       parentBody => {
         val nextPath              = nextNestPath(nestPath)
@@ -312,7 +329,8 @@ trait Generator {
         val (newBody, wasMissing) =
           addSumTrait(camelName,
                       sum.params.map(_.toTree(nextPath, nextTypes, asVals = true)),
-                      extending
+                      extending,
+                      jsClasses
           )(
             parentBody
           )
@@ -327,7 +345,8 @@ trait Generator {
                               circeDecoder,
                               forceModule,
                               nextPath,
-                              nextTypes
+                              nextTypes,
+                              jsClasses = jsClasses
             )
           ) ++
             sum.instances.map(
@@ -340,7 +359,8 @@ trait Generator {
                                 forceModule,
                                 nextPath,
                                 nextTypes,
-                                camelName.some // Extends
+                                camelName.some, // Extends
+                                jsClasses
               )
             )
 
