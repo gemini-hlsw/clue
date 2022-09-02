@@ -46,11 +46,11 @@ object Settings {
 
     val Circe = Def.setting(
       Seq(
-        "io.circe" %%% "circe-core",
-        "io.circe" %%% "circe-generic",
-        "io.circe" %%% "circe-parser",
-        "io.circe" %%% "circe-testing"
-      ).map(_ % circe)
+        "com.armanbilge" %%% "cassiphone-core",
+        // "io.circe" %%% "circe-generic",
+        // "io.circe" %%% "circe-parser",
+        "com.armanbilge" %%% "cassiphone-testing"
+      ).map(_ % "0.15-13538c4-SNAPSHOT")
     )
 
     val DisciplineMUnit = Def.setting(
