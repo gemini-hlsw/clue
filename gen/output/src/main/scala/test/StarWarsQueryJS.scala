@@ -48,14 +48,19 @@ object StarWarsQueryJS extends GraphQLOperation[StarWars] {
       val friends: Option[List[Data.Character.Friends]]
     }
     object Character {
-      case class Friends(val name: Option[String] = None)
+      sealed trait Friends extends scalajs.js.Object { val name: Option[String] }
       object Friends {
         implicit val name: monocle.Lens[Data.Character.Friends, Option[String]] = monocle.macros.GenLens[Data.Character.Friends](_.name)
         implicit val eqFriends: cats.Eq[Data.Character.Friends] = cats.Eq.fromUniversalEquals
         implicit val showFriends: cats.Show[Data.Character.Friends] = cats.Show.fromToString
         implicit val jsonDecoderFriends: io.circe.Decoder[Data.Character.Friends] = io.circe.generic.semiauto.deriveDecoder[Data.Character.Friends]
       }
-      case class Human(override val id: String, override val name: Option[String] = None, val homePlanet: Option[String] = None, override val friends: Option[List[Data.Character.Friends]] = None) extends Character()
+      sealed trait Human extends scalajs.js.Object with Character() {
+        val id: String
+        val name: Option[String]
+        val homePlanet: Option[String]
+        val friends: Option[List[Data.Character.Friends]]
+      }
       object Human {
         implicit val id: monocle.Lens[Data.Character.Human, String] = monocle.macros.GenLens[Data.Character.Human](_.id)
         implicit val name: monocle.Lens[Data.Character.Human, Option[String]] = monocle.macros.GenLens[Data.Character.Human](_.name)
@@ -65,7 +70,12 @@ object StarWarsQueryJS extends GraphQLOperation[StarWars] {
         implicit val showHuman: cats.Show[Data.Character.Human] = cats.Show.fromToString
         implicit val jsonDecoderHuman: io.circe.Decoder[Data.Character.Human] = io.circe.generic.semiauto.deriveDecoder[Data.Character.Human]
       }
-      case class Droid(override val id: String, override val name: Option[String] = None, override val friends: Option[List[Data.Character.Friends]] = None, val primaryFunction: Option[String] = None) extends Character()
+      sealed trait Droid extends scalajs.js.Object with Character() {
+        val id: String
+        val name: Option[String]
+        val friends: Option[List[Data.Character.Friends]]
+        val primaryFunction: Option[String]
+      }
       object Droid {
         implicit val id: monocle.Lens[Data.Character.Droid, String] = monocle.macros.GenLens[Data.Character.Droid](_.id)
         implicit val name: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.name)
