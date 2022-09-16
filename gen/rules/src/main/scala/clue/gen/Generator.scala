@@ -384,7 +384,8 @@ trait Generator {
       catsShow:          Boolean,
       scalaJSReactReuse: Boolean,
       circeEncoder:      Boolean = false,
-      circeDecoder:      Boolean = false
+      circeDecoder:      Boolean = false,
+      jitDecoder:        Boolean = false
     ): List[Stat] => List[Stat] =
       addEnum(snakeToCamel(name),
               values,
@@ -392,7 +393,8 @@ trait Generator {
               catsShow,
               scalaJSReactReuse,
               circeEncoder,
-              circeDecoder
+              circeDecoder,
+              jitDecoder
       )
   }
 
@@ -403,12 +405,30 @@ trait Generator {
     catsShow:          Boolean,
     scalaJSReactReuse: Boolean,
     circeEncoder:      Boolean = false,
-    circeDecoder:      Boolean = false
+    circeDecoder:      Boolean = false,
+    jitDecoder:        Boolean = false,
   ): List[Stat] => List[Stat] =
     parentBody =>
       mustDefineType(name)(parentBody) match {
         case Skip                                =>
           parentBody
+        case Define(newParentBody, early, inits) if jitDecoder =>
+          val allInits   = inits :+ init"${Type.Name(name)}()"
+          val enumValues = values.map(EnumValue.fromString)
+          addModuleDefs(
+            name,
+            catsEq,
+            catsShow,
+            scalaJSReactReuse,
+            circeEncoder,
+            circeDecoder,
+            TypeType.Enum(enumValues),
+            _ ++ enumValues.map { enumValue =>
+              q"""opaque type ${Term.Name(enumValue.className)} <: {..$early} = _root_.io.circe.Json"""
+            }
+          )(
+            newParentBody :+ q"opaque type ${Type.Name(name)} = _root_.io.circe.Json"
+          )
         case Define(newParentBody, early, inits) =>
           val allInits   = inits :+ init"${Type.Name(name)}()"
           val enumValues = values.map(EnumValue.fromString)
