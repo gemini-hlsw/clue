@@ -406,13 +406,14 @@ trait Generator {
     scalaJSReactReuse: Boolean,
     circeEncoder:      Boolean = false,
     circeDecoder:      Boolean = false,
-    jitDecoder:        Boolean = false,
+    jitDecoder:        Boolean = false
   ): List[Stat] => List[Stat] =
     parentBody =>
       mustDefineType(name)(parentBody) match {
-        case Skip                                =>
+        case Skip                                              =>
           parentBody
         case Define(newParentBody, early, inits) if jitDecoder =>
+          import scala.meta.dialects.Scala3
           val allInits   = inits :+ init"${Type.Name(name)}()"
           val enumValues = values.map(EnumValue.fromString)
           addModuleDefs(
@@ -424,12 +425,12 @@ trait Generator {
             circeDecoder,
             TypeType.Enum(enumValues),
             _ ++ enumValues.map { enumValue =>
-              q"""opaque type ${Term.Name(enumValue.className)} <: {..$early} = _root_.io.circe.Json"""
+              q"""opaque type ${Type.Name(enumValue.className)} <: {..$early} = String"""
             }
           )(
             newParentBody :+ q"opaque type ${Type.Name(name)} = _root_.io.circe.Json"
           )
-        case Define(newParentBody, early, inits) =>
+        case Define(newParentBody, early, inits)               =>
           val allInits   = inits :+ init"${Type.Name(name)}()"
           val enumValues = values.map(EnumValue.fromString)
           addModuleDefs(

@@ -5,7 +5,6 @@
 /*
   rules = [GraphQLGen]
   GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
-  GraphQLGen.jitDecoder = true
  */
 package test
 
