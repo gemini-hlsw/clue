@@ -412,9 +412,8 @@ trait Generator {
       mustDefineType(name)(parentBody) match {
         case Skip                                              =>
           parentBody
-        case Define(newParentBody, early, inits) if jitDecoder =>
+        case Define(newParentBody, _, _) if jitDecoder =>
           import scala.meta.dialects.Scala3
-          val allInits   = inits :+ init"${Type.Name(name)}()"
           val enumValues = values.map(EnumValue.fromString)
           addModuleDefs(
             name,
@@ -424,8 +423,11 @@ trait Generator {
             circeEncoder,
             circeDecoder,
             TypeType.Enum(enumValues),
-            _ ++ enumValues.map { enumValue =>
-              Defn.Type(List(Mod.Opaque()), Type.Name(enumValue.className), Nil, t"String", Type.Bounds(None, Some(Type.Name(name))))
+            _ ++ enumValues.flatMap { enumValue =>
+              List(
+                Defn.Type(List(Mod.Opaque()), Type.Name(enumValue.className), Nil, t"String", Type.Bounds(None, Some(Type.Name(name)))),
+                q"val ${Pat.Var(Term.Name(enumValue.className))}: ${Type.Name(enumValue.className)} = ${enumValue.asString}"
+              )
             }
           )(
             newParentBody :+ q"opaque type ${Type.Name(name)} = String"

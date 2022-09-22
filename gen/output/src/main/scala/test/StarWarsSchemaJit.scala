@@ -15,8 +15,11 @@ object StarWarsJit {
     opaque type Episode = String
     object Episode {
       opaque type Newhope <: Episode = String
+      val Newhope: Newhope = "NEWHOPE"
       opaque type Empire <: Episode = String
+      val Empire: Empire = "EMPIRE"
       opaque type Jedi <: Episode = String
+      val Jedi: Jedi = "JEDI"
       implicit val eqEpisode: cats.Eq[Episode] = cats.Eq.fromUniversalEquals
       implicit val showEpisode: cats.Show[Episode] = cats.Show.fromToString
       implicit val jsonEncoderEpisode: io.circe.Encoder[Episode] = io.circe.Encoder.encodeString.contramap[Episode]({
