@@ -338,6 +338,7 @@ trait QueryGen extends Generator {
             config.monocleLenses,
             config.scalaJSReactReuse,
             circeDecoder = true,
+            jitDecoder = config.jitDecoder,
             forceModule = true
           )(parentBody)
       }
