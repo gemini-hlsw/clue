@@ -6,15 +6,15 @@
 package test
 
 import clue.GraphQLOperation
-import test.StarWars
+import test.StarWarsJit
 
 
-object StarWarsQueryJit extends GraphQLOperation[StarWars] {
-  import StarWars.Scalars._
+object StarWarsQueryJit extends GraphQLOperation[StarWarsJit] {
+  import StarWarsJit.Scalars._
   ignoreUnusedImportScalars()
-  import StarWars.Enums._
+  import StarWarsJit.Enums._
   ignoreUnusedImportEnums()
-  import StarWars.Types._
+  import StarWarsJit.Types._
   ignoreUnusedImportTypes()
   override val document: String = """
         query ($charId: ID!) {
@@ -110,6 +110,6 @@ object StarWarsQueryJit extends GraphQLOperation[StarWars] {
   }
   val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-  def query[F[_]](charId: String)(implicit client: clue.TransactionalClient[F, StarWars]) = client.request(this)(Variables(charId))
+  def query[F[_]](charId: String)(implicit client: clue.TransactionalClient[F, StarWarsJit]) = client.request(this)(Variables(charId))
 }
 // format: on

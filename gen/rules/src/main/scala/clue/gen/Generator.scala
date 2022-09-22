@@ -425,10 +425,10 @@ trait Generator {
             circeDecoder,
             TypeType.Enum(enumValues),
             _ ++ enumValues.map { enumValue =>
-              q"""opaque type ${Type.Name(enumValue.className)} <: {..$early} = String"""
+              Defn.Type(List(Mod.Opaque()), Type.Name(enumValue.className), Nil, t"String", Type.Bounds(None, Some(Type.Name(name))))
             }
           )(
-            newParentBody :+ q"opaque type ${Type.Name(name)} = _root_.io.circe.Json"
+            newParentBody :+ q"opaque type ${Type.Name(name)} = String"
           )
         case Define(newParentBody, early, inits)               =>
           val allInits   = inits :+ init"${Type.Name(name)}()"

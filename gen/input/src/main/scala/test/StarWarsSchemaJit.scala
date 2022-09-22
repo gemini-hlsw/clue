@@ -5,11 +5,12 @@
 /*
   rules = [GraphQLGen]
   GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
+  GraphQLGen.jitDecoder = true
  */
 package test
 
 import clue.annotation.GraphQLSchema
 
 @GraphQLSchema
-trait StarWars
+trait StarWarsJit
 // format: on

@@ -135,6 +135,7 @@ lazy val genOutput = project
   .disablePlugins(ScalafixPlugin)
   .settings(
     scalacOptions ++= { if (tlIsScala3.value) Nil else List("-Wconf:cat=unused:info") },
+    scalacOptions ~= (_.filterNot(_ == "-source:3.0-migration")),
     libraryDependencies ++= Settings.Libraries.Monocle.value,
     tlFatalWarnings := false
   )
