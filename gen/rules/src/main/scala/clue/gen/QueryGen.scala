@@ -107,7 +107,9 @@ trait QueryGen extends Generator {
 
     CaseClass(
       "Variables",
-      inputs.right.get.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true))
+      inputs.right.get.map(iv =>
+        ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true, pureJson = false)
+      )
     )
   }
 
@@ -163,7 +165,8 @@ trait QueryGen extends Generator {
   protected def resolveData(
     schema:   Schema,
     algebra:  Query,
-    rootType: Option[GType]
+    rootType: Option[GType],
+    pureJson: Boolean
   ): CaseClass = {
     import Query._
 
@@ -207,6 +210,7 @@ trait QueryGen extends Generator {
                   ClassParam.fromGrackleType(paramName,
                                              nextType.dealias,
                                              isInput = false,
+                                             pureJson = pureJson,
                                              paramTypeNameOverride
                   )
                 )
@@ -332,7 +336,7 @@ trait QueryGen extends Generator {
             case _: UntypedSubscription => schemaType.field("subscription").flatMap(_.asNamed)
           }
 
-          resolveData(schema, operation.query, rootType).addToParentBody(
+          resolveData(schema, operation.query, rootType, config.jitDecoder).addToParentBody(
             config.catsEq,
             config.catsShow,
             config.monocleLenses,
