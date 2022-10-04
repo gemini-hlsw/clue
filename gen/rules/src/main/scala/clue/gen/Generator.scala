@@ -210,7 +210,8 @@ trait Generator {
             )
           ) ++ pars.map { par =>
             val (decodeTo, castTo) = findDecodeCast(par.decltpe.get)
-            q"""extension (thiz: ${Type.Name(name)}) def ${Term.Name(
+            val targetName = s"${name}_${par.name.value}"
+            q"""extension (thiz: ${Type.Name(name)}) @scala.annotation.targetName($targetName) def ${Term.Name(
                 par.name.value
               )}: ${par.decltpe} = _root_.io.circe.Decoder[$decodeTo].decodeJson(thiz.asObject.get.apply(${par.name.value}).get).asInstanceOf[$castTo]"""
           }
