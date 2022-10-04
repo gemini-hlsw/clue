@@ -430,7 +430,6 @@ trait Generator {
       scalaJSReactReuse: Boolean,
       circeEncoder:      Boolean = false,
       circeDecoder:      Boolean = false,
-      jitDecoder:        Boolean = false
     ): List[Stat] => List[Stat] =
       addEnum(snakeToCamel(name),
               values,
@@ -439,7 +438,6 @@ trait Generator {
               scalaJSReactReuse,
               circeEncoder,
               circeDecoder,
-              jitDecoder
       )
   }
 
@@ -451,39 +449,11 @@ trait Generator {
     scalaJSReactReuse: Boolean,
     circeEncoder:      Boolean = false,
     circeDecoder:      Boolean = false,
-    jitDecoder:        Boolean = false
   ): List[Stat] => List[Stat] =
     parentBody =>
       mustDefineType(name)(parentBody) match {
         case Skip                                      =>
           parentBody
-        case Define(newParentBody, _, _) if jitDecoder =>
-          import scala.meta.dialects.Scala3
-          val enumValues = values.map(EnumValue.fromString)
-          addModuleDefs(
-            name,
-            catsEq,
-            catsShow,
-            scalaJSReactReuse,
-            circeEncoder,
-            circeDecoder,
-            jitDecoder,
-            TypeType.Enum(enumValues),
-            _ ++ enumValues.flatMap { enumValue =>
-              List(
-                Defn.Type(List(Mod.Opaque()),
-                          Type.Name(enumValue.className),
-                          Nil,
-                          t"String",
-                          Type.Bounds(None, Some(Type.Name(name)))
-                ),
-                q"val ${Pat.Var(Term.Name(enumValue.className))}: ${Type
-                    .Name(enumValue.className)} = ${enumValue.asString}"
-              )
-            }
-          )(
-            newParentBody :+ q"opaque type ${Type.Name(name)} = String"
-          )
         case Define(newParentBody, early, inits)       =>
           val allInits   = inits :+ init"${Type.Name(name)}()"
           val enumValues = values.map(EnumValue.fromString)
@@ -494,7 +464,7 @@ trait Generator {
             scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
-            jitDecoder,
+            false,
             TypeType.Enum(enumValues),
             _ ++ enumValues.map { enumValue =>
               // q"case object ${TermName(enumValue.className)} extends ..$early with ..$allInit"

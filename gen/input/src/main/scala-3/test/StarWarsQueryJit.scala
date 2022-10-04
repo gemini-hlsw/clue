@@ -12,10 +12,10 @@ package test
 
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
-import test.StarWarsJit
+import test.StarWars
 
 @GraphQL
-trait StarWarsQueryJit extends GraphQLOperation[StarWarsJit] {
+trait StarWarsQueryJit extends GraphQLOperation[StarWars] {
   override val document: String = """
         query ($charId: ID!) {
           character(id: $charId) {

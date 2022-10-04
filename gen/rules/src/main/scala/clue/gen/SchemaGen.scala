@@ -38,7 +38,6 @@ trait SchemaGen extends Generator {
                                   config.scalaJSReactReuse,
                                   circeEncoder = true,
                                   circeDecoder = true,
-                                  jitDecoder = config.jitDecoder
                 )
               )
         )
