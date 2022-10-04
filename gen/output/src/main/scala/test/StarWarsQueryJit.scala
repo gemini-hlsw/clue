@@ -40,7 +40,8 @@ object StarWarsQueryJit extends GraphQLOperation[StarWarsJit] {
     implicit val showVariables: cats.Show[Variables] = cats.Show.fromToString
     implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
   }
-  case class Data(val character: Option[Data.Character] = None)
+  opaque type Data = _root_.io.circe.Json
+  extension (thiz: Data) def character: Option[Data.Character] = _root_.io.circe.Decoder[Option[_root_.io.circe.Json]].decodeJson(thiz.asObject.get.apply("character").get).asInstanceOf[Option[Data.Character]]
   object Data {
     sealed trait Character {
       val id: String
@@ -48,14 +49,19 @@ object StarWarsQueryJit extends GraphQLOperation[StarWarsJit] {
       val friends: Option[List[Data.Character.Friends]]
     }
     object Character {
-      case class Friends(val name: Option[String] = None)
+      opaque type Friends = _root_.io.circe.Json
+      extension (thiz: Friends) def name: Option[String] = _root_.io.circe.Decoder[Option[_root_.io.circe.Json]].decodeJson(thiz.asObject.get.apply("name").get).asInstanceOf[Option[String]]
       object Friends {
         implicit val name: monocle.Lens[Data.Character.Friends, Option[String]] = monocle.macros.GenLens[Data.Character.Friends](_.name)
         implicit val eqFriends: cats.Eq[Data.Character.Friends] = cats.Eq.fromUniversalEquals
         implicit val showFriends: cats.Show[Data.Character.Friends] = cats.Show.fromToString
         implicit val jsonDecoderFriends: io.circe.Decoder[Data.Character.Friends] = io.circe.generic.semiauto.deriveDecoder[Data.Character.Friends]
       }
-      case class Human(override val id: String, override val name: Option[String] = None, val homePlanet: Option[String] = None, override val friends: Option[List[Data.Character.Friends]] = None) extends Character()
+      opaque type Human <: Character = _root_.io.circe.Json
+      extension (thiz: Human) def id: String = _root_.io.circe.Decoder[_root_.io.circe.Json].decodeJson(thiz.asObject.get.apply("id").get).asInstanceOf[String]
+      extension (thiz: Human) def name: Option[String] = _root_.io.circe.Decoder[Option[_root_.io.circe.Json]].decodeJson(thiz.asObject.get.apply("name").get).asInstanceOf[Option[String]]
+      extension (thiz: Human) def homePlanet: Option[String] = _root_.io.circe.Decoder[Option[_root_.io.circe.Json]].decodeJson(thiz.asObject.get.apply("homePlanet").get).asInstanceOf[Option[String]]
+      extension (thiz: Human) def friends: Option[List[Data.Character.Friends]] = _root_.io.circe.Decoder[Option[List[_root_.io.circe.Json]]].decodeJson(thiz.asObject.get.apply("friends").get).asInstanceOf[Option[List[Data.Character.Friends]]]
       object Human {
         implicit val id: monocle.Lens[Data.Character.Human, String] = monocle.macros.GenLens[Data.Character.Human](_.id)
         implicit val name: monocle.Lens[Data.Character.Human, Option[String]] = monocle.macros.GenLens[Data.Character.Human](_.name)
@@ -65,7 +71,11 @@ object StarWarsQueryJit extends GraphQLOperation[StarWarsJit] {
         implicit val showHuman: cats.Show[Data.Character.Human] = cats.Show.fromToString
         implicit val jsonDecoderHuman: io.circe.Decoder[Data.Character.Human] = io.circe.generic.semiauto.deriveDecoder[Data.Character.Human]
       }
-      case class Droid(override val id: String, override val name: Option[String] = None, override val friends: Option[List[Data.Character.Friends]] = None, val primaryFunction: Option[String] = None) extends Character()
+      opaque type Droid <: Character = _root_.io.circe.Json
+      extension (thiz: Droid) def id: String = _root_.io.circe.Decoder[_root_.io.circe.Json].decodeJson(thiz.asObject.get.apply("id").get).asInstanceOf[String]
+      extension (thiz: Droid) def name: Option[String] = _root_.io.circe.Decoder[Option[_root_.io.circe.Json]].decodeJson(thiz.asObject.get.apply("name").get).asInstanceOf[Option[String]]
+      extension (thiz: Droid) def friends: Option[List[Data.Character.Friends]] = _root_.io.circe.Decoder[Option[List[_root_.io.circe.Json]]].decodeJson(thiz.asObject.get.apply("friends").get).asInstanceOf[Option[List[Data.Character.Friends]]]
+      extension (thiz: Droid) def primaryFunction: Option[String] = _root_.io.circe.Decoder[Option[_root_.io.circe.Json]].decodeJson(thiz.asObject.get.apply("primaryFunction").get).asInstanceOf[Option[String]]
       object Droid {
         implicit val id: monocle.Lens[Data.Character.Droid, String] = monocle.macros.GenLens[Data.Character.Droid](_.id)
         implicit val name: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.name)
