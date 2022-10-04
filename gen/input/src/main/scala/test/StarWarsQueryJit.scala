@@ -6,6 +6,7 @@
   rules = [GraphQLGen]
   GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
   GraphQLGen.jitDecoder = true
+  GraphQLGen.monocleLenses = false
  */
 package test
 
