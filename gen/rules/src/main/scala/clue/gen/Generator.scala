@@ -59,7 +59,7 @@ trait Generator {
   private def nestedTypeTree(nestTree: Term.Ref, tpe: Type): Type =
     tpe match {
       case named @ Type.Name(_)   => Type.Select(nestTree, named)
-      case select @ Type.Select(_, _) => select
+      // case Type.Select?
       case Type.Apply(ttpe, args) =>
         Type.Apply(ttpe, args.map(t => nestedTypeTree(nestTree, t)))
       case other                  =>
@@ -116,19 +116,15 @@ trait Generator {
       name:         String,
       tpe:          grackle.Type,
       isInput:      Boolean,
-      pureJson:     Boolean,
-      nameOverride: Option[String] = None,
+      nameOverride: Option[String] = None
     ): ClassParam = {
       def resolveType(tpe: grackle.Type): Type =
         tpe match {
           case grackle.NullableType(tpe) =>
             if (isInput)
               t"clue.data.Input[${resolveType(tpe)}]"
-            else if (pureJson)
-              resolveType(tpe)
             else
               t"Option[${resolveType(tpe)}]"
-          case grackle.ListType(_) if pureJson => t"_root_.io.circe.Json.JArray" // TODO
           case grackle.ListType(tpe)     => t"List[${resolveType(tpe)}]"
           case nt: grackle.NamedType     =>
             DefaultMappings.getOrElse(nt.name,
