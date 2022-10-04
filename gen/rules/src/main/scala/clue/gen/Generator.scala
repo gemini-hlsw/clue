@@ -210,7 +210,7 @@ trait Generator {
               Type.Bounds(None, extending.map(name => Type.Name(name)))
             )
           ) ++ pars.map { par =>
-            val targetName         = s"${name}_${par.name.value}"
+            val targetName = s"${name}_${par.name.value}"
             q"""extension (thiz: ${Type.Name(
                 name
               )}) @scala.annotation.targetName($targetName) def ${Term.Name(
@@ -429,7 +429,7 @@ trait Generator {
       catsShow:          Boolean,
       scalaJSReactReuse: Boolean,
       circeEncoder:      Boolean = false,
-      circeDecoder:      Boolean = false,
+      circeDecoder:      Boolean = false
     ): List[Stat] => List[Stat] =
       addEnum(snakeToCamel(name),
               values,
@@ -437,7 +437,7 @@ trait Generator {
               catsShow,
               scalaJSReactReuse,
               circeEncoder,
-              circeDecoder,
+              circeDecoder
       )
   }
 
@@ -448,13 +448,13 @@ trait Generator {
     catsShow:          Boolean,
     scalaJSReactReuse: Boolean,
     circeEncoder:      Boolean = false,
-    circeDecoder:      Boolean = false,
+    circeDecoder:      Boolean = false
   ): List[Stat] => List[Stat] =
     parentBody =>
       mustDefineType(name)(parentBody) match {
-        case Skip                                      =>
+        case Skip                                =>
           parentBody
-        case Define(newParentBody, early, inits)       =>
+        case Define(newParentBody, early, inits) =>
           val allInits   = inits :+ init"${Type.Name(name)}()"
           val enumValues = values.map(EnumValue.fromString)
           addModuleDefs(
@@ -544,11 +544,17 @@ trait Generator {
     def valName(prefix: String): Pat.Var = Pat.Var(Term.Name(s"$prefix$name"))
 
     val eqDef = Option.when(catsEq)(
-      q"implicit val ${valName("eq")}: cats.Eq[$n] = cats.Eq.fromUniversalEquals"
+      if (jitDecoder)
+        q"implicit val ${valName("eq")}: cats.Eq[$n] = _root_.io.circe.Json.eqJson.asInstanceOf[cats.Eq[$n]]"
+      else
+        q"implicit val ${valName("eq")}: cats.Eq[$n] = cats.Eq.fromUniversalEquals"
     )
 
     val showDef = Option.when(catsShow)(
-      q"implicit val ${valName("show")}: cats.Show[$n] = cats.Show.fromToString"
+      if (jitDecoder)
+        q"implicit val ${valName("show")}: cats.Show[$n] = _root_.io.circe.Json.showJson.asInstanceOf[cats.Show[$n]]"
+      else
+        q"implicit val ${valName("show")}: cats.Show[$n] = cats.Show.fromToString"
     )
 
     val reuseDef = Option.when(scalaJSReactReuse)(

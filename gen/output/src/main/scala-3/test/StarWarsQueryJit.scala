@@ -51,8 +51,8 @@ object StarWarsQueryJit extends GraphQLOperation[StarWars] {
       opaque type Friends = _root_.io.circe.Json
       extension (thiz: Friends) @scala.annotation.targetName("Friends_name") def name: Option[String] = _root_.io.circe.Decoder[Option[String]].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply("name").get).toTry.get
       object Friends {
-        implicit val eqFriends: cats.Eq[Data.Character.Friends] = cats.Eq.fromUniversalEquals
-        implicit val showFriends: cats.Show[Data.Character.Friends] = cats.Show.fromToString
+        implicit val eqFriends: cats.Eq[Data.Character.Friends] = _root_.io.circe.Json.eqJson.asInstanceOf[cats.Eq[Data.Character.Friends]]
+        implicit val showFriends: cats.Show[Data.Character.Friends] = _root_.io.circe.Json.showJson.asInstanceOf[cats.Show[Data.Character.Friends]]
         implicit val jsonDecoderFriends: io.circe.Decoder[Data.Character.Friends] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data.Character.Friends]]
       }
       opaque type Human <: Character = Character
@@ -61,8 +61,8 @@ object StarWarsQueryJit extends GraphQLOperation[StarWars] {
       extension (thiz: Human) @scala.annotation.targetName("Human_homePlanet") def homePlanet: Option[String] = _root_.io.circe.Decoder[Option[String]].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply("homePlanet").get).toTry.get
       extension (thiz: Human) @scala.annotation.targetName("Human_friends") def friends: Option[List[Data.Character.Friends]] = _root_.io.circe.Decoder[Option[List[Data.Character.Friends]]].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply("friends").get).toTry.get
       object Human {
-        implicit val eqHuman: cats.Eq[Data.Character.Human] = cats.Eq.fromUniversalEquals
-        implicit val showHuman: cats.Show[Data.Character.Human] = cats.Show.fromToString
+        implicit val eqHuman: cats.Eq[Data.Character.Human] = _root_.io.circe.Json.eqJson.asInstanceOf[cats.Eq[Data.Character.Human]]
+        implicit val showHuman: cats.Show[Data.Character.Human] = _root_.io.circe.Json.showJson.asInstanceOf[cats.Show[Data.Character.Human]]
         implicit val jsonDecoderHuman: io.circe.Decoder[Data.Character.Human] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data.Character.Human]]
       }
       opaque type Droid <: Character = Character
@@ -71,16 +71,16 @@ object StarWarsQueryJit extends GraphQLOperation[StarWars] {
       extension (thiz: Droid) @scala.annotation.targetName("Droid_friends") def friends: Option[List[Data.Character.Friends]] = _root_.io.circe.Decoder[Option[List[Data.Character.Friends]]].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply("friends").get).toTry.get
       extension (thiz: Droid) @scala.annotation.targetName("Droid_primaryFunction") def primaryFunction: Option[String] = _root_.io.circe.Decoder[Option[String]].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply("primaryFunction").get).toTry.get
       object Droid {
-        implicit val eqDroid: cats.Eq[Data.Character.Droid] = cats.Eq.fromUniversalEquals
-        implicit val showDroid: cats.Show[Data.Character.Droid] = cats.Show.fromToString
+        implicit val eqDroid: cats.Eq[Data.Character.Droid] = _root_.io.circe.Json.eqJson.asInstanceOf[cats.Eq[Data.Character.Droid]]
+        implicit val showDroid: cats.Show[Data.Character.Droid] = _root_.io.circe.Json.showJson.asInstanceOf[cats.Show[Data.Character.Droid]]
         implicit val jsonDecoderDroid: io.circe.Decoder[Data.Character.Droid] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data.Character.Droid]]
       }
-      implicit val eqCharacter: cats.Eq[Data.Character] = cats.Eq.fromUniversalEquals
-      implicit val showCharacter: cats.Show[Data.Character] = cats.Show.fromToString
+      implicit val eqCharacter: cats.Eq[Data.Character] = _root_.io.circe.Json.eqJson.asInstanceOf[cats.Eq[Data.Character]]
+      implicit val showCharacter: cats.Show[Data.Character] = _root_.io.circe.Json.showJson.asInstanceOf[cats.Show[Data.Character]]
       implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data.Character]]
     }
-    implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
-    implicit val showData: cats.Show[Data] = cats.Show.fromToString
+    implicit val eqData: cats.Eq[Data] = _root_.io.circe.Json.eqJson.asInstanceOf[cats.Eq[Data]]
+    implicit val showData: cats.Show[Data] = _root_.io.circe.Json.showJson.asInstanceOf[cats.Show[Data]]
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data]]
   }
   val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
