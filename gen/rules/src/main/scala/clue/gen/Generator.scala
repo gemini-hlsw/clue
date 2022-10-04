@@ -210,25 +210,16 @@ trait Generator {
               Type.Bounds(None, extending.map(name => Type.Name(name)))
             )
           ) ++ pars.map { par =>
-            val (decodeTo, castTo) = findDecodeCast(par.decltpe.get)
             val targetName         = s"${name}_${par.name.value}"
             q"""extension (thiz: ${Type.Name(
                 name
               )}) @scala.annotation.targetName($targetName) def ${Term.Name(
                 par.name.value
-              )}: ${par.decltpe} = _root_.io.circe.Decoder[$decodeTo].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply(${par.name.value}).get).asInstanceOf[$castTo]"""
+              )}: ${par.decltpe} = _root_.io.circe.Decoder[${par.decltpe.get}].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply(${par.name.value}).get).toTry.get"""
           }
 
           (stats, true)
       }
-
-  private def findDecodeCast(tpe: Type): (Type, Type) = tpe match {
-    case Type.Apply(container @ Type.Name("Option" | "List"), List(arg)) =>
-      val (inner, cast) = findDecodeCast(arg)
-      (Type.Apply(container, List(inner)), Type.Apply(container, List(cast)))
-    case _                                                               =>
-      (t"_root_.io.circe.Json", tpe)
-  }
 
   /**
    * The definition of a case class to contain an object from the query response.
