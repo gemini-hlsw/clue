@@ -205,7 +205,7 @@ trait Generator {
             Defn.Type(List(Mod.Opaque()),
                       Type.Name(name),
                       Nil,
-                      t"_root_.io.circe.Json",
+                      extending.fold[Type](t"_root_.io.circe.Json")(name => Type.Name(name)),
                       Type.Bounds(None, extending.map(name => Type.Name(name)))
             )
           ) ++ pars.map { par =>
@@ -213,7 +213,7 @@ trait Generator {
             val targetName = s"${name}_${par.name.value}"
             q"""extension (thiz: ${Type.Name(name)}) @scala.annotation.targetName($targetName) def ${Term.Name(
                 par.name.value
-              )}: ${par.decltpe} = _root_.io.circe.Decoder[$decodeTo].decodeJson(thiz.asObject.get.apply(${par.name.value}).get).asInstanceOf[$castTo]"""
+              )}: ${par.decltpe} = _root_.io.circe.Decoder[$decodeTo].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply(${par.name.value}).get).asInstanceOf[$castTo]"""
           }
 
           (stats, true)
