@@ -53,7 +53,7 @@ object StarWarsQueryJit extends GraphQLOperation[StarWarsJit] {
       object Friends {
         implicit val eqFriends: cats.Eq[Data.Character.Friends] = cats.Eq.fromUniversalEquals
         implicit val showFriends: cats.Show[Data.Character.Friends] = cats.Show.fromToString
-        implicit val jsonDecoderFriends: io.circe.Decoder[Data.Character.Friends] = io.circe.generic.semiauto.deriveDecoder[Data.Character.Friends]
+        implicit val jsonDecoderFriends: io.circe.Decoder[Data.Character.Friends] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data.Character.Friends]]
       }
       opaque type Human <: Character = Character
       extension (thiz: Human) @scala.annotation.targetName("Human_id") def id: String = _root_.io.circe.Decoder[_root_.io.circe.Json].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply("id").get).asInstanceOf[String]
@@ -63,7 +63,7 @@ object StarWarsQueryJit extends GraphQLOperation[StarWarsJit] {
       object Human {
         implicit val eqHuman: cats.Eq[Data.Character.Human] = cats.Eq.fromUniversalEquals
         implicit val showHuman: cats.Show[Data.Character.Human] = cats.Show.fromToString
-        implicit val jsonDecoderHuman: io.circe.Decoder[Data.Character.Human] = io.circe.generic.semiauto.deriveDecoder[Data.Character.Human]
+        implicit val jsonDecoderHuman: io.circe.Decoder[Data.Character.Human] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data.Character.Human]]
       }
       opaque type Droid <: Character = Character
       extension (thiz: Droid) @scala.annotation.targetName("Droid_id") def id: String = _root_.io.circe.Decoder[_root_.io.circe.Json].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply("id").get).asInstanceOf[String]
@@ -73,15 +73,15 @@ object StarWarsQueryJit extends GraphQLOperation[StarWarsJit] {
       object Droid {
         implicit val eqDroid: cats.Eq[Data.Character.Droid] = cats.Eq.fromUniversalEquals
         implicit val showDroid: cats.Show[Data.Character.Droid] = cats.Show.fromToString
-        implicit val jsonDecoderDroid: io.circe.Decoder[Data.Character.Droid] = io.circe.generic.semiauto.deriveDecoder[Data.Character.Droid]
+        implicit val jsonDecoderDroid: io.circe.Decoder[Data.Character.Droid] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data.Character.Droid]]
       }
       implicit val eqCharacter: cats.Eq[Data.Character] = cats.Eq.fromUniversalEquals
       implicit val showCharacter: cats.Show[Data.Character] = cats.Show.fromToString
-      implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = List[io.circe.Decoder[Data.Character]](io.circe.Decoder[Data.Character.Human].asInstanceOf[io.circe.Decoder[Data.Character]], io.circe.Decoder[Data.Character.Droid].asInstanceOf[io.circe.Decoder[Data.Character]]).reduceLeft(_ or _)
+      implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data.Character]]
     }
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
-    implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]
+    implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[Data]]
   }
   val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData

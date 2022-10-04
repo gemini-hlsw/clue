@@ -202,16 +202,19 @@ trait Generator {
           import scala.meta.dialects.Scala3
 
           val stats: List[Stat] = newParentBody ++ List(
-            Defn.Type(List(Mod.Opaque()),
-                      Type.Name(name),
-                      Nil,
-                      extending.fold[Type](t"_root_.io.circe.Json")(name => Type.Name(name)),
-                      Type.Bounds(None, extending.map(name => Type.Name(name)))
+            Defn.Type(
+              List(Mod.Opaque()),
+              Type.Name(name),
+              Nil,
+              extending.fold[Type](t"_root_.io.circe.Json")(name => Type.Name(name)),
+              Type.Bounds(None, extending.map(name => Type.Name(name)))
             )
           ) ++ pars.map { par =>
             val (decodeTo, castTo) = findDecodeCast(par.decltpe.get)
-            val targetName = s"${name}_${par.name.value}"
-            q"""extension (thiz: ${Type.Name(name)}) @scala.annotation.targetName($targetName) def ${Term.Name(
+            val targetName         = s"${name}_${par.name.value}"
+            q"""extension (thiz: ${Type.Name(
+                name
+              )}) @scala.annotation.targetName($targetName) def ${Term.Name(
                 par.name.value
               )}: ${par.decltpe} = _root_.io.circe.Decoder[$decodeTo].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply(${par.name.value}).get).asInstanceOf[$castTo]"""
           }
@@ -223,7 +226,7 @@ trait Generator {
     case Type.Apply(container @ Type.Name("Option" | "List"), List(arg)) =>
       val (inner, cast) = findDecodeCast(arg)
       (Type.Apply(container, List(inner)), Type.Apply(container, List(cast)))
-    case _ =>
+    case _                                                               =>
       (t"_root_.io.circe.Json", tpe)
   }
 
@@ -255,14 +258,15 @@ trait Generator {
         val nextPath: Option[Term.Ref]       = nextNestPath(nestPath)
         val nextTypes: Map[String, Term.Ref] = nextNestedTypes(nested, nestPath, nestedTypes)
 
-        val (newBody, wasMissing) = if (jitDecoder)
-          addOpaqueDef(camelName, params.map(_.toTree(nextPath, nextTypes)), extending)(
-            parentBody
-          )
+        val (newBody, wasMissing) =
+          if (jitDecoder)
+            addOpaqueDef(camelName, params.map(_.toTree(nextPath, nextTypes)), extending)(
+              parentBody
+            )
           else
-          addCaseClassDef(camelName, params.map(_.toTree(nextPath, nextTypes)), extending)(
-            parentBody
-          )
+            addCaseClassDef(camelName, params.map(_.toTree(nextPath, nextTypes)), extending)(
+              parentBody
+            )
 
         val addNested = nested.map(
           _.addToParentBody(
@@ -296,6 +300,7 @@ trait Generator {
             scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
+            jitDecoder,
             bodyMod = scala.Function.chain(addNested ++ addLenses),
             nestPath = nestPath
           )(newBody)
@@ -417,6 +422,7 @@ trait Generator {
             scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
+            jitDecoder,
             TypeType.Sum(sum.instances.map(_.name)),
             bodyMod = scala.Function.chain(addDefinitions ++ addLenses),
             nestPath = nestPath
@@ -470,6 +476,7 @@ trait Generator {
             scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
+            jitDecoder,
             TypeType.Enum(enumValues),
             _ ++ enumValues.flatMap { enumValue =>
               List(
@@ -496,6 +503,7 @@ trait Generator {
             scalaJSReactReuse,
             circeEncoder,
             circeDecoder,
+            jitDecoder,
             TypeType.Enum(enumValues),
             _ ++ enumValues.map { enumValue =>
               // q"case object ${TermName(enumValue.className)} extends ..$early with ..$allInit"
@@ -564,6 +572,7 @@ trait Generator {
     scalaJSReactReuse: Boolean,
     circeEncoder:      Boolean = false,
     circeDecoder:      Boolean = false,
+    jitDecoder:        Boolean = false,
     typeType:          TypeType = TypeType.CaseClass,
     bodyMod:           List[Stat] => List[Stat] = identity,
     nestPath:          Option[Term.Ref] = None
@@ -603,6 +612,8 @@ trait Generator {
     })
 
     val decoderDef = Option.when(circeDecoder)(typeType match {
+      case _ if jitDecoder            =>
+        q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.Decoder.decodeJson.asInstanceOf[io.circe.Decoder[$n]]"
       case TypeType.CaseClass         =>
         q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
       case TypeType.Enum(enumValues)  =>
