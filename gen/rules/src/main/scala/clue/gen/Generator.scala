@@ -270,7 +270,7 @@ trait Generator {
         val addMembers = Option.when(jitDecoder) { (moduleBody: List[Stat]) =>
           val members = pars.flatMap { par =>
             import scala.meta.dialects.Scala3
-            
+
             val name = camelName
 
             val targetName        = s"${name}_${par.name.value}"
