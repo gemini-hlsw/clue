@@ -209,13 +209,19 @@ trait Generator {
               extending.fold[Type](t"_root_.io.circe.Json")(name => Type.Name(name)),
               Type.Bounds(None, extending.map(name => Type.Name(name)))
             )
-          ) ++ pars.map { par =>
-            val targetName = s"${name}_${par.name.value}"
-            q"""extension (thiz: ${Type.Name(
+          ) ++ pars.flatMap { par =>
+            val targetName        = s"${name}_${par.name.value}"
+            val targetNameAttempt = s"${name}_${par.name.value}Attempt"
+            val attemptTermName   = Term.Name(s"${par.name.value}Attempt")
+            val attempt           = q"""extension (thiz: ${Type.Name(
+                name
+              )}) @scala.annotation.targetName($targetNameAttempt) def ${attemptTermName}: Either[Throwable, ${par.decltpe.get}] = _root_.io.circe.Decoder[${par.decltpe.get}].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply(${par.name.value}).get)"""
+            val unsafe            = q"""extension (thiz: ${Type.Name(
                 name
               )}) @scala.annotation.targetName($targetName) def ${Term.Name(
                 par.name.value
-              )}: ${par.decltpe} = _root_.io.circe.Decoder[${par.decltpe.get}].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply(${par.name.value}).get).toTry.get"""
+              )}: ${par.decltpe} = thiz.$attemptTermName.toTry.get"""
+            List(unsafe, attempt)
           }
 
           (stats, true)
@@ -248,16 +254,32 @@ trait Generator {
       parentBody => {
         val nextPath: Option[Term.Ref]       = nextNestPath(nestPath)
         val nextTypes: Map[String, Term.Ref] = nextNestedTypes(nested, nestPath, nestedTypes)
+        val pars                             = params.map(_.toTree(nextPath, nextTypes))
 
         val (newBody, wasMissing) =
           if (jitDecoder)
-            addOpaqueDef(camelName, params.map(_.toTree(nextPath, nextTypes)), extending)(
+            addOpaqueDef(camelName, pars, extending)(
               parentBody
             )
           else
-            addCaseClassDef(camelName, params.map(_.toTree(nextPath, nextTypes)), extending)(
+            addCaseClassDef(camelName, pars, extending)(
               parentBody
             )
+
+        val addUnapply = Option.when(jitDecoder) { (moduleBody: List[Stat]) =>
+          val unapply = pars match {
+            case List(par) =>
+              q"def unapply(thiz: ${Type.Name(camelName)}): Option[${par.decltpe.get}] = thiz.${Term
+                  .Name(s"${par.name}Attempt")}.toOption"
+            case pars      =>
+              val members = pars.map { par =>
+                q"thiz.${Term.Name(s"${par.name}Attempt")}"
+              }
+              q"def unapply(thiz: ${Type.Name(camelName)}): Option[(..${pars.flatMap(_.decltpe.toList)})] = cats.Semigroupal.${Term
+                  .Name(s"tuple${members.length}")}(..${members}).toOption"
+          }
+          moduleBody ++ List(unapply)
+        }
 
         val addNested = nested.map(
           _.addToParentBody(
@@ -292,7 +314,7 @@ trait Generator {
             circeEncoder,
             circeDecoder,
             jitDecoder,
-            bodyMod = scala.Function.chain(addNested ++ addLenses),
+            bodyMod = scala.Function.chain(addUnapply.toList ++ addNested ++ addLenses),
             nestPath = nestPath
           )(newBody)
         else
