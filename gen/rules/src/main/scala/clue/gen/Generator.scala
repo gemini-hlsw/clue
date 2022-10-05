@@ -191,7 +191,6 @@ trait Generator {
 
   protected[this] def addOpaqueDef(
     name:      String,
-    pars:      List[Term.Param],
     extending: Option[String] = None
   ): List[Stat] => (List[Stat], Boolean) =
     parentBody =>
@@ -209,20 +208,7 @@ trait Generator {
               extending.fold[Type](t"_root_.io.circe.Json")(name => Type.Name(name)),
               Type.Bounds(None, extending.map(name => Type.Name(name)))
             )
-          ) ++ pars.flatMap { par =>
-            val targetName        = s"${name}_${par.name.value}"
-            val targetNameAttempt = s"${name}_${par.name.value}Attempt"
-            val attemptTermName   = Term.Name(s"${par.name.value}Attempt")
-            val attempt           = q"""extension (thiz: ${Type.Name(
-                name
-              )}) @scala.annotation.targetName($targetNameAttempt) def ${attemptTermName}: Either[Throwable, ${par.decltpe.get}] = _root_.io.circe.Decoder[${par.decltpe.get}].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply(${par.name.value}).get)"""
-            val unsafe            = q"""extension (thiz: ${Type.Name(
-                name
-              )}) @scala.annotation.targetName($targetName) def ${Term.Name(
-                par.name.value
-              )}: ${par.decltpe} = thiz.$attemptTermName.toTry.get"""
-            List(unsafe, attempt)
-          }
+          )
 
           (stats, true)
       }
@@ -258,7 +244,7 @@ trait Generator {
 
         val (newBody, wasMissing) =
           if (jitDecoder)
-            addOpaqueDef(camelName, pars, extending)(
+            addOpaqueDef(camelName, extending)(
               parentBody
             )
           else
@@ -279,6 +265,29 @@ trait Generator {
                   .Name(s"tuple${members.length}")}(..${members}).toOption"
           }
           moduleBody ++ List(unapply)
+        }
+
+        val addMembers = Option.when(jitDecoder) { (moduleBody: List[Stat]) =>
+          val members = pars.flatMap { par =>
+            import scala.meta.dialects.Scala3
+            
+            val name = camelName
+
+            val targetName        = s"${name}_${par.name.value}"
+            val targetNameAttempt = s"${name}_${par.name.value}Attempt"
+            val attemptTermName   = Term.Name(s"${par.name.value}Attempt")
+            val attempt           = q"""extension (thiz: ${Type.Name(
+                name
+              )}) @scala.annotation.targetName($targetNameAttempt) def ${attemptTermName}: Either[Throwable, ${par.decltpe.get}] = _root_.io.circe.Decoder[${par.decltpe.get}].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply(${par.name.value}).get)"""
+            val unsafe            = q"""extension (thiz: ${Type.Name(
+                name
+              )}) @scala.annotation.targetName($targetName) def ${Term.Name(
+                par.name.value
+              )}: ${par.decltpe} = thiz.$attemptTermName.toTry.get"""
+            List(unsafe, attempt)
+          }
+
+          moduleBody ++ members
         }
 
         val addNested = nested.map(
@@ -314,7 +323,8 @@ trait Generator {
             circeEncoder,
             circeDecoder,
             jitDecoder,
-            bodyMod = scala.Function.chain(addUnapply.toList ++ addNested ++ addLenses),
+            bodyMod =
+              scala.Function.chain(addUnapply.toList ++ addMembers ++ addNested ++ addLenses),
             nestPath = nestPath
           )(newBody)
         else
