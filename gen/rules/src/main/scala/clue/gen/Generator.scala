@@ -303,7 +303,7 @@ trait Generator {
           )
         )
 
-        val addLenses = Option.when(monocleLenses) { (moduleBody: List[Stat]) =>
+        val addLenses = Option.when(monocleLenses && !jitDecoder) { (moduleBody: List[Stat]) =>
           val lensesDef = params.map { param =>
             val thisType  = qualifiedNestedType(nestPath, Type.Name(camelName))
             val childType = param.typeTree(nextPath, nextTypes)
