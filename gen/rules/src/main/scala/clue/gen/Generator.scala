@@ -174,44 +174,32 @@ trait Generator {
   protected[this] def addCaseClassDef(
     name:      String,
     pars:      List[Term.Param],
-    extending: Option[String] = None
-  ): List[Stat] => (List[Stat], Boolean) =
-    parentBody =>
-      mustDefineType(name)(parentBody) match {
-        case Skip                                =>
-          (parentBody, false)
-        case Define(newParentBody, early, inits) =>
-          val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
-          (newParentBody :+
-             //  q"case class ${Type.Name(name)}(..$pars) extends ..$earlyDefs with ..$allParents",
-             q"case class ${Type.Name(name)}(..$pars) extends {..$early} with ..$allInits",
-           true
-          )
-      }
+    extending: Option[String] = None,
+    early:     List[Stat],
+    inits:     List[Init]
+  ): List[Stat] => List[Stat] = { parentBody =>
+    val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
+    parentBody :+
+      //  q"case class ${Type.Name(name)}(..$pars) extends ..$earlyDefs with ..$allParents",
+      q"case class ${Type.Name(name)}(..$pars) extends {..$early} with ..$allInits"
+  }
 
   protected[this] def addOpaqueDef(
     name:      String,
     extending: Option[String] = None
-  ): List[Stat] => (List[Stat], Boolean) =
-    parentBody =>
-      mustDefineType(name)(parentBody) match {
-        case Skip                        =>
-          (parentBody, false)
-        case Define(newParentBody, _, _) =>
-          import scala.meta.dialects.Scala3
+  ): List[Stat] => List[Stat] = { parentBody =>
+    import scala.meta.dialects.Scala3
 
-          val stats: List[Stat] = newParentBody ++ List(
-            Defn.Type(
-              List(Mod.Opaque()),
-              Type.Name(name),
-              Nil,
-              extending.fold[Type](t"_root_.io.circe.Json")(name => Type.Name(name)),
-              Type.Bounds(None, extending.map(name => Type.Name(name)))
-            )
-          )
-
-          (stats, true)
-      }
+    parentBody ++ List(
+      Defn.Type(
+        List(Mod.Opaque()),
+        Type.Name(name),
+        Nil,
+        extending.fold[Type](t"_root_.io.circe.Json")(name => Type.Name(name)),
+        Type.Bounds(None, extending.map(name => Type.Name(name)))
+      )
+    )
+  }
 
   /**
    * The definition of a case class to contain an object from the query response.
@@ -242,17 +230,15 @@ trait Generator {
         val nextTypes: Map[String, Term.Ref] = nextNestedTypes(nested, nestPath, nestedTypes)
         val pars                             = params.map(_.toTree(nextPath, nextTypes))
 
-        val (newBody, wasMissing) =
-          if (jitDecoder)
-            addOpaqueDef(camelName, extending)(
-              parentBody
-            )
-          else
-            addCaseClassDef(camelName, pars, extending)(
-              parentBody
-            )
+        val (newBody, wasMissing, usedJitDecoder) = mustDefineType(camelName)(parentBody) match {
+          case Skip                                          => (parentBody, false, false)
+          case Define(newParentBody, Nil, Nil) if jitDecoder =>
+            (addOpaqueDef(camelName, extending)(newParentBody), true, true)
+          case Define(newParentBody, early, inits)           =>
+            (addCaseClassDef(camelName, pars, extending, early, inits)(newParentBody), true, false)
+        }
 
-        val addUnapply = Option.when(jitDecoder) { (moduleBody: List[Stat]) =>
+        val addUnapply = Option.when(usedJitDecoder) { (moduleBody: List[Stat]) =>
           val unapply = pars match {
             case List(par) =>
               q"def unapply(thiz: ${Type.Name(camelName)}): Option[${par.decltpe.get}] = thiz.${Term
@@ -267,7 +253,7 @@ trait Generator {
           moduleBody ++ List(unapply)
         }
 
-        val addMembers = Option.when(jitDecoder) { (moduleBody: List[Stat]) =>
+        val addMembers = Option.when(usedJitDecoder) { (moduleBody: List[Stat]) =>
           val members = pars.flatMap { par =>
             import scala.meta.dialects.Scala3
 
@@ -303,7 +289,7 @@ trait Generator {
           )
         )
 
-        val addLenses = Option.when(monocleLenses && !jitDecoder) { (moduleBody: List[Stat]) =>
+        val addLenses = Option.when(monocleLenses && !usedJitDecoder) { (moduleBody: List[Stat]) =>
           val lensesDef = params.map { param =>
             val thisType  = qualifiedNestedType(nestPath, Type.Name(camelName))
             val childType = param.typeTree(nextPath, nextTypes)
