@@ -1548,361 +1548,361 @@ object LucumaODB {
     def ignoreUnusedImportTypes(): Unit = ()
     case class AsterismProgramLinks(val asterismId: AsterismId, val programIds: List[ProgramId])
     object AsterismProgramLinks {
-      implicit val asterismId: monocle.Lens[AsterismProgramLinks, AsterismId] = monocle.macros.GenLens[AsterismProgramLinks](_.asterismId)
-      implicit val programIds: monocle.Lens[AsterismProgramLinks, List[ProgramId]] = monocle.macros.GenLens[AsterismProgramLinks](_.programIds)
+      val asterismId: monocle.Lens[AsterismProgramLinks, AsterismId] = monocle.macros.GenLens[AsterismProgramLinks](_.asterismId)
+      val programIds: monocle.Lens[AsterismProgramLinks, List[ProgramId]] = monocle.macros.GenLens[AsterismProgramLinks](_.programIds)
       implicit val eqAsterismProgramLinks: cats.Eq[AsterismProgramLinks] = cats.Eq.fromUniversalEquals
       implicit val showAsterismProgramLinks: cats.Show[AsterismProgramLinks] = cats.Show.fromToString
       implicit val jsonEncoderAsterismProgramLinks: io.circe.Encoder[AsterismProgramLinks] = io.circe.generic.semiauto.deriveEncoder[AsterismProgramLinks].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class AsterismTargetLinks(val asterismId: AsterismId, val targetIds: List[TargetId])
     object AsterismTargetLinks {
-      implicit val asterismId: monocle.Lens[AsterismTargetLinks, AsterismId] = monocle.macros.GenLens[AsterismTargetLinks](_.asterismId)
-      implicit val targetIds: monocle.Lens[AsterismTargetLinks, List[TargetId]] = monocle.macros.GenLens[AsterismTargetLinks](_.targetIds)
+      val asterismId: monocle.Lens[AsterismTargetLinks, AsterismId] = monocle.macros.GenLens[AsterismTargetLinks](_.asterismId)
+      val targetIds: monocle.Lens[AsterismTargetLinks, List[TargetId]] = monocle.macros.GenLens[AsterismTargetLinks](_.targetIds)
       implicit val eqAsterismTargetLinks: cats.Eq[AsterismTargetLinks] = cats.Eq.fromUniversalEquals
       implicit val showAsterismTargetLinks: cats.Show[AsterismTargetLinks] = cats.Show.fromToString
       implicit val jsonEncoderAsterismTargetLinks: io.circe.Encoder[AsterismTargetLinks] = io.circe.generic.semiauto.deriveEncoder[AsterismTargetLinks].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CatalogIdInput(val name: CatalogName, val id: String)
     object CatalogIdInput {
-      implicit val name: monocle.Lens[CatalogIdInput, CatalogName] = monocle.macros.GenLens[CatalogIdInput](_.name)
-      implicit val id: monocle.Lens[CatalogIdInput, String] = monocle.macros.GenLens[CatalogIdInput](_.id)
+      val name: monocle.Lens[CatalogIdInput, CatalogName] = monocle.macros.GenLens[CatalogIdInput](_.name)
+      val id: monocle.Lens[CatalogIdInput, String] = monocle.macros.GenLens[CatalogIdInput](_.id)
       implicit val eqCatalogIdInput: cats.Eq[CatalogIdInput] = cats.Eq.fromUniversalEquals
       implicit val showCatalogIdInput: cats.Show[CatalogIdInput] = cats.Show.fromToString
       implicit val jsonEncoderCatalogIdInput: io.circe.Encoder[CatalogIdInput] = io.circe.generic.semiauto.deriveEncoder[CatalogIdInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class ConstraintSetObservationLinks(val constraintSetId: ConstraintSetId, val observationIds: List[ObservationId])
     object ConstraintSetObservationLinks {
-      implicit val constraintSetId: monocle.Lens[ConstraintSetObservationLinks, ConstraintSetId] = monocle.macros.GenLens[ConstraintSetObservationLinks](_.constraintSetId)
-      implicit val observationIds: monocle.Lens[ConstraintSetObservationLinks, List[ObservationId]] = monocle.macros.GenLens[ConstraintSetObservationLinks](_.observationIds)
+      val constraintSetId: monocle.Lens[ConstraintSetObservationLinks, ConstraintSetId] = monocle.macros.GenLens[ConstraintSetObservationLinks](_.constraintSetId)
+      val observationIds: monocle.Lens[ConstraintSetObservationLinks, List[ObservationId]] = monocle.macros.GenLens[ConstraintSetObservationLinks](_.observationIds)
       implicit val eqConstraintSetObservationLinks: cats.Eq[ConstraintSetObservationLinks] = cats.Eq.fromUniversalEquals
       implicit val showConstraintSetObservationLinks: cats.Show[ConstraintSetObservationLinks] = cats.Show.fromToString
       implicit val jsonEncoderConstraintSetObservationLinks: io.circe.Encoder[ConstraintSetObservationLinks] = io.circe.generic.semiauto.deriveEncoder[ConstraintSetObservationLinks].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CoordinatesInput(val ra: RightAscensionInput, val dec: DeclinationInput)
     object CoordinatesInput {
-      implicit val ra: monocle.Lens[CoordinatesInput, RightAscensionInput] = monocle.macros.GenLens[CoordinatesInput](_.ra)
-      implicit val dec: monocle.Lens[CoordinatesInput, DeclinationInput] = monocle.macros.GenLens[CoordinatesInput](_.dec)
+      val ra: monocle.Lens[CoordinatesInput, RightAscensionInput] = monocle.macros.GenLens[CoordinatesInput](_.ra)
+      val dec: monocle.Lens[CoordinatesInput, DeclinationInput] = monocle.macros.GenLens[CoordinatesInput](_.dec)
       implicit val eqCoordinatesInput: cats.Eq[CoordinatesInput] = cats.Eq.fromUniversalEquals
       implicit val showCoordinatesInput: cats.Show[CoordinatesInput] = cats.Show.fromToString
       implicit val jsonEncoderCoordinatesInput: io.circe.Encoder[CoordinatesInput] = io.circe.generic.semiauto.deriveEncoder[CoordinatesInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CreateAirmassRangeInput(val min: BigDecimal, val max: BigDecimal)
     object CreateAirmassRangeInput {
-      implicit val min: monocle.Lens[CreateAirmassRangeInput, BigDecimal] = monocle.macros.GenLens[CreateAirmassRangeInput](_.min)
-      implicit val max: monocle.Lens[CreateAirmassRangeInput, BigDecimal] = monocle.macros.GenLens[CreateAirmassRangeInput](_.max)
+      val min: monocle.Lens[CreateAirmassRangeInput, BigDecimal] = monocle.macros.GenLens[CreateAirmassRangeInput](_.min)
+      val max: monocle.Lens[CreateAirmassRangeInput, BigDecimal] = monocle.macros.GenLens[CreateAirmassRangeInput](_.max)
       implicit val eqCreateAirmassRangeInput: cats.Eq[CreateAirmassRangeInput] = cats.Eq.fromUniversalEquals
       implicit val showCreateAirmassRangeInput: cats.Show[CreateAirmassRangeInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateAirmassRangeInput: io.circe.Encoder[CreateAirmassRangeInput] = io.circe.generic.semiauto.deriveEncoder[CreateAirmassRangeInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CreateAsterismInput(val asterismId: clue.data.Input[AsterismId] = clue.data.Ignore, val name: clue.data.Input[NonEmptyString] = clue.data.Ignore, val programIds: List[ProgramId], val explicitBase: clue.data.Input[CoordinatesInput] = clue.data.Ignore)
     object CreateAsterismInput {
-      implicit val asterismId: monocle.Lens[CreateAsterismInput, clue.data.Input[AsterismId]] = monocle.macros.GenLens[CreateAsterismInput](_.asterismId)
-      implicit val name: monocle.Lens[CreateAsterismInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[CreateAsterismInput](_.name)
-      implicit val programIds: monocle.Lens[CreateAsterismInput, List[ProgramId]] = monocle.macros.GenLens[CreateAsterismInput](_.programIds)
-      implicit val explicitBase: monocle.Lens[CreateAsterismInput, clue.data.Input[CoordinatesInput]] = monocle.macros.GenLens[CreateAsterismInput](_.explicitBase)
+      val asterismId: monocle.Lens[CreateAsterismInput, clue.data.Input[AsterismId]] = monocle.macros.GenLens[CreateAsterismInput](_.asterismId)
+      val name: monocle.Lens[CreateAsterismInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[CreateAsterismInput](_.name)
+      val programIds: monocle.Lens[CreateAsterismInput, List[ProgramId]] = monocle.macros.GenLens[CreateAsterismInput](_.programIds)
+      val explicitBase: monocle.Lens[CreateAsterismInput, clue.data.Input[CoordinatesInput]] = monocle.macros.GenLens[CreateAsterismInput](_.explicitBase)
       implicit val eqCreateAsterismInput: cats.Eq[CreateAsterismInput] = cats.Eq.fromUniversalEquals
       implicit val showCreateAsterismInput: cats.Show[CreateAsterismInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateAsterismInput: io.circe.Encoder[CreateAsterismInput] = io.circe.generic.semiauto.deriveEncoder[CreateAsterismInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CreateConstraintSetInput(val constraintSetId: clue.data.Input[ConstraintSetId] = clue.data.Ignore, val programId: ProgramId, val name: NonEmptyString, val imageQuality: ImageQuality, val cloudExtinction: CloudExtinction, val skyBackground: SkyBackground, val waterVapor: WaterVapor, val elevationRange: CreateElevationRangeInput)
     object CreateConstraintSetInput {
-      implicit val constraintSetId: monocle.Lens[CreateConstraintSetInput, clue.data.Input[ConstraintSetId]] = monocle.macros.GenLens[CreateConstraintSetInput](_.constraintSetId)
-      implicit val programId: monocle.Lens[CreateConstraintSetInput, ProgramId] = monocle.macros.GenLens[CreateConstraintSetInput](_.programId)
-      implicit val name: monocle.Lens[CreateConstraintSetInput, NonEmptyString] = monocle.macros.GenLens[CreateConstraintSetInput](_.name)
-      implicit val imageQuality: monocle.Lens[CreateConstraintSetInput, ImageQuality] = monocle.macros.GenLens[CreateConstraintSetInput](_.imageQuality)
-      implicit val cloudExtinction: monocle.Lens[CreateConstraintSetInput, CloudExtinction] = monocle.macros.GenLens[CreateConstraintSetInput](_.cloudExtinction)
-      implicit val skyBackground: monocle.Lens[CreateConstraintSetInput, SkyBackground] = monocle.macros.GenLens[CreateConstraintSetInput](_.skyBackground)
-      implicit val waterVapor: monocle.Lens[CreateConstraintSetInput, WaterVapor] = monocle.macros.GenLens[CreateConstraintSetInput](_.waterVapor)
-      implicit val elevationRange: monocle.Lens[CreateConstraintSetInput, CreateElevationRangeInput] = monocle.macros.GenLens[CreateConstraintSetInput](_.elevationRange)
+      val constraintSetId: monocle.Lens[CreateConstraintSetInput, clue.data.Input[ConstraintSetId]] = monocle.macros.GenLens[CreateConstraintSetInput](_.constraintSetId)
+      val programId: monocle.Lens[CreateConstraintSetInput, ProgramId] = monocle.macros.GenLens[CreateConstraintSetInput](_.programId)
+      val name: monocle.Lens[CreateConstraintSetInput, NonEmptyString] = monocle.macros.GenLens[CreateConstraintSetInput](_.name)
+      val imageQuality: monocle.Lens[CreateConstraintSetInput, ImageQuality] = monocle.macros.GenLens[CreateConstraintSetInput](_.imageQuality)
+      val cloudExtinction: monocle.Lens[CreateConstraintSetInput, CloudExtinction] = monocle.macros.GenLens[CreateConstraintSetInput](_.cloudExtinction)
+      val skyBackground: monocle.Lens[CreateConstraintSetInput, SkyBackground] = monocle.macros.GenLens[CreateConstraintSetInput](_.skyBackground)
+      val waterVapor: monocle.Lens[CreateConstraintSetInput, WaterVapor] = monocle.macros.GenLens[CreateConstraintSetInput](_.waterVapor)
+      val elevationRange: monocle.Lens[CreateConstraintSetInput, CreateElevationRangeInput] = monocle.macros.GenLens[CreateConstraintSetInput](_.elevationRange)
       implicit val eqCreateConstraintSetInput: cats.Eq[CreateConstraintSetInput] = cats.Eq.fromUniversalEquals
       implicit val showCreateConstraintSetInput: cats.Show[CreateConstraintSetInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateConstraintSetInput: io.circe.Encoder[CreateConstraintSetInput] = io.circe.generic.semiauto.deriveEncoder[CreateConstraintSetInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CreateElevationRangeInput(val airmassRange: clue.data.Input[CreateAirmassRangeInput] = clue.data.Ignore, val hourAngleRange: clue.data.Input[CreateHourAngleRangeInput] = clue.data.Ignore)
     object CreateElevationRangeInput {
-      implicit val airmassRange: monocle.Lens[CreateElevationRangeInput, clue.data.Input[CreateAirmassRangeInput]] = monocle.macros.GenLens[CreateElevationRangeInput](_.airmassRange)
-      implicit val hourAngleRange: monocle.Lens[CreateElevationRangeInput, clue.data.Input[CreateHourAngleRangeInput]] = monocle.macros.GenLens[CreateElevationRangeInput](_.hourAngleRange)
+      val airmassRange: monocle.Lens[CreateElevationRangeInput, clue.data.Input[CreateAirmassRangeInput]] = monocle.macros.GenLens[CreateElevationRangeInput](_.airmassRange)
+      val hourAngleRange: monocle.Lens[CreateElevationRangeInput, clue.data.Input[CreateHourAngleRangeInput]] = monocle.macros.GenLens[CreateElevationRangeInput](_.hourAngleRange)
       implicit val eqCreateElevationRangeInput: cats.Eq[CreateElevationRangeInput] = cats.Eq.fromUniversalEquals
       implicit val showCreateElevationRangeInput: cats.Show[CreateElevationRangeInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateElevationRangeInput: io.circe.Encoder[CreateElevationRangeInput] = io.circe.generic.semiauto.deriveEncoder[CreateElevationRangeInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CreateHourAngleRangeInput(val minHours: BigDecimal, val maxHours: BigDecimal)
     object CreateHourAngleRangeInput {
-      implicit val minHours: monocle.Lens[CreateHourAngleRangeInput, BigDecimal] = monocle.macros.GenLens[CreateHourAngleRangeInput](_.minHours)
-      implicit val maxHours: monocle.Lens[CreateHourAngleRangeInput, BigDecimal] = monocle.macros.GenLens[CreateHourAngleRangeInput](_.maxHours)
+      val minHours: monocle.Lens[CreateHourAngleRangeInput, BigDecimal] = monocle.macros.GenLens[CreateHourAngleRangeInput](_.minHours)
+      val maxHours: monocle.Lens[CreateHourAngleRangeInput, BigDecimal] = monocle.macros.GenLens[CreateHourAngleRangeInput](_.maxHours)
       implicit val eqCreateHourAngleRangeInput: cats.Eq[CreateHourAngleRangeInput] = cats.Eq.fromUniversalEquals
       implicit val showCreateHourAngleRangeInput: cats.Show[CreateHourAngleRangeInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateHourAngleRangeInput: io.circe.Encoder[CreateHourAngleRangeInput] = io.circe.generic.semiauto.deriveEncoder[CreateHourAngleRangeInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CreateNonsiderealInput(val targetId: clue.data.Input[TargetId] = clue.data.Ignore, val programIds: clue.data.Input[List[ProgramId]] = clue.data.Ignore, val name: NonEmptyString, val key: EphemerisKeyType, val des: String, val magnitudes: clue.data.Input[List[MagnitudeInput]] = clue.data.Ignore)
     object CreateNonsiderealInput {
-      implicit val targetId: monocle.Lens[CreateNonsiderealInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[CreateNonsiderealInput](_.targetId)
-      implicit val programIds: monocle.Lens[CreateNonsiderealInput, clue.data.Input[List[ProgramId]]] = monocle.macros.GenLens[CreateNonsiderealInput](_.programIds)
-      implicit val name: monocle.Lens[CreateNonsiderealInput, NonEmptyString] = monocle.macros.GenLens[CreateNonsiderealInput](_.name)
-      implicit val key: monocle.Lens[CreateNonsiderealInput, EphemerisKeyType] = monocle.macros.GenLens[CreateNonsiderealInput](_.key)
-      implicit val des: monocle.Lens[CreateNonsiderealInput, String] = monocle.macros.GenLens[CreateNonsiderealInput](_.des)
-      implicit val magnitudes: monocle.Lens[CreateNonsiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[CreateNonsiderealInput](_.magnitudes)
+      val targetId: monocle.Lens[CreateNonsiderealInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[CreateNonsiderealInput](_.targetId)
+      val programIds: monocle.Lens[CreateNonsiderealInput, clue.data.Input[List[ProgramId]]] = monocle.macros.GenLens[CreateNonsiderealInput](_.programIds)
+      val name: monocle.Lens[CreateNonsiderealInput, NonEmptyString] = monocle.macros.GenLens[CreateNonsiderealInput](_.name)
+      val key: monocle.Lens[CreateNonsiderealInput, EphemerisKeyType] = monocle.macros.GenLens[CreateNonsiderealInput](_.key)
+      val des: monocle.Lens[CreateNonsiderealInput, String] = monocle.macros.GenLens[CreateNonsiderealInput](_.des)
+      val magnitudes: monocle.Lens[CreateNonsiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[CreateNonsiderealInput](_.magnitudes)
       implicit val eqCreateNonsiderealInput: cats.Eq[CreateNonsiderealInput] = cats.Eq.fromUniversalEquals
       implicit val showCreateNonsiderealInput: cats.Show[CreateNonsiderealInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateNonsiderealInput: io.circe.Encoder[CreateNonsiderealInput] = io.circe.generic.semiauto.deriveEncoder[CreateNonsiderealInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CreateObservationInput(val observationId: clue.data.Input[ObservationId] = clue.data.Ignore, val programId: ProgramId, val name: clue.data.Input[NonEmptyString] = clue.data.Ignore, val asterismId: clue.data.Input[AsterismId] = clue.data.Ignore, val targetId: clue.data.Input[TargetId] = clue.data.Ignore, val status: clue.data.Input[ObsStatus] = clue.data.Ignore)
     object CreateObservationInput {
-      implicit val observationId: monocle.Lens[CreateObservationInput, clue.data.Input[ObservationId]] = monocle.macros.GenLens[CreateObservationInput](_.observationId)
-      implicit val programId: monocle.Lens[CreateObservationInput, ProgramId] = monocle.macros.GenLens[CreateObservationInput](_.programId)
-      implicit val name: monocle.Lens[CreateObservationInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[CreateObservationInput](_.name)
-      implicit val asterismId: monocle.Lens[CreateObservationInput, clue.data.Input[AsterismId]] = monocle.macros.GenLens[CreateObservationInput](_.asterismId)
-      implicit val targetId: monocle.Lens[CreateObservationInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[CreateObservationInput](_.targetId)
-      implicit val status: monocle.Lens[CreateObservationInput, clue.data.Input[ObsStatus]] = monocle.macros.GenLens[CreateObservationInput](_.status)
+      val observationId: monocle.Lens[CreateObservationInput, clue.data.Input[ObservationId]] = monocle.macros.GenLens[CreateObservationInput](_.observationId)
+      val programId: monocle.Lens[CreateObservationInput, ProgramId] = monocle.macros.GenLens[CreateObservationInput](_.programId)
+      val name: monocle.Lens[CreateObservationInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[CreateObservationInput](_.name)
+      val asterismId: monocle.Lens[CreateObservationInput, clue.data.Input[AsterismId]] = monocle.macros.GenLens[CreateObservationInput](_.asterismId)
+      val targetId: monocle.Lens[CreateObservationInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[CreateObservationInput](_.targetId)
+      val status: monocle.Lens[CreateObservationInput, clue.data.Input[ObsStatus]] = monocle.macros.GenLens[CreateObservationInput](_.status)
       implicit val eqCreateObservationInput: cats.Eq[CreateObservationInput] = cats.Eq.fromUniversalEquals
       implicit val showCreateObservationInput: cats.Show[CreateObservationInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateObservationInput: io.circe.Encoder[CreateObservationInput] = io.circe.generic.semiauto.deriveEncoder[CreateObservationInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class CreateSiderealInput(val targetId: clue.data.Input[TargetId] = clue.data.Ignore, val programIds: clue.data.Input[List[ProgramId]] = clue.data.Ignore, val name: NonEmptyString, val catalogId: clue.data.Input[CatalogIdInput] = clue.data.Ignore, val ra: RightAscensionInput, val dec: DeclinationInput, val epoch: clue.data.Input[EpochString] = clue.data.Ignore, val properMotion: clue.data.Input[ProperMotionInput] = clue.data.Ignore, val radialVelocity: clue.data.Input[RadialVelocityInput] = clue.data.Ignore, val parallax: clue.data.Input[ParallaxModelInput] = clue.data.Ignore, val magnitudes: clue.data.Input[List[MagnitudeInput]] = clue.data.Ignore)
     object CreateSiderealInput {
-      implicit val targetId: monocle.Lens[CreateSiderealInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[CreateSiderealInput](_.targetId)
-      implicit val programIds: monocle.Lens[CreateSiderealInput, clue.data.Input[List[ProgramId]]] = monocle.macros.GenLens[CreateSiderealInput](_.programIds)
-      implicit val name: monocle.Lens[CreateSiderealInput, NonEmptyString] = monocle.macros.GenLens[CreateSiderealInput](_.name)
-      implicit val catalogId: monocle.Lens[CreateSiderealInput, clue.data.Input[CatalogIdInput]] = monocle.macros.GenLens[CreateSiderealInput](_.catalogId)
-      implicit val ra: monocle.Lens[CreateSiderealInput, RightAscensionInput] = monocle.macros.GenLens[CreateSiderealInput](_.ra)
-      implicit val dec: monocle.Lens[CreateSiderealInput, DeclinationInput] = monocle.macros.GenLens[CreateSiderealInput](_.dec)
-      implicit val epoch: monocle.Lens[CreateSiderealInput, clue.data.Input[EpochString]] = monocle.macros.GenLens[CreateSiderealInput](_.epoch)
-      implicit val properMotion: monocle.Lens[CreateSiderealInput, clue.data.Input[ProperMotionInput]] = monocle.macros.GenLens[CreateSiderealInput](_.properMotion)
-      implicit val radialVelocity: monocle.Lens[CreateSiderealInput, clue.data.Input[RadialVelocityInput]] = monocle.macros.GenLens[CreateSiderealInput](_.radialVelocity)
-      implicit val parallax: monocle.Lens[CreateSiderealInput, clue.data.Input[ParallaxModelInput]] = monocle.macros.GenLens[CreateSiderealInput](_.parallax)
-      implicit val magnitudes: monocle.Lens[CreateSiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[CreateSiderealInput](_.magnitudes)
+      val targetId: monocle.Lens[CreateSiderealInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[CreateSiderealInput](_.targetId)
+      val programIds: monocle.Lens[CreateSiderealInput, clue.data.Input[List[ProgramId]]] = monocle.macros.GenLens[CreateSiderealInput](_.programIds)
+      val name: monocle.Lens[CreateSiderealInput, NonEmptyString] = monocle.macros.GenLens[CreateSiderealInput](_.name)
+      val catalogId: monocle.Lens[CreateSiderealInput, clue.data.Input[CatalogIdInput]] = monocle.macros.GenLens[CreateSiderealInput](_.catalogId)
+      val ra: monocle.Lens[CreateSiderealInput, RightAscensionInput] = monocle.macros.GenLens[CreateSiderealInput](_.ra)
+      val dec: monocle.Lens[CreateSiderealInput, DeclinationInput] = monocle.macros.GenLens[CreateSiderealInput](_.dec)
+      val epoch: monocle.Lens[CreateSiderealInput, clue.data.Input[EpochString]] = monocle.macros.GenLens[CreateSiderealInput](_.epoch)
+      val properMotion: monocle.Lens[CreateSiderealInput, clue.data.Input[ProperMotionInput]] = monocle.macros.GenLens[CreateSiderealInput](_.properMotion)
+      val radialVelocity: monocle.Lens[CreateSiderealInput, clue.data.Input[RadialVelocityInput]] = monocle.macros.GenLens[CreateSiderealInput](_.radialVelocity)
+      val parallax: monocle.Lens[CreateSiderealInput, clue.data.Input[ParallaxModelInput]] = monocle.macros.GenLens[CreateSiderealInput](_.parallax)
+      val magnitudes: monocle.Lens[CreateSiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[CreateSiderealInput](_.magnitudes)
       implicit val eqCreateSiderealInput: cats.Eq[CreateSiderealInput] = cats.Eq.fromUniversalEquals
       implicit val showCreateSiderealInput: cats.Show[CreateSiderealInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateSiderealInput: io.circe.Encoder[CreateSiderealInput] = io.circe.generic.semiauto.deriveEncoder[CreateSiderealInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class DeclinationDecimalInput(val value: BigDecimal, val units: DeclinationUnits)
     object DeclinationDecimalInput {
-      implicit val value: monocle.Lens[DeclinationDecimalInput, BigDecimal] = monocle.macros.GenLens[DeclinationDecimalInput](_.value)
-      implicit val units: monocle.Lens[DeclinationDecimalInput, DeclinationUnits] = monocle.macros.GenLens[DeclinationDecimalInput](_.units)
+      val value: monocle.Lens[DeclinationDecimalInput, BigDecimal] = monocle.macros.GenLens[DeclinationDecimalInput](_.value)
+      val units: monocle.Lens[DeclinationDecimalInput, DeclinationUnits] = monocle.macros.GenLens[DeclinationDecimalInput](_.units)
       implicit val eqDeclinationDecimalInput: cats.Eq[DeclinationDecimalInput] = cats.Eq.fromUniversalEquals
       implicit val showDeclinationDecimalInput: cats.Show[DeclinationDecimalInput] = cats.Show.fromToString
       implicit val jsonEncoderDeclinationDecimalInput: io.circe.Encoder[DeclinationDecimalInput] = io.circe.generic.semiauto.deriveEncoder[DeclinationDecimalInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class DeclinationInput(val microarcseconds: clue.data.Input[Long] = clue.data.Ignore, val degrees: clue.data.Input[BigDecimal] = clue.data.Ignore, val dms: clue.data.Input[DmsString] = clue.data.Ignore, val fromLong: clue.data.Input[DeclinationLongInput] = clue.data.Ignore, val fromDecimal: clue.data.Input[DeclinationDecimalInput] = clue.data.Ignore)
     object DeclinationInput {
-      implicit val microarcseconds: monocle.Lens[DeclinationInput, clue.data.Input[Long]] = monocle.macros.GenLens[DeclinationInput](_.microarcseconds)
-      implicit val degrees: monocle.Lens[DeclinationInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[DeclinationInput](_.degrees)
-      implicit val dms: monocle.Lens[DeclinationInput, clue.data.Input[DmsString]] = monocle.macros.GenLens[DeclinationInput](_.dms)
-      implicit val fromLong: monocle.Lens[DeclinationInput, clue.data.Input[DeclinationLongInput]] = monocle.macros.GenLens[DeclinationInput](_.fromLong)
-      implicit val fromDecimal: monocle.Lens[DeclinationInput, clue.data.Input[DeclinationDecimalInput]] = monocle.macros.GenLens[DeclinationInput](_.fromDecimal)
+      val microarcseconds: monocle.Lens[DeclinationInput, clue.data.Input[Long]] = monocle.macros.GenLens[DeclinationInput](_.microarcseconds)
+      val degrees: monocle.Lens[DeclinationInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[DeclinationInput](_.degrees)
+      val dms: monocle.Lens[DeclinationInput, clue.data.Input[DmsString]] = monocle.macros.GenLens[DeclinationInput](_.dms)
+      val fromLong: monocle.Lens[DeclinationInput, clue.data.Input[DeclinationLongInput]] = monocle.macros.GenLens[DeclinationInput](_.fromLong)
+      val fromDecimal: monocle.Lens[DeclinationInput, clue.data.Input[DeclinationDecimalInput]] = monocle.macros.GenLens[DeclinationInput](_.fromDecimal)
       implicit val eqDeclinationInput: cats.Eq[DeclinationInput] = cats.Eq.fromUniversalEquals
       implicit val showDeclinationInput: cats.Show[DeclinationInput] = cats.Show.fromToString
       implicit val jsonEncoderDeclinationInput: io.circe.Encoder[DeclinationInput] = io.circe.generic.semiauto.deriveEncoder[DeclinationInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class DeclinationLongInput(val value: Long, val units: DeclinationUnits)
     object DeclinationLongInput {
-      implicit val value: monocle.Lens[DeclinationLongInput, Long] = monocle.macros.GenLens[DeclinationLongInput](_.value)
-      implicit val units: monocle.Lens[DeclinationLongInput, DeclinationUnits] = monocle.macros.GenLens[DeclinationLongInput](_.units)
+      val value: monocle.Lens[DeclinationLongInput, Long] = monocle.macros.GenLens[DeclinationLongInput](_.value)
+      val units: monocle.Lens[DeclinationLongInput, DeclinationUnits] = monocle.macros.GenLens[DeclinationLongInput](_.units)
       implicit val eqDeclinationLongInput: cats.Eq[DeclinationLongInput] = cats.Eq.fromUniversalEquals
       implicit val showDeclinationLongInput: cats.Show[DeclinationLongInput] = cats.Show.fromToString
       implicit val jsonEncoderDeclinationLongInput: io.circe.Encoder[DeclinationLongInput] = io.circe.generic.semiauto.deriveEncoder[DeclinationLongInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class EditAsterismInput(val asterismId: AsterismId, val existence: clue.data.Input[Existence] = clue.data.Ignore, val name: clue.data.Input[NonEmptyString] = clue.data.Ignore, val explicitBase: clue.data.Input[CoordinatesInput] = clue.data.Ignore)
     object EditAsterismInput {
-      implicit val asterismId: monocle.Lens[EditAsterismInput, AsterismId] = monocle.macros.GenLens[EditAsterismInput](_.asterismId)
-      implicit val existence: monocle.Lens[EditAsterismInput, clue.data.Input[Existence]] = monocle.macros.GenLens[EditAsterismInput](_.existence)
-      implicit val name: monocle.Lens[EditAsterismInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[EditAsterismInput](_.name)
-      implicit val explicitBase: monocle.Lens[EditAsterismInput, clue.data.Input[CoordinatesInput]] = monocle.macros.GenLens[EditAsterismInput](_.explicitBase)
+      val asterismId: monocle.Lens[EditAsterismInput, AsterismId] = monocle.macros.GenLens[EditAsterismInput](_.asterismId)
+      val existence: monocle.Lens[EditAsterismInput, clue.data.Input[Existence]] = monocle.macros.GenLens[EditAsterismInput](_.existence)
+      val name: monocle.Lens[EditAsterismInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[EditAsterismInput](_.name)
+      val explicitBase: monocle.Lens[EditAsterismInput, clue.data.Input[CoordinatesInput]] = monocle.macros.GenLens[EditAsterismInput](_.explicitBase)
       implicit val eqEditAsterismInput: cats.Eq[EditAsterismInput] = cats.Eq.fromUniversalEquals
       implicit val showEditAsterismInput: cats.Show[EditAsterismInput] = cats.Show.fromToString
       implicit val jsonEncoderEditAsterismInput: io.circe.Encoder[EditAsterismInput] = io.circe.generic.semiauto.deriveEncoder[EditAsterismInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class EditConstraintSetInput(val constraintSetId: ConstraintSetId, val existence: clue.data.Input[Existence] = clue.data.Ignore, val name: clue.data.Input[NonEmptyString] = clue.data.Ignore, val imageQuality: clue.data.Input[ImageQuality] = clue.data.Ignore, val cloudExtinction: clue.data.Input[CloudExtinction] = clue.data.Ignore, val skyBackground: clue.data.Input[SkyBackground] = clue.data.Ignore, val waterVapor: clue.data.Input[WaterVapor] = clue.data.Ignore, val elevationRange: clue.data.Input[CreateElevationRangeInput] = clue.data.Ignore)
     object EditConstraintSetInput {
-      implicit val constraintSetId: monocle.Lens[EditConstraintSetInput, ConstraintSetId] = monocle.macros.GenLens[EditConstraintSetInput](_.constraintSetId)
-      implicit val existence: monocle.Lens[EditConstraintSetInput, clue.data.Input[Existence]] = monocle.macros.GenLens[EditConstraintSetInput](_.existence)
-      implicit val name: monocle.Lens[EditConstraintSetInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[EditConstraintSetInput](_.name)
-      implicit val imageQuality: monocle.Lens[EditConstraintSetInput, clue.data.Input[ImageQuality]] = monocle.macros.GenLens[EditConstraintSetInput](_.imageQuality)
-      implicit val cloudExtinction: monocle.Lens[EditConstraintSetInput, clue.data.Input[CloudExtinction]] = monocle.macros.GenLens[EditConstraintSetInput](_.cloudExtinction)
-      implicit val skyBackground: monocle.Lens[EditConstraintSetInput, clue.data.Input[SkyBackground]] = monocle.macros.GenLens[EditConstraintSetInput](_.skyBackground)
-      implicit val waterVapor: monocle.Lens[EditConstraintSetInput, clue.data.Input[WaterVapor]] = monocle.macros.GenLens[EditConstraintSetInput](_.waterVapor)
-      implicit val elevationRange: monocle.Lens[EditConstraintSetInput, clue.data.Input[CreateElevationRangeInput]] = monocle.macros.GenLens[EditConstraintSetInput](_.elevationRange)
+      val constraintSetId: monocle.Lens[EditConstraintSetInput, ConstraintSetId] = monocle.macros.GenLens[EditConstraintSetInput](_.constraintSetId)
+      val existence: monocle.Lens[EditConstraintSetInput, clue.data.Input[Existence]] = monocle.macros.GenLens[EditConstraintSetInput](_.existence)
+      val name: monocle.Lens[EditConstraintSetInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[EditConstraintSetInput](_.name)
+      val imageQuality: monocle.Lens[EditConstraintSetInput, clue.data.Input[ImageQuality]] = monocle.macros.GenLens[EditConstraintSetInput](_.imageQuality)
+      val cloudExtinction: monocle.Lens[EditConstraintSetInput, clue.data.Input[CloudExtinction]] = monocle.macros.GenLens[EditConstraintSetInput](_.cloudExtinction)
+      val skyBackground: monocle.Lens[EditConstraintSetInput, clue.data.Input[SkyBackground]] = monocle.macros.GenLens[EditConstraintSetInput](_.skyBackground)
+      val waterVapor: monocle.Lens[EditConstraintSetInput, clue.data.Input[WaterVapor]] = monocle.macros.GenLens[EditConstraintSetInput](_.waterVapor)
+      val elevationRange: monocle.Lens[EditConstraintSetInput, clue.data.Input[CreateElevationRangeInput]] = monocle.macros.GenLens[EditConstraintSetInput](_.elevationRange)
       implicit val eqEditConstraintSetInput: cats.Eq[EditConstraintSetInput] = cats.Eq.fromUniversalEquals
       implicit val showEditConstraintSetInput: cats.Show[EditConstraintSetInput] = cats.Show.fromToString
       implicit val jsonEncoderEditConstraintSetInput: io.circe.Encoder[EditConstraintSetInput] = io.circe.generic.semiauto.deriveEncoder[EditConstraintSetInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class EditObservationInput(val observationId: ObservationId, val existence: clue.data.Input[Existence] = clue.data.Ignore, val name: clue.data.Input[NonEmptyString] = clue.data.Ignore, val status: clue.data.Input[ObsStatus] = clue.data.Ignore, val asterismId: clue.data.Input[AsterismId] = clue.data.Ignore, val targetId: clue.data.Input[TargetId] = clue.data.Ignore)
     object EditObservationInput {
-      implicit val observationId: monocle.Lens[EditObservationInput, ObservationId] = monocle.macros.GenLens[EditObservationInput](_.observationId)
-      implicit val existence: monocle.Lens[EditObservationInput, clue.data.Input[Existence]] = monocle.macros.GenLens[EditObservationInput](_.existence)
-      implicit val name: monocle.Lens[EditObservationInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[EditObservationInput](_.name)
-      implicit val status: monocle.Lens[EditObservationInput, clue.data.Input[ObsStatus]] = monocle.macros.GenLens[EditObservationInput](_.status)
-      implicit val asterismId: monocle.Lens[EditObservationInput, clue.data.Input[AsterismId]] = monocle.macros.GenLens[EditObservationInput](_.asterismId)
-      implicit val targetId: monocle.Lens[EditObservationInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[EditObservationInput](_.targetId)
+      val observationId: monocle.Lens[EditObservationInput, ObservationId] = monocle.macros.GenLens[EditObservationInput](_.observationId)
+      val existence: monocle.Lens[EditObservationInput, clue.data.Input[Existence]] = monocle.macros.GenLens[EditObservationInput](_.existence)
+      val name: monocle.Lens[EditObservationInput, clue.data.Input[NonEmptyString]] = monocle.macros.GenLens[EditObservationInput](_.name)
+      val status: monocle.Lens[EditObservationInput, clue.data.Input[ObsStatus]] = monocle.macros.GenLens[EditObservationInput](_.status)
+      val asterismId: monocle.Lens[EditObservationInput, clue.data.Input[AsterismId]] = monocle.macros.GenLens[EditObservationInput](_.asterismId)
+      val targetId: monocle.Lens[EditObservationInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[EditObservationInput](_.targetId)
       implicit val eqEditObservationInput: cats.Eq[EditObservationInput] = cats.Eq.fromUniversalEquals
       implicit val showEditObservationInput: cats.Show[EditObservationInput] = cats.Show.fromToString
       implicit val jsonEncoderEditObservationInput: io.circe.Encoder[EditObservationInput] = io.circe.generic.semiauto.deriveEncoder[EditObservationInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class EditObservationPointingInput(val observationIds: List[ObservationId], val asterismId: clue.data.Input[AsterismId] = clue.data.Ignore, val targetId: clue.data.Input[TargetId] = clue.data.Ignore)
     object EditObservationPointingInput {
-      implicit val observationIds: monocle.Lens[EditObservationPointingInput, List[ObservationId]] = monocle.macros.GenLens[EditObservationPointingInput](_.observationIds)
-      implicit val asterismId: monocle.Lens[EditObservationPointingInput, clue.data.Input[AsterismId]] = monocle.macros.GenLens[EditObservationPointingInput](_.asterismId)
-      implicit val targetId: monocle.Lens[EditObservationPointingInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[EditObservationPointingInput](_.targetId)
+      val observationIds: monocle.Lens[EditObservationPointingInput, List[ObservationId]] = monocle.macros.GenLens[EditObservationPointingInput](_.observationIds)
+      val asterismId: monocle.Lens[EditObservationPointingInput, clue.data.Input[AsterismId]] = monocle.macros.GenLens[EditObservationPointingInput](_.asterismId)
+      val targetId: monocle.Lens[EditObservationPointingInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[EditObservationPointingInput](_.targetId)
       implicit val eqEditObservationPointingInput: cats.Eq[EditObservationPointingInput] = cats.Eq.fromUniversalEquals
       implicit val showEditObservationPointingInput: cats.Show[EditObservationPointingInput] = cats.Show.fromToString
       implicit val jsonEncoderEditObservationPointingInput: io.circe.Encoder[EditObservationPointingInput] = io.circe.generic.semiauto.deriveEncoder[EditObservationPointingInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class EditSiderealInput(val targetId: TargetId, val magnitudes: clue.data.Input[List[MagnitudeInput]] = clue.data.Ignore, val modifyMagnitudes: clue.data.Input[List[MagnitudeInput]] = clue.data.Ignore, val deleteMagnitudes: clue.data.Input[List[MagnitudeBand]] = clue.data.Ignore, val existence: clue.data.Input[Existence] = clue.data.Ignore, val name: clue.data.Input[String] = clue.data.Ignore, val catalogId: clue.data.Input[CatalogIdInput] = clue.data.Ignore, val ra: clue.data.Input[RightAscensionInput] = clue.data.Ignore, val dec: clue.data.Input[DeclinationInput] = clue.data.Ignore, val epoch: clue.data.Input[EpochString] = clue.data.Ignore, val properMotion: clue.data.Input[ProperMotionInput] = clue.data.Ignore, val radialVelocity: clue.data.Input[RadialVelocityInput] = clue.data.Ignore, val parallax: clue.data.Input[ParallaxModelInput] = clue.data.Ignore)
     object EditSiderealInput {
-      implicit val targetId: monocle.Lens[EditSiderealInput, TargetId] = monocle.macros.GenLens[EditSiderealInput](_.targetId)
-      implicit val magnitudes: monocle.Lens[EditSiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[EditSiderealInput](_.magnitudes)
-      implicit val modifyMagnitudes: monocle.Lens[EditSiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[EditSiderealInput](_.modifyMagnitudes)
-      implicit val deleteMagnitudes: monocle.Lens[EditSiderealInput, clue.data.Input[List[MagnitudeBand]]] = monocle.macros.GenLens[EditSiderealInput](_.deleteMagnitudes)
-      implicit val existence: monocle.Lens[EditSiderealInput, clue.data.Input[Existence]] = monocle.macros.GenLens[EditSiderealInput](_.existence)
-      implicit val name: monocle.Lens[EditSiderealInput, clue.data.Input[String]] = monocle.macros.GenLens[EditSiderealInput](_.name)
-      implicit val catalogId: monocle.Lens[EditSiderealInput, clue.data.Input[CatalogIdInput]] = monocle.macros.GenLens[EditSiderealInput](_.catalogId)
-      implicit val ra: monocle.Lens[EditSiderealInput, clue.data.Input[RightAscensionInput]] = monocle.macros.GenLens[EditSiderealInput](_.ra)
-      implicit val dec: monocle.Lens[EditSiderealInput, clue.data.Input[DeclinationInput]] = monocle.macros.GenLens[EditSiderealInput](_.dec)
-      implicit val epoch: monocle.Lens[EditSiderealInput, clue.data.Input[EpochString]] = monocle.macros.GenLens[EditSiderealInput](_.epoch)
-      implicit val properMotion: monocle.Lens[EditSiderealInput, clue.data.Input[ProperMotionInput]] = monocle.macros.GenLens[EditSiderealInput](_.properMotion)
-      implicit val radialVelocity: monocle.Lens[EditSiderealInput, clue.data.Input[RadialVelocityInput]] = monocle.macros.GenLens[EditSiderealInput](_.radialVelocity)
-      implicit val parallax: monocle.Lens[EditSiderealInput, clue.data.Input[ParallaxModelInput]] = monocle.macros.GenLens[EditSiderealInput](_.parallax)
+      val targetId: monocle.Lens[EditSiderealInput, TargetId] = monocle.macros.GenLens[EditSiderealInput](_.targetId)
+      val magnitudes: monocle.Lens[EditSiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[EditSiderealInput](_.magnitudes)
+      val modifyMagnitudes: monocle.Lens[EditSiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[EditSiderealInput](_.modifyMagnitudes)
+      val deleteMagnitudes: monocle.Lens[EditSiderealInput, clue.data.Input[List[MagnitudeBand]]] = monocle.macros.GenLens[EditSiderealInput](_.deleteMagnitudes)
+      val existence: monocle.Lens[EditSiderealInput, clue.data.Input[Existence]] = monocle.macros.GenLens[EditSiderealInput](_.existence)
+      val name: monocle.Lens[EditSiderealInput, clue.data.Input[String]] = monocle.macros.GenLens[EditSiderealInput](_.name)
+      val catalogId: monocle.Lens[EditSiderealInput, clue.data.Input[CatalogIdInput]] = monocle.macros.GenLens[EditSiderealInput](_.catalogId)
+      val ra: monocle.Lens[EditSiderealInput, clue.data.Input[RightAscensionInput]] = monocle.macros.GenLens[EditSiderealInput](_.ra)
+      val dec: monocle.Lens[EditSiderealInput, clue.data.Input[DeclinationInput]] = monocle.macros.GenLens[EditSiderealInput](_.dec)
+      val epoch: monocle.Lens[EditSiderealInput, clue.data.Input[EpochString]] = monocle.macros.GenLens[EditSiderealInput](_.epoch)
+      val properMotion: monocle.Lens[EditSiderealInput, clue.data.Input[ProperMotionInput]] = monocle.macros.GenLens[EditSiderealInput](_.properMotion)
+      val radialVelocity: monocle.Lens[EditSiderealInput, clue.data.Input[RadialVelocityInput]] = monocle.macros.GenLens[EditSiderealInput](_.radialVelocity)
+      val parallax: monocle.Lens[EditSiderealInput, clue.data.Input[ParallaxModelInput]] = monocle.macros.GenLens[EditSiderealInput](_.parallax)
       implicit val eqEditSiderealInput: cats.Eq[EditSiderealInput] = cats.Eq.fromUniversalEquals
       implicit val showEditSiderealInput: cats.Show[EditSiderealInput] = cats.Show.fromToString
       implicit val jsonEncoderEditSiderealInput: io.circe.Encoder[EditSiderealInput] = io.circe.generic.semiauto.deriveEncoder[EditSiderealInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class MagnitudeInput(val value: BigDecimal, val band: MagnitudeBand, val error: clue.data.Input[BigDecimal] = clue.data.Ignore, val system: clue.data.Input[MagnitudeSystem] = clue.data.Ignore)
     object MagnitudeInput {
-      implicit val value: monocle.Lens[MagnitudeInput, BigDecimal] = monocle.macros.GenLens[MagnitudeInput](_.value)
-      implicit val band: monocle.Lens[MagnitudeInput, MagnitudeBand] = monocle.macros.GenLens[MagnitudeInput](_.band)
-      implicit val error: monocle.Lens[MagnitudeInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[MagnitudeInput](_.error)
-      implicit val system: monocle.Lens[MagnitudeInput, clue.data.Input[MagnitudeSystem]] = monocle.macros.GenLens[MagnitudeInput](_.system)
+      val value: monocle.Lens[MagnitudeInput, BigDecimal] = monocle.macros.GenLens[MagnitudeInput](_.value)
+      val band: monocle.Lens[MagnitudeInput, MagnitudeBand] = monocle.macros.GenLens[MagnitudeInput](_.band)
+      val error: monocle.Lens[MagnitudeInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[MagnitudeInput](_.error)
+      val system: monocle.Lens[MagnitudeInput, clue.data.Input[MagnitudeSystem]] = monocle.macros.GenLens[MagnitudeInput](_.system)
       implicit val eqMagnitudeInput: cats.Eq[MagnitudeInput] = cats.Eq.fromUniversalEquals
       implicit val showMagnitudeInput: cats.Show[MagnitudeInput] = cats.Show.fromToString
       implicit val jsonEncoderMagnitudeInput: io.circe.Encoder[MagnitudeInput] = io.circe.generic.semiauto.deriveEncoder[MagnitudeInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class ParallaxDecimalInput(val value: BigDecimal, val units: ParallaxUnits)
     object ParallaxDecimalInput {
-      implicit val value: monocle.Lens[ParallaxDecimalInput, BigDecimal] = monocle.macros.GenLens[ParallaxDecimalInput](_.value)
-      implicit val units: monocle.Lens[ParallaxDecimalInput, ParallaxUnits] = monocle.macros.GenLens[ParallaxDecimalInput](_.units)
+      val value: monocle.Lens[ParallaxDecimalInput, BigDecimal] = monocle.macros.GenLens[ParallaxDecimalInput](_.value)
+      val units: monocle.Lens[ParallaxDecimalInput, ParallaxUnits] = monocle.macros.GenLens[ParallaxDecimalInput](_.units)
       implicit val eqParallaxDecimalInput: cats.Eq[ParallaxDecimalInput] = cats.Eq.fromUniversalEquals
       implicit val showParallaxDecimalInput: cats.Show[ParallaxDecimalInput] = cats.Show.fromToString
       implicit val jsonEncoderParallaxDecimalInput: io.circe.Encoder[ParallaxDecimalInput] = io.circe.generic.semiauto.deriveEncoder[ParallaxDecimalInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class ParallaxLongInput(val value: Long, val units: ParallaxUnits)
     object ParallaxLongInput {
-      implicit val value: monocle.Lens[ParallaxLongInput, Long] = monocle.macros.GenLens[ParallaxLongInput](_.value)
-      implicit val units: monocle.Lens[ParallaxLongInput, ParallaxUnits] = monocle.macros.GenLens[ParallaxLongInput](_.units)
+      val value: monocle.Lens[ParallaxLongInput, Long] = monocle.macros.GenLens[ParallaxLongInput](_.value)
+      val units: monocle.Lens[ParallaxLongInput, ParallaxUnits] = monocle.macros.GenLens[ParallaxLongInput](_.units)
       implicit val eqParallaxLongInput: cats.Eq[ParallaxLongInput] = cats.Eq.fromUniversalEquals
       implicit val showParallaxLongInput: cats.Show[ParallaxLongInput] = cats.Show.fromToString
       implicit val jsonEncoderParallaxLongInput: io.circe.Encoder[ParallaxLongInput] = io.circe.generic.semiauto.deriveEncoder[ParallaxLongInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class ParallaxModelInput(val microarcseconds: clue.data.Input[Long] = clue.data.Ignore, val milliarcseconds: clue.data.Input[BigDecimal] = clue.data.Ignore, val fromLong: clue.data.Input[ParallaxLongInput] = clue.data.Ignore, val fromDecimal: clue.data.Input[ParallaxDecimalInput] = clue.data.Ignore)
     object ParallaxModelInput {
-      implicit val microarcseconds: monocle.Lens[ParallaxModelInput, clue.data.Input[Long]] = monocle.macros.GenLens[ParallaxModelInput](_.microarcseconds)
-      implicit val milliarcseconds: monocle.Lens[ParallaxModelInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[ParallaxModelInput](_.milliarcseconds)
-      implicit val fromLong: monocle.Lens[ParallaxModelInput, clue.data.Input[ParallaxLongInput]] = monocle.macros.GenLens[ParallaxModelInput](_.fromLong)
-      implicit val fromDecimal: monocle.Lens[ParallaxModelInput, clue.data.Input[ParallaxDecimalInput]] = monocle.macros.GenLens[ParallaxModelInput](_.fromDecimal)
+      val microarcseconds: monocle.Lens[ParallaxModelInput, clue.data.Input[Long]] = monocle.macros.GenLens[ParallaxModelInput](_.microarcseconds)
+      val milliarcseconds: monocle.Lens[ParallaxModelInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[ParallaxModelInput](_.milliarcseconds)
+      val fromLong: monocle.Lens[ParallaxModelInput, clue.data.Input[ParallaxLongInput]] = monocle.macros.GenLens[ParallaxModelInput](_.fromLong)
+      val fromDecimal: monocle.Lens[ParallaxModelInput, clue.data.Input[ParallaxDecimalInput]] = monocle.macros.GenLens[ParallaxModelInput](_.fromDecimal)
       implicit val eqParallaxModelInput: cats.Eq[ParallaxModelInput] = cats.Eq.fromUniversalEquals
       implicit val showParallaxModelInput: cats.Show[ParallaxModelInput] = cats.Show.fromToString
       implicit val jsonEncoderParallaxModelInput: io.circe.Encoder[ParallaxModelInput] = io.circe.generic.semiauto.deriveEncoder[ParallaxModelInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class ProperMotionComponentDecimalInput(val value: BigDecimal, val units: ProperMotionComponentUnits)
     object ProperMotionComponentDecimalInput {
-      implicit val value: monocle.Lens[ProperMotionComponentDecimalInput, BigDecimal] = monocle.macros.GenLens[ProperMotionComponentDecimalInput](_.value)
-      implicit val units: monocle.Lens[ProperMotionComponentDecimalInput, ProperMotionComponentUnits] = monocle.macros.GenLens[ProperMotionComponentDecimalInput](_.units)
+      val value: monocle.Lens[ProperMotionComponentDecimalInput, BigDecimal] = monocle.macros.GenLens[ProperMotionComponentDecimalInput](_.value)
+      val units: monocle.Lens[ProperMotionComponentDecimalInput, ProperMotionComponentUnits] = monocle.macros.GenLens[ProperMotionComponentDecimalInput](_.units)
       implicit val eqProperMotionComponentDecimalInput: cats.Eq[ProperMotionComponentDecimalInput] = cats.Eq.fromUniversalEquals
       implicit val showProperMotionComponentDecimalInput: cats.Show[ProperMotionComponentDecimalInput] = cats.Show.fromToString
       implicit val jsonEncoderProperMotionComponentDecimalInput: io.circe.Encoder[ProperMotionComponentDecimalInput] = io.circe.generic.semiauto.deriveEncoder[ProperMotionComponentDecimalInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class ProperMotionComponentInput(val microarcsecondsPerYear: clue.data.Input[Long] = clue.data.Ignore, val milliarcsecondsPerYear: clue.data.Input[BigDecimal] = clue.data.Ignore, val fromLong: clue.data.Input[ProperMotionComponentLongInput] = clue.data.Ignore, val fromDecimal: clue.data.Input[ProperMotionComponentDecimalInput] = clue.data.Ignore)
     object ProperMotionComponentInput {
-      implicit val microarcsecondsPerYear: monocle.Lens[ProperMotionComponentInput, clue.data.Input[Long]] = monocle.macros.GenLens[ProperMotionComponentInput](_.microarcsecondsPerYear)
-      implicit val milliarcsecondsPerYear: monocle.Lens[ProperMotionComponentInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[ProperMotionComponentInput](_.milliarcsecondsPerYear)
-      implicit val fromLong: monocle.Lens[ProperMotionComponentInput, clue.data.Input[ProperMotionComponentLongInput]] = monocle.macros.GenLens[ProperMotionComponentInput](_.fromLong)
-      implicit val fromDecimal: monocle.Lens[ProperMotionComponentInput, clue.data.Input[ProperMotionComponentDecimalInput]] = monocle.macros.GenLens[ProperMotionComponentInput](_.fromDecimal)
+      val microarcsecondsPerYear: monocle.Lens[ProperMotionComponentInput, clue.data.Input[Long]] = monocle.macros.GenLens[ProperMotionComponentInput](_.microarcsecondsPerYear)
+      val milliarcsecondsPerYear: monocle.Lens[ProperMotionComponentInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[ProperMotionComponentInput](_.milliarcsecondsPerYear)
+      val fromLong: monocle.Lens[ProperMotionComponentInput, clue.data.Input[ProperMotionComponentLongInput]] = monocle.macros.GenLens[ProperMotionComponentInput](_.fromLong)
+      val fromDecimal: monocle.Lens[ProperMotionComponentInput, clue.data.Input[ProperMotionComponentDecimalInput]] = monocle.macros.GenLens[ProperMotionComponentInput](_.fromDecimal)
       implicit val eqProperMotionComponentInput: cats.Eq[ProperMotionComponentInput] = cats.Eq.fromUniversalEquals
       implicit val showProperMotionComponentInput: cats.Show[ProperMotionComponentInput] = cats.Show.fromToString
       implicit val jsonEncoderProperMotionComponentInput: io.circe.Encoder[ProperMotionComponentInput] = io.circe.generic.semiauto.deriveEncoder[ProperMotionComponentInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class ProperMotionComponentLongInput(val value: Long, val units: ProperMotionComponentUnits)
     object ProperMotionComponentLongInput {
-      implicit val value: monocle.Lens[ProperMotionComponentLongInput, Long] = monocle.macros.GenLens[ProperMotionComponentLongInput](_.value)
-      implicit val units: monocle.Lens[ProperMotionComponentLongInput, ProperMotionComponentUnits] = monocle.macros.GenLens[ProperMotionComponentLongInput](_.units)
+      val value: monocle.Lens[ProperMotionComponentLongInput, Long] = monocle.macros.GenLens[ProperMotionComponentLongInput](_.value)
+      val units: monocle.Lens[ProperMotionComponentLongInput, ProperMotionComponentUnits] = monocle.macros.GenLens[ProperMotionComponentLongInput](_.units)
       implicit val eqProperMotionComponentLongInput: cats.Eq[ProperMotionComponentLongInput] = cats.Eq.fromUniversalEquals
       implicit val showProperMotionComponentLongInput: cats.Show[ProperMotionComponentLongInput] = cats.Show.fromToString
       implicit val jsonEncoderProperMotionComponentLongInput: io.circe.Encoder[ProperMotionComponentLongInput] = io.circe.generic.semiauto.deriveEncoder[ProperMotionComponentLongInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class ProperMotionInput(val ra: ProperMotionComponentInput, val dec: ProperMotionComponentInput)
     object ProperMotionInput {
-      implicit val ra: monocle.Lens[ProperMotionInput, ProperMotionComponentInput] = monocle.macros.GenLens[ProperMotionInput](_.ra)
-      implicit val dec: monocle.Lens[ProperMotionInput, ProperMotionComponentInput] = monocle.macros.GenLens[ProperMotionInput](_.dec)
+      val ra: monocle.Lens[ProperMotionInput, ProperMotionComponentInput] = monocle.macros.GenLens[ProperMotionInput](_.ra)
+      val dec: monocle.Lens[ProperMotionInput, ProperMotionComponentInput] = monocle.macros.GenLens[ProperMotionInput](_.dec)
       implicit val eqProperMotionInput: cats.Eq[ProperMotionInput] = cats.Eq.fromUniversalEquals
       implicit val showProperMotionInput: cats.Show[ProperMotionInput] = cats.Show.fromToString
       implicit val jsonEncoderProperMotionInput: io.circe.Encoder[ProperMotionInput] = io.circe.generic.semiauto.deriveEncoder[ProperMotionInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class RadialVelocityDecimalInput(val value: BigDecimal, val units: RadialVelocityUnits)
     object RadialVelocityDecimalInput {
-      implicit val value: monocle.Lens[RadialVelocityDecimalInput, BigDecimal] = monocle.macros.GenLens[RadialVelocityDecimalInput](_.value)
-      implicit val units: monocle.Lens[RadialVelocityDecimalInput, RadialVelocityUnits] = monocle.macros.GenLens[RadialVelocityDecimalInput](_.units)
+      val value: monocle.Lens[RadialVelocityDecimalInput, BigDecimal] = monocle.macros.GenLens[RadialVelocityDecimalInput](_.value)
+      val units: monocle.Lens[RadialVelocityDecimalInput, RadialVelocityUnits] = monocle.macros.GenLens[RadialVelocityDecimalInput](_.units)
       implicit val eqRadialVelocityDecimalInput: cats.Eq[RadialVelocityDecimalInput] = cats.Eq.fromUniversalEquals
       implicit val showRadialVelocityDecimalInput: cats.Show[RadialVelocityDecimalInput] = cats.Show.fromToString
       implicit val jsonEncoderRadialVelocityDecimalInput: io.circe.Encoder[RadialVelocityDecimalInput] = io.circe.generic.semiauto.deriveEncoder[RadialVelocityDecimalInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class RadialVelocityInput(val centimetersPerSecond: clue.data.Input[Long] = clue.data.Ignore, val metersPerSecond: clue.data.Input[BigDecimal] = clue.data.Ignore, val kilometersPerSecond: clue.data.Input[BigDecimal] = clue.data.Ignore, val fromLong: clue.data.Input[RadialVelocityLongInput] = clue.data.Ignore, val fromDecimal: clue.data.Input[RadialVelocityDecimalInput] = clue.data.Ignore)
     object RadialVelocityInput {
-      implicit val centimetersPerSecond: monocle.Lens[RadialVelocityInput, clue.data.Input[Long]] = monocle.macros.GenLens[RadialVelocityInput](_.centimetersPerSecond)
-      implicit val metersPerSecond: monocle.Lens[RadialVelocityInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[RadialVelocityInput](_.metersPerSecond)
-      implicit val kilometersPerSecond: monocle.Lens[RadialVelocityInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[RadialVelocityInput](_.kilometersPerSecond)
-      implicit val fromLong: monocle.Lens[RadialVelocityInput, clue.data.Input[RadialVelocityLongInput]] = monocle.macros.GenLens[RadialVelocityInput](_.fromLong)
-      implicit val fromDecimal: monocle.Lens[RadialVelocityInput, clue.data.Input[RadialVelocityDecimalInput]] = monocle.macros.GenLens[RadialVelocityInput](_.fromDecimal)
+      val centimetersPerSecond: monocle.Lens[RadialVelocityInput, clue.data.Input[Long]] = monocle.macros.GenLens[RadialVelocityInput](_.centimetersPerSecond)
+      val metersPerSecond: monocle.Lens[RadialVelocityInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[RadialVelocityInput](_.metersPerSecond)
+      val kilometersPerSecond: monocle.Lens[RadialVelocityInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[RadialVelocityInput](_.kilometersPerSecond)
+      val fromLong: monocle.Lens[RadialVelocityInput, clue.data.Input[RadialVelocityLongInput]] = monocle.macros.GenLens[RadialVelocityInput](_.fromLong)
+      val fromDecimal: monocle.Lens[RadialVelocityInput, clue.data.Input[RadialVelocityDecimalInput]] = monocle.macros.GenLens[RadialVelocityInput](_.fromDecimal)
       implicit val eqRadialVelocityInput: cats.Eq[RadialVelocityInput] = cats.Eq.fromUniversalEquals
       implicit val showRadialVelocityInput: cats.Show[RadialVelocityInput] = cats.Show.fromToString
       implicit val jsonEncoderRadialVelocityInput: io.circe.Encoder[RadialVelocityInput] = io.circe.generic.semiauto.deriveEncoder[RadialVelocityInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class RadialVelocityLongInput(val value: Long, val units: RadialVelocityUnits)
     object RadialVelocityLongInput {
-      implicit val value: monocle.Lens[RadialVelocityLongInput, Long] = monocle.macros.GenLens[RadialVelocityLongInput](_.value)
-      implicit val units: monocle.Lens[RadialVelocityLongInput, RadialVelocityUnits] = monocle.macros.GenLens[RadialVelocityLongInput](_.units)
+      val value: monocle.Lens[RadialVelocityLongInput, Long] = monocle.macros.GenLens[RadialVelocityLongInput](_.value)
+      val units: monocle.Lens[RadialVelocityLongInput, RadialVelocityUnits] = monocle.macros.GenLens[RadialVelocityLongInput](_.units)
       implicit val eqRadialVelocityLongInput: cats.Eq[RadialVelocityLongInput] = cats.Eq.fromUniversalEquals
       implicit val showRadialVelocityLongInput: cats.Show[RadialVelocityLongInput] = cats.Show.fromToString
       implicit val jsonEncoderRadialVelocityLongInput: io.circe.Encoder[RadialVelocityLongInput] = io.circe.generic.semiauto.deriveEncoder[RadialVelocityLongInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class RightAscensionDecimalInput(val value: BigDecimal, val units: RightAscensionUnits)
     object RightAscensionDecimalInput {
-      implicit val value: monocle.Lens[RightAscensionDecimalInput, BigDecimal] = monocle.macros.GenLens[RightAscensionDecimalInput](_.value)
-      implicit val units: monocle.Lens[RightAscensionDecimalInput, RightAscensionUnits] = monocle.macros.GenLens[RightAscensionDecimalInput](_.units)
+      val value: monocle.Lens[RightAscensionDecimalInput, BigDecimal] = monocle.macros.GenLens[RightAscensionDecimalInput](_.value)
+      val units: monocle.Lens[RightAscensionDecimalInput, RightAscensionUnits] = monocle.macros.GenLens[RightAscensionDecimalInput](_.units)
       implicit val eqRightAscensionDecimalInput: cats.Eq[RightAscensionDecimalInput] = cats.Eq.fromUniversalEquals
       implicit val showRightAscensionDecimalInput: cats.Show[RightAscensionDecimalInput] = cats.Show.fromToString
       implicit val jsonEncoderRightAscensionDecimalInput: io.circe.Encoder[RightAscensionDecimalInput] = io.circe.generic.semiauto.deriveEncoder[RightAscensionDecimalInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class RightAscensionInput(val microarcseconds: clue.data.Input[Long] = clue.data.Ignore, val degrees: clue.data.Input[BigDecimal] = clue.data.Ignore, val hours: clue.data.Input[BigDecimal] = clue.data.Ignore, val hms: clue.data.Input[HmsString] = clue.data.Ignore, val fromLong: clue.data.Input[RightAscensionLongInput] = clue.data.Ignore, val fromDecimal: clue.data.Input[RightAscensionDecimalInput] = clue.data.Ignore)
     object RightAscensionInput {
-      implicit val microarcseconds: monocle.Lens[RightAscensionInput, clue.data.Input[Long]] = monocle.macros.GenLens[RightAscensionInput](_.microarcseconds)
-      implicit val degrees: monocle.Lens[RightAscensionInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[RightAscensionInput](_.degrees)
-      implicit val hours: monocle.Lens[RightAscensionInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[RightAscensionInput](_.hours)
-      implicit val hms: monocle.Lens[RightAscensionInput, clue.data.Input[HmsString]] = monocle.macros.GenLens[RightAscensionInput](_.hms)
-      implicit val fromLong: monocle.Lens[RightAscensionInput, clue.data.Input[RightAscensionLongInput]] = monocle.macros.GenLens[RightAscensionInput](_.fromLong)
-      implicit val fromDecimal: monocle.Lens[RightAscensionInput, clue.data.Input[RightAscensionDecimalInput]] = monocle.macros.GenLens[RightAscensionInput](_.fromDecimal)
+      val microarcseconds: monocle.Lens[RightAscensionInput, clue.data.Input[Long]] = monocle.macros.GenLens[RightAscensionInput](_.microarcseconds)
+      val degrees: monocle.Lens[RightAscensionInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[RightAscensionInput](_.degrees)
+      val hours: monocle.Lens[RightAscensionInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[RightAscensionInput](_.hours)
+      val hms: monocle.Lens[RightAscensionInput, clue.data.Input[HmsString]] = monocle.macros.GenLens[RightAscensionInput](_.hms)
+      val fromLong: monocle.Lens[RightAscensionInput, clue.data.Input[RightAscensionLongInput]] = monocle.macros.GenLens[RightAscensionInput](_.fromLong)
+      val fromDecimal: monocle.Lens[RightAscensionInput, clue.data.Input[RightAscensionDecimalInput]] = monocle.macros.GenLens[RightAscensionInput](_.fromDecimal)
       implicit val eqRightAscensionInput: cats.Eq[RightAscensionInput] = cats.Eq.fromUniversalEquals
       implicit val showRightAscensionInput: cats.Show[RightAscensionInput] = cats.Show.fromToString
       implicit val jsonEncoderRightAscensionInput: io.circe.Encoder[RightAscensionInput] = io.circe.generic.semiauto.deriveEncoder[RightAscensionInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class RightAscensionLongInput(val value: Long, val units: RightAscensionUnits)
     object RightAscensionLongInput {
-      implicit val value: monocle.Lens[RightAscensionLongInput, Long] = monocle.macros.GenLens[RightAscensionLongInput](_.value)
-      implicit val units: monocle.Lens[RightAscensionLongInput, RightAscensionUnits] = monocle.macros.GenLens[RightAscensionLongInput](_.units)
+      val value: monocle.Lens[RightAscensionLongInput, Long] = monocle.macros.GenLens[RightAscensionLongInput](_.value)
+      val units: monocle.Lens[RightAscensionLongInput, RightAscensionUnits] = monocle.macros.GenLens[RightAscensionLongInput](_.units)
       implicit val eqRightAscensionLongInput: cats.Eq[RightAscensionLongInput] = cats.Eq.fromUniversalEquals
       implicit val showRightAscensionLongInput: cats.Show[RightAscensionLongInput] = cats.Show.fromToString
       implicit val jsonEncoderRightAscensionLongInput: io.circe.Encoder[RightAscensionLongInput] = io.circe.generic.semiauto.deriveEncoder[RightAscensionLongInput].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class TargetAsterismLinks(val targetId: TargetId, val asterismIds: List[AsterismId])
     object TargetAsterismLinks {
-      implicit val targetId: monocle.Lens[TargetAsterismLinks, TargetId] = monocle.macros.GenLens[TargetAsterismLinks](_.targetId)
-      implicit val asterismIds: monocle.Lens[TargetAsterismLinks, List[AsterismId]] = monocle.macros.GenLens[TargetAsterismLinks](_.asterismIds)
+      val targetId: monocle.Lens[TargetAsterismLinks, TargetId] = monocle.macros.GenLens[TargetAsterismLinks](_.targetId)
+      val asterismIds: monocle.Lens[TargetAsterismLinks, List[AsterismId]] = monocle.macros.GenLens[TargetAsterismLinks](_.asterismIds)
       implicit val eqTargetAsterismLinks: cats.Eq[TargetAsterismLinks] = cats.Eq.fromUniversalEquals
       implicit val showTargetAsterismLinks: cats.Show[TargetAsterismLinks] = cats.Show.fromToString
       implicit val jsonEncoderTargetAsterismLinks: io.circe.Encoder[TargetAsterismLinks] = io.circe.generic.semiauto.deriveEncoder[TargetAsterismLinks].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
     }
     case class TargetProgramLinks(val targetId: TargetId, val programIds: List[ProgramId])
     object TargetProgramLinks {
-      implicit val targetId: monocle.Lens[TargetProgramLinks, TargetId] = monocle.macros.GenLens[TargetProgramLinks](_.targetId)
-      implicit val programIds: monocle.Lens[TargetProgramLinks, List[ProgramId]] = monocle.macros.GenLens[TargetProgramLinks](_.programIds)
+      val targetId: monocle.Lens[TargetProgramLinks, TargetId] = monocle.macros.GenLens[TargetProgramLinks](_.targetId)
+      val programIds: monocle.Lens[TargetProgramLinks, List[ProgramId]] = monocle.macros.GenLens[TargetProgramLinks](_.programIds)
       implicit val eqTargetProgramLinks: cats.Eq[TargetProgramLinks] = cats.Eq.fromUniversalEquals
       implicit val showTargetProgramLinks: cats.Show[TargetProgramLinks] = cats.Show.fromToString
       implicit val jsonEncoderTargetProgramLinks: io.circe.Encoder[TargetProgramLinks] = io.circe.generic.semiauto.deriveEncoder[TargetProgramLinks].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
