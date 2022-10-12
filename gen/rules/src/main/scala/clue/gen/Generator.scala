@@ -264,7 +264,7 @@ trait Generator {
             val attemptTermName   = Term.Name(s"${par.name.value}Attempt")
             val attempt           = q"""extension (thiz: ${Type.Name(
                 name
-              )}) @scala.annotation.targetName($targetNameAttempt) def ${attemptTermName}: Either[Throwable, ${par.decltpe.get}] = _root_.io.circe.Decoder[${par.decltpe.get}].decodeJson(thiz.asInstanceOf[_root_.io.circe.JsonObject].apply(${par.name.value}).get)"""
+              )}) @scala.annotation.targetName($targetNameAttempt) def ${attemptTermName}: Either[Throwable, ${par.decltpe.get}] = _root_.io.circe.Decoder[${par.decltpe.get}].decodeJson(thiz.asInstanceOf[_root_.io.circe.Json].asObject.get.apply(${par.name.value}).get)"""
             val unsafe            = q"""extension (thiz: ${Type.Name(
                 name
               )}) @scala.annotation.targetName($targetName) def ${Term.Name(
