@@ -37,7 +37,7 @@ object Wrapper extends Something {
         """
     case class Variables(val charId: String)
     object Variables {
-      implicit val charId: monocle.Lens[Variables, String] = monocle.macros.GenLens[Variables](_.charId)
+      val charId: monocle.Lens[Variables, String] = monocle.macros.GenLens[Variables](_.charId)
       implicit val eqVariables: cats.Eq[Variables] = cats.Eq.fromUniversalEquals
       implicit val showVariables: cats.Show[Variables] = cats.Show.fromToString
       implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
@@ -52,7 +52,7 @@ object Wrapper extends Something {
       object Character {
         case class Friends(val name: Option[String] = None)
         object Friends {
-          implicit val name: monocle.Lens[Data.Character.Friends, Option[String]] = monocle.macros.GenLens[Data.Character.Friends](_.name)
+          val name: monocle.Lens[Data.Character.Friends, Option[String]] = monocle.macros.GenLens[Data.Character.Friends](_.name)
           implicit val eqFriends: cats.Eq[Data.Character.Friends] = cats.Eq.fromUniversalEquals
           implicit val showFriends: cats.Show[Data.Character.Friends] = cats.Show.fromToString
           implicit val reuseFriends: japgolly.scalajs.react.Reusability[Data.Character.Friends] = {
@@ -63,10 +63,10 @@ object Wrapper extends Something {
         }
         case class Human(override val id: String, override val name: Option[String] = None, val homePlanet: Option[String] = None, override val friends: Option[List[Data.Character.Friends]] = None) extends Character()
         object Human {
-          implicit val id: monocle.Lens[Data.Character.Human, String] = monocle.macros.GenLens[Data.Character.Human](_.id)
-          implicit val name: monocle.Lens[Data.Character.Human, Option[String]] = monocle.macros.GenLens[Data.Character.Human](_.name)
-          implicit val homePlanet: monocle.Lens[Data.Character.Human, Option[String]] = monocle.macros.GenLens[Data.Character.Human](_.homePlanet)
-          implicit val friends: monocle.Lens[Data.Character.Human, Option[List[Data.Character.Friends]]] = monocle.macros.GenLens[Data.Character.Human](_.friends)
+          val id: monocle.Lens[Data.Character.Human, String] = monocle.macros.GenLens[Data.Character.Human](_.id)
+          val name: monocle.Lens[Data.Character.Human, Option[String]] = monocle.macros.GenLens[Data.Character.Human](_.name)
+          val homePlanet: monocle.Lens[Data.Character.Human, Option[String]] = monocle.macros.GenLens[Data.Character.Human](_.homePlanet)
+          val friends: monocle.Lens[Data.Character.Human, Option[List[Data.Character.Friends]]] = monocle.macros.GenLens[Data.Character.Human](_.friends)
           implicit val eqHuman: cats.Eq[Data.Character.Human] = cats.Eq.fromUniversalEquals
           implicit val showHuman: cats.Show[Data.Character.Human] = cats.Show.fromToString
           implicit val reuseHuman: japgolly.scalajs.react.Reusability[Data.Character.Human] = {
@@ -77,10 +77,10 @@ object Wrapper extends Something {
         }
         case class Droid(override val id: String, override val name: Option[String] = None, override val friends: Option[List[Data.Character.Friends]] = None, val primaryFunction: Option[String] = None) extends Character()
         object Droid {
-          implicit val id: monocle.Lens[Data.Character.Droid, String] = monocle.macros.GenLens[Data.Character.Droid](_.id)
-          implicit val name: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.name)
-          implicit val friends: monocle.Lens[Data.Character.Droid, Option[List[Data.Character.Friends]]] = monocle.macros.GenLens[Data.Character.Droid](_.friends)
-          implicit val primaryFunction: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.primaryFunction)
+          val id: monocle.Lens[Data.Character.Droid, String] = monocle.macros.GenLens[Data.Character.Droid](_.id)
+          val name: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.name)
+          val friends: monocle.Lens[Data.Character.Droid, Option[List[Data.Character.Friends]]] = monocle.macros.GenLens[Data.Character.Droid](_.friends)
+          val primaryFunction: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.primaryFunction)
           implicit val eqDroid: cats.Eq[Data.Character.Droid] = cats.Eq.fromUniversalEquals
           implicit val showDroid: cats.Show[Data.Character.Droid] = cats.Show.fromToString
           implicit val reuseDroid: japgolly.scalajs.react.Reusability[Data.Character.Droid] = {
@@ -121,7 +121,7 @@ object Wrapper extends Something {
         }
         implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = List[io.circe.Decoder[Data.Character]](io.circe.Decoder[Data.Character.Human].asInstanceOf[io.circe.Decoder[Data.Character]], io.circe.Decoder[Data.Character.Droid].asInstanceOf[io.circe.Decoder[Data.Character]]).reduceLeft(_ or _)
       }
-      implicit val character: monocle.Lens[Data, Option[Data.Character]] = monocle.macros.GenLens[Data](_.character)
+      val character: monocle.Lens[Data, Option[Data.Character]] = monocle.macros.GenLens[Data](_.character)
       implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
       implicit val showData: cats.Show[Data] = cats.Show.fromToString
       implicit val reuseData: japgolly.scalajs.react.Reusability[Data] = {
