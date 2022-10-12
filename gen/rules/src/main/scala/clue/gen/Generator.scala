@@ -291,10 +291,16 @@ trait Generator {
 
         val addLenses = Option.when(monocleLenses && !usedJitDecoder) { (moduleBody: List[Stat]) =>
           val lensesDef = params.map { param =>
-            val thisType  = qualifiedNestedType(nestPath, Type.Name(camelName))
-            val childType = param.typeTree(nextPath, nextTypes)
-            q"implicit val ${Pat.Var(Term.Name(param.name))}:  monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term
-                .Name(param.name)})"
+            val thisType           = qualifiedNestedType(nestPath, Type.Name(camelName))
+            val childType          = param.typeTree(nextPath, nextTypes)
+            def genLens(tpe: Type) =
+              q"monocle.macros.GenLens[$tpe](_.${Term.Name(param.name)})"
+            val lens               = if (jitDecoder) {
+              val dottyType = Type.Name("DottyWorkaround")
+              q"{ type $dottyType = $thisType; ${genLens(dottyType)}}"
+            } else
+              genLens(thisType)
+            q"implicit val ${Pat.Var(Term.Name(param.name))}: monocle.Lens[$thisType, $childType] = $lens"
           // q"val ${Term.Name(param.name)}: monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term.Name(param.name)})"
           }
           moduleBody ++ lensesDef
