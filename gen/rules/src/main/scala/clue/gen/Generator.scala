@@ -236,7 +236,7 @@ trait Generator {
           val lensesDef = params.map { param =>
             val thisType  = qualifiedNestedType(nestPath, Type.Name(camelName))
             val childType = param.typeTree(nextPath, nextTypes)
-            q"implicit val ${Pat.Var(Term.Name(param.name))}:  monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term
+            q"val ${Pat.Var(Term.Name(param.name))}:  monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term
                 .Name(param.name)})"
           // q"val ${Term.Name(param.name)}: monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term.Name(param.name)})"
           }
