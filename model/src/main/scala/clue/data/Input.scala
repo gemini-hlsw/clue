@@ -112,10 +112,10 @@ object Input {
   private val IgnoreValue: Json = Json.fromString("clue.data.Ignore")
 
   val dropIgnoreFolder: Json.Folder[Json] = new Json.Folder[Json] {
-    def onNull: Json                       = Json.Null
+    def onNull: Json = Json.Null
     def onBoolean(value: Boolean): Json    = Json.fromBoolean(value)
-    def onNumber(value: JsonNumber): Json  = Json.fromJsonNumber(value)
-    def onString(value: String): Json      = Json.fromString(value)
+    def onNumber(value:  JsonNumber): Json = Json.fromJsonNumber(value)
+    def onString(value:  String): Json     = Json.fromString(value)
     def onArray(value: Vector[Json]): Json =
       Json.fromValues(value.collect {
         case v if v =!= IgnoreValue => v.foldWith(this)
