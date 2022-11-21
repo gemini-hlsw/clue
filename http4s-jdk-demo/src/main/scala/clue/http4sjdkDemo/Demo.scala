@@ -118,16 +118,17 @@ object Demo extends IOApp.Simple {
     withLogger[IO].use { implicit logger =>
       withStreamingClient[IO].use { implicit client =>
         for {
-          result          <- client.request(Query)
-          _               <- IO.println(result)
-          (stream, close) <- client.subscribe(Subscription).allocated
-          fiber           <- stream.evalTap(_ => IO.println("UPDATE!")).compile.drain.start
-          _               <- mutator(client, (result \\ "id").map(_.as[String].toOption.get)).start
-          _               <- IO.sleep(10.seconds)
-          _               <- close
-          _               <- fiber.join
-          result          <- client.request(Query)
-          _               <- IO.println(result)
+          result         <- client.request(Query)
+          _              <- IO.println(result)
+          subscription   <- client.subscribe(Subscription).allocated
+          (stream, close) = subscription
+          fiber          <- stream.evalTap(_ => IO.println("UPDATE!")).compile.drain.start
+          _              <- mutator(client, (result \\ "id").map(_.as[String].toOption.get)).start
+          _              <- IO.sleep(10.seconds)
+          _              <- close
+          _              <- fiber.join
+          result         <- client.request(Query)
+          _              <- IO.println(result)
 
         } yield ()
       }
