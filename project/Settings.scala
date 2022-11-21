@@ -13,7 +13,7 @@ object Settings {
     val grackle                  = "0.1.9"
     val http4s                   = "0.23.16"
     val http4sDom                = "0.2.3"
-    val http4sJDKClient          = "0.7.0"
+    val http4sJDKClient          = "0.8.0"
     val jawn                     = "1.3.2"
     val log4Cats                 = "2.5.0"
     val monocle                  = "3.1.0"
