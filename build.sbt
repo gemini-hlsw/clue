@@ -19,6 +19,7 @@ lazy val root = tlCrossRootProject
     core,
     scalaJS,
     http4s,
+    http4sJDKDemo,
     genRules,
     genInput,
     genOutput,
