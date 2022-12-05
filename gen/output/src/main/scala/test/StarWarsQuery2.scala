@@ -18,7 +18,7 @@ object Wrapper extends Something {
     ignoreUnusedImportEnums()
     import StarWars.Types._
     ignoreUnusedImportTypes()
-    override val document: String = """
+    final val document = """
           query ($charId: ID!) {
             character(id: $charId) {
               id

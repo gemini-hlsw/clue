@@ -17,7 +17,7 @@ import test.StarWars
 object Wrapper /* gql: extends Something */ {
   @GraphQL
   trait StarWarsQuery2 extends GraphQLOperation[StarWars] {
-  override val document: String = """
+  final val document = """
         query ($charId: ID!) {
           character(id: $charId) {
             id

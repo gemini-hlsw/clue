@@ -13,7 +13,7 @@ import clue.annotation.GraphQL
 
 @GraphQL
 trait LucumaQuery2 extends GraphQLOperation[LucumaODB] {
-  val document = """
+  final val document = """
       query Program {
         program(programId: "p-2") {
           id

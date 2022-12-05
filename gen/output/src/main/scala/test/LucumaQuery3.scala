@@ -15,7 +15,7 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
   ignoreUnusedImportEnums()
   import LucumaODB.Types._
   ignoreUnusedImportTypes()
-  val document = """
+  final val document = """
       query {
         observations(programId: "p-2", first: 2147483647) {
           nodes {
