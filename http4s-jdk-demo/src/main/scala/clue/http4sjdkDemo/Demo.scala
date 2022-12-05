@@ -87,7 +87,7 @@ object Demo extends IOApp.Simple {
   def withStreamingClient[F[_]: Async: Logger]
     : Resource[F, PersistentStreamingClient[F, Unit, _, _]] =
     for {
-      client <- JdkWSClient.simple
+      client <- Resource.eval(JdkWSClient.simple)
       backend = Http4sWSBackend(client)
       uri     = uri"wss://lucuma-odb-development.herokuapp.com/ws"
       sc     <- Resource.eval(ApolloWebSocketClient.of[F, Unit](uri)(Async[F], Logger[F], backend))
