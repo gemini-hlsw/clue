@@ -33,7 +33,7 @@ object Wrapper /* gql: extends Something */ {
             }
           }
         }
-      """
+      """ + ""
 }
 }
 // format: on

@@ -9,6 +9,7 @@ import edu.gemini.grackle.UntypedOperation._
 import edu.gemini.grackle.{Term => _, Type => GType, _}
 
 import scala.meta._
+import scalafix.v1._
 
 trait QueryGen extends Generator {
 
@@ -31,12 +32,19 @@ trait QueryGen extends Generator {
   // kicked in after macro expansion, and not before.
   // Actually(3)... We are out of luck, scalafix doesn't see macro expansions:
   // https://scalacenter.github.io/scalafix/docs/developers/semantic-tree.html#macros
-  protected def extractDocument(stats: List[Stat]): Option[String] =
-    stats.collectFirst {
-      case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
-          if valName == "document" =>
-        value
-    }
+  protected def extractDocument(stats: List[Stat])(implicit doc: SemanticDocument): Option[String] =
+    stats.flatMap {
+      case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, rhs) if valName == "document" =>
+        rhs match {
+          case Lit.String(value) => List(value)
+          case _                 =>
+            println(rhs.symbol)
+            rhs.synthetics.collectFirst { case LiteralTree(StringConstant(value)) =>
+              value
+            }
+        }
+      case _                                                                               => Nil
+    }.headOption
 
   protected def addImports(schemaName: String): List[Stat] => List[Stat] =
     parentBody => {
