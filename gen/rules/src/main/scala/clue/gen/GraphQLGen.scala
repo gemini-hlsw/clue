@@ -88,7 +88,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                 extractDocument(stats) match {
                   case None           =>
                     abort(
-                      "The GraphQLOperation must define a 'val document: String' with a literal value."
+                      "The GraphQLOperation must define a 'final val document = ...' with a literal value."
                     )
                   case Some(document) =>
                     config.getSchema(schemaType.value).flatMap { schema =>
