@@ -34,3 +34,5 @@ class AnnotationPattern(fqcn: String) {
 object GraphQLSchemaAnnotation extends AnnotationPattern("clue.annotation.GraphQLSchema")
 
 object GraphQLAnnotation extends AnnotationPattern("clue.annotation.GraphQL")
+
+object GraphQLSubqueryAnnotation extends AnnotationPattern("clue.annotation.GraphQLSubquery")

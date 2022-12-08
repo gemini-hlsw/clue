@@ -21,6 +21,12 @@ trait QueryGen extends Generator {
             Nil
           ) =>
         tpe
+      case Init(
+            Type.Apply(Type.Name("GraphQLSubquery"), List(tpe @ Type.Name(_))),
+            _,
+            Nil
+          ) =>
+        tpe
     }.headOption
 
   // TODO Support concatenation and stripMargin?
@@ -37,6 +43,20 @@ trait QueryGen extends Generator {
           if valName == "document" =>
         value
     }
+
+  protected def extractSubquery(stats: List[Stat]): Option[(String, String)] = {
+    val subquery   = stats.collectFirst {
+      case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
+          if valName == "subquery" =>
+        value
+    }
+    val schemaType = stats.collectFirst {
+      case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
+          if valName == "rootType" =>
+        value
+    }
+    subquery.zip(schemaType)
+  }
 
   protected def addImports(schemaName: String): List[Stat] => List[Stat] =
     parentBody => {
@@ -300,9 +320,10 @@ trait QueryGen extends Generator {
   }
 
   protected def addData(
-    schema:    Schema,
-    operation: UntypedOperation,
-    config:    GraphQLGenConfig
+    schema:           Schema,
+    operation:        UntypedOperation,
+    config:           GraphQLGenConfig,
+    rootTypeOverride: Option[NamedType] = None
   ): List[Stat] => List[Stat] =
     parentBody =>
       mustDefineType("Data")(parentBody) match {
@@ -332,7 +353,7 @@ trait QueryGen extends Generator {
             case _: UntypedSubscription => schemaType.field("subscription").flatMap(_.asNamed)
           }
 
-          resolveData(schema, operation.query, rootType).addToParentBody(
+          resolveData(schema, operation.query, rootTypeOverride.orElse(rootType)).addToParentBody(
             config.catsEq,
             config.catsShow,
             config.monocleLenses,

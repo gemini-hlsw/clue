@@ -135,6 +135,101 @@ class GraphQLGen(config: GraphQLGenConfig)
                     }
                 }
             }
+          case obj @ Defn.Trait(
+                mods @ GraphQLAnnotation(_),
+                templateName,
+                Nil,
+                _,
+                Template(early, inits, self, stats)
+              ) =>
+            val objName = templateName.value
+            config.getSchema(objName).map { schema =>
+              val modObjDefs = scala.Function.chain(
+                List(addScalars, addEnums(schema, config), addInputs(schema, config))
+              )
+
+              // Can't get RemoveUnused to remove the unused import, since rules in the same run are note applied incrementally.
+              // See https://github.com/scalacenter/scalafix/issues/1204
+              val newMods = GraphQLSchemaAnnotation.removeFrom(mods)
+
+              Patch.replaceTree(
+                obj,
+                indented(obj)(
+                  List(
+                    q"sealed trait ${Type.Name(objName)}".toString,
+                    q"..$newMods object ${Term
+                        .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
+                  ).mkString("\n")
+                )
+              ) + Patch.removeGlobalImport(GraphQLSchemaAnnotation.symbol)
+            }
+          case obj @ Defn.Trait(
+                mods @ GraphQLSubqueryAnnotation(_),
+                templateName,
+                Nil,
+                _,
+                Template(early, inits, self, stats)
+              ) =>
+            val objName = templateName.value
+
+            extractSchemaType(inits) match {
+              case None             =>
+                abort(
+                  "Invalid annotation target: must be a trait extending GraphQLOperation[Schema]"
+                )
+              case Some(schemaType) =>
+                extractSubquery(stats) match {
+                  case None                           =>
+                    abort(
+                      "The GraphQLOperation must define a 'val subquery' and 'val schemaType' with a literal String value."
+                    )
+                  case Some((subquery, rootTypeName)) =>
+                    config.getSchema(schemaType.value).flatMap { schema =>
+                      // Parse the operation.
+                      val queryResult = QueryParser.parseText(s"query $subquery")
+                      if (queryResult.isLeft)
+                        abort(
+                          s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                        )
+                      else {
+                        IO.whenA(queryResult.isBoth)(
+                          log(
+                            s"Warning parsing document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                          )
+                        ) >> IO {
+                          val operation = queryResult.toOption.get
+
+                          // Modifications to add the missing definitions.
+                          val modObjDefs = scala.Function.chain(
+                            List(
+                              addImports(schemaType.value),
+                              addData(schema,
+                                      operation,
+                                      config,
+                                      schema.types.find(_.name == rootTypeName)
+                              ),
+                              addDataDecoder,
+                              addConvenienceMethod(schemaType, operation)
+                            )
+                          )
+
+                          val newMods = GraphQLSubqueryAnnotation.removeFrom(mods)
+
+                          // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
+                          Patch.replaceTree(
+                            obj,
+                            indented(obj)(
+                              List(
+                                q"..$newMods object ${Term
+                                    .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
+                              ).mkString("\n")
+                            )
+                          ) + Patch.removeGlobalImport(GraphQLSubqueryAnnotation.symbol)
+                        }
+                      }
+                    }
+                }
+            }
         }
 
     (importPatch ++ genPatch).sequence
