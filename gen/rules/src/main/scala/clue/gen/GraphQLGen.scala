@@ -42,6 +42,12 @@ class GraphQLGen(config: GraphQLGenConfig)
     val genPatch: List[IO[Patch]] =
       doc.tree
         .collect {
+          case obj @ Defn.Object(
+                GraphQLStubAnnotation(_),
+                _,
+                _
+              ) =>
+            IO.pure(Patch.replaceTree(obj, ""))
           case obj @ Defn.Trait(
                 mods @ GraphQLSchemaAnnotation(_),
                 templateName,

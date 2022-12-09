@@ -31,4 +31,6 @@ object StarWarsSubquery extends GraphQLSubquery[StarWars] {
   }
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
 }
+
+
 // format: on

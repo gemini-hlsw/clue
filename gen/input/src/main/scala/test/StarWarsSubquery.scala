@@ -22,4 +22,7 @@ trait StarWarsSubquery extends GraphQLSubquery[StarWars] {
         }
       """
 }
+
+@clue.annotation.GraphQLStub
+object StarWarsSubquery
 // format: on

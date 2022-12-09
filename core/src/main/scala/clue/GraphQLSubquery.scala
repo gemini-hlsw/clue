@@ -18,4 +18,6 @@ trait GraphQLSubquery[S] {
   object implicits {
     implicit val implicitDataDecoder: Decoder[Data] = dataDecoder
   }
+
+  final override def toString = subquery
 }
