@@ -99,7 +99,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                   case Some(document) =>
                     config.getSchema(schemaType.value).flatMap { schema =>
                       // Parse the operation.
-                      val queryResult = QueryParser.parseText(document)
+                      val queryResult = QueryParser.parseText(document.render)
                       if (queryResult.isLeft)
                         abort(
                           s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
@@ -117,7 +117,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                             List(
                               addImports(schemaType.value),
                               addVars(schema, operation, config),
-                              addData(schema, operation, config),
+                              addData(schema, operation, config, document.subqueries),
                               addVarEncoder,
                               addDataDecoder,
                               addConvenienceMethod(schemaType, operation)
@@ -212,6 +212,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                               addData(schema,
                                       operation,
                                       config,
+                                      Nil,
                                       schema.types.find(_.name == rootTypeName)
                               ),
                               addDataDecoder,

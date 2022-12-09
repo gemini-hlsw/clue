@@ -29,6 +29,23 @@ trait QueryGen extends Generator {
         tpe
     }.headOption
 
+  case class InterpolatedDocument(parts: List[DocumentPart]) {
+    def render = parts.map {
+      case DocumentPart.Literal(value) => value
+      case _                           => ""
+    }.mkString
+
+    def subqueries = parts.collect { case DocumentPart.Subquery(term) =>
+      term
+    }
+  }
+
+  sealed abstract class DocumentPart
+  object DocumentPart {
+    case class Literal(value: String) extends DocumentPart
+    case class Subquery(term: Term)   extends DocumentPart
+  }
+
   // TODO Support concatenation and stripMargin?
   // Actually when we support gql"" that should delimit things...
   // Actually(2)... Scalafix runs in a completely different context than the actual code.
@@ -37,11 +54,28 @@ trait QueryGen extends Generator {
   // kicked in after macro expansion, and not before.
   // Actually(3)... We are out of luck, scalafix doesn't see macro expansions:
   // https://scalacenter.github.io/scalafix/docs/developers/semantic-tree.html#macros
-  protected def extractDocument(stats: List[Stat]): Option[String] =
+  protected def extractDocument(stats: List[Stat]): Option[InterpolatedDocument] =
     stats.collectFirst {
       case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
           if valName == "document" =>
-        value
+        InterpolatedDocument(List(DocumentPart.Literal(value)))
+      case Defn.Val(_,
+                    List(Pat.Var(Term.Name(valName))),
+                    _,
+                    Term.Interpolate(_, rawLiterals, rawArgs)
+          ) if valName == "document" =>
+        val literals: List[DocumentPart] = rawLiterals.collect { case Lit.String(value) =>
+          DocumentPart.Literal(value)
+        }
+
+        val args: List[DocumentPart] = rawArgs.map(DocumentPart.Subquery(_))
+
+        val parts = literals.map(Some(_)).zipAll(args.map(Some(_)), None, None).flatMap {
+          case (literal, arg) =>
+            List(literal, arg).flatten
+        }
+
+        InterpolatedDocument(parts)
     }
 
   protected def extractSubquery(stats: List[Stat]): Option[(String, String)] = {
@@ -181,9 +215,10 @@ trait QueryGen extends Generator {
    * Recurse the query AST and collect the necessary [[CaseClass]] es to hold its results.
    */
   protected def resolveData(
-    schema:   Schema,
-    algebra:  Query,
-    rootType: Option[GType]
+    schema:     Schema,
+    algebra:    Query,
+    subqueries: List[Term],
+    rootType:   Option[GType]
   ): CaseClass = {
     import Query._
 
@@ -323,6 +358,7 @@ trait QueryGen extends Generator {
     schema:           Schema,
     operation:        UntypedOperation,
     config:           GraphQLGenConfig,
+    subqueries:       List[Term],
     rootTypeOverride: Option[NamedType] = None
   ): List[Stat] => List[Stat] =
     parentBody =>
@@ -353,14 +389,15 @@ trait QueryGen extends Generator {
             case _: UntypedSubscription => schemaType.field("subscription").flatMap(_.asNamed)
           }
 
-          resolveData(schema, operation.query, rootTypeOverride.orElse(rootType)).addToParentBody(
-            config.catsEq,
-            config.catsShow,
-            config.monocleLenses,
-            config.scalaJSReactReuse,
-            circeDecoder = true,
-            forceModule = true
-          )(parentBody)
+          resolveData(schema, operation.query, subqueries, rootTypeOverride.orElse(rootType))
+            .addToParentBody(
+              config.catsEq,
+              config.catsShow,
+              config.monocleLenses,
+              config.scalaJSReactReuse,
+              circeDecoder = true,
+              forceModule = true
+            )(parentBody)
       }
 
   private def isTermDefined(termName: String): List[Stat] => Boolean =
