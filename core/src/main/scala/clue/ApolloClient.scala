@@ -312,6 +312,8 @@ class ApolloClient[F[_], S, CP, CE](
             F.unit
           case Initialized(stateConnectionId, _, _, _) if connectionId =!= stateConnectionId =>
             F.unit
+          case s @ Disconnected(_)                                                           =>
+            s"Complete RECEIVED for subscription [$subscriptionId] on Disconnected state: [$s]".debugF
           case s @ _                                                                         =>
             s"UNEXPECTED Complete RECEIVED for subscription [$subscriptionId]. State is: [$s]".warnF
         }
