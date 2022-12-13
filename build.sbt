@@ -94,7 +94,7 @@ lazy val http4sJDKDemo = project
     tlJdkRelease := Some(11),
     libraryDependencies ++= Seq(
       "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
-      "org.slf4j"      % "slf4j-simple"   % "2.0.5"
+      "org.slf4j"      % "slf4j-simple"   % "2.0.6"
     ) ++ Settings.Libraries.Http4sJDKClient.value
   )
   .dependsOn(http4s.jvm)
