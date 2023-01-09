@@ -3,6 +3,7 @@
 
 package clue.gen
 
+import cats.data.State
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all._
 import edu.gemini.grackle.UntypedOperation._
@@ -30,10 +31,15 @@ trait QueryGen extends Generator {
     }.headOption
 
   case class InterpolatedDocument(parts: List[DocumentPart]) {
-    def render = parts.map {
-      case DocumentPart.Literal(value) => value
-      case _                           => ""
-    }.mkString
+    def render = parts
+      .traverse {
+        case DocumentPart.Literal(value) => State.pure[Int, String](value)
+        case _                           =>
+          State.inspect[Int, String](i => s"{ subquery$i }") <* State.modify(_ + 1)
+      }
+      .runA(0)
+      .value
+      .mkString
 
     def subqueries = parts.collect { case DocumentPart.Subquery(term) =>
       term
@@ -235,7 +241,14 @@ trait QueryGen extends Generator {
       nameOverride:   Option[String] = none
     ): ClassAccumulator =
       currentAlgebra match {
-        case Select(name, _, child) =>
+        case Select(name, _, Select(fieldName, _, _)) if fieldName.startsWith("subquery") =>
+          val i = fieldName.substring("subquery".length).toInt
+          ClassAccumulator(parAccum =
+            List(
+              ClassParam(name, Type.Select(subqueries(i).asInstanceOf[Term.Ref], Type.Name("Data")))
+            )
+          )
+        case Select(name, _, child)                                                       =>
           val paramName = nameOverride.getOrElse(name)
 
           MetaTypes
