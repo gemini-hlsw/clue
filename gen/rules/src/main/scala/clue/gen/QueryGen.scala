@@ -242,12 +242,26 @@ trait QueryGen extends Generator {
     ): ClassAccumulator =
       currentAlgebra match {
         case Select(name, _, Select(fieldName, _, _)) if fieldName.startsWith("subquery") =>
-          val i = fieldName.substring("subquery".length).toInt
-          ClassAccumulator(parAccum =
-            List(
-              ClassParam(name, Type.Select(subqueries(i).asInstanceOf[Term.Ref], Type.Name("Data")))
-            )
-          )
+          val param = MetaTypes
+            .get(name)
+            .orElse(currentType.flatMap(_.field(name)))
+            .fold(
+              throw new Exception(
+                s"Could not resolve type for field [$name] - Is this a valid field present in the schema?"
+              )
+            ) { nextType =>
+              val i = fieldName.substring("subquery".length).toInt
+
+              ClassParam.fromGrackleType(
+                name,
+                nextType.dealias,
+                isInput = false,
+                typeOverride =
+                  Some(Type.Select(subqueries(i).asInstanceOf[Term.Ref], Type.Name("Data")))
+              )
+            }
+
+          ClassAccumulator(parAccum = List(param))
         case Select(name, _, child)                                                       =>
           val paramName = nameOverride.getOrElse(name)
 
