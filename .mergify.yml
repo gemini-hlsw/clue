@@ -16,9 +16,9 @@ pull_request_rules:
   - status-success=Build and Test (ubuntu-latest, 2.13.10, temurin@11, rootJS)
   - status-success=Build and Test (ubuntu-latest, 2.13.10, temurin@11, rootJVM)
   - status-success=Build and Test (ubuntu-latest, 2.13.10, temurin@17, rootJVM)
-  - status-success=Build and Test (ubuntu-latest, 3.2.1, temurin@11, rootJS)
-  - status-success=Build and Test (ubuntu-latest, 3.2.1, temurin@11, rootJVM)
-  - status-success=Build and Test (ubuntu-latest, 3.2.1, temurin@17, rootJVM)
+  - status-success=Build and Test (ubuntu-latest, 3.2.2, temurin@11, rootJS)
+  - status-success=Build and Test (ubuntu-latest, 3.2.2, temurin@11, rootJVM)
+  - status-success=Build and Test (ubuntu-latest, 3.2.2, temurin@17, rootJVM)
   actions:
     merge: {}
 - name: Label core PRs
