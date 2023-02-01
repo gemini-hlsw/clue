@@ -152,7 +152,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                 Template(early, inits, self, stats)
               ) if inits.exists {
                 case Init(Type.Apply(Type.Name("GraphQLSubquery"), _), _, _) => true
-                case _                                                        => false
+                case _                                                       => false
               } =>
             val objName = templateName.value
 
