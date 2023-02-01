@@ -9,9 +9,10 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.annotation.GraphQL
 import test.StarWars
 
-@clue.annotation.GraphQLSubquery
+@GraphQL
 trait StarWarsSubquery extends GraphQLSubquery[StarWars] {
 
   override val rootType: String = "Character"

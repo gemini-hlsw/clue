@@ -35,6 +35,4 @@ object GraphQLSchemaAnnotation extends AnnotationPattern("clue.annotation.GraphQ
 
 object GraphQLAnnotation extends AnnotationPattern("clue.annotation.GraphQL")
 
-object GraphQLSubqueryAnnotation extends AnnotationPattern("clue.annotation.GraphQLSubquery")
-
 object GraphQLStubAnnotation extends AnnotationPattern("clue.annotation.GraphQLStub")

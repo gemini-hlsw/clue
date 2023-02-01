@@ -82,7 +82,10 @@ class GraphQLGen(config: GraphQLGenConfig)
                 Nil,
                 _,
                 Template(early, inits, self, stats)
-              ) =>
+              ) if inits.exists {
+                case Init(Type.Apply(Type.Name("GraphQLOperation"), _), _, _) => true
+                case _                                                        => false
+              } =>
             val objName = templateName.value
 
             extractSchemaType(inits) match {
@@ -142,12 +145,15 @@ class GraphQLGen(config: GraphQLGenConfig)
                 }
             }
           case obj @ Defn.Trait(
-                mods @ GraphQLSubqueryAnnotation(_),
+                mods @ GraphQLAnnotation(_),
                 templateName,
                 Nil,
                 _,
                 Template(early, inits, self, stats)
-              ) =>
+              ) if inits.exists {
+                case Init(Type.Apply(Type.Name("GraphQLSubquery"), _), _, _) => true
+                case _                                                        => false
+              } =>
             val objName = templateName.value
 
             extractSchemaType(inits) match {
@@ -192,7 +198,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                             )
                           )
 
-                          val newMods = GraphQLSubqueryAnnotation.removeFrom(mods)
+                          val newMods = GraphQLAnnotation.removeFrom(mods)
 
                           // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
                           Patch.replaceTree(
@@ -203,7 +209,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                                     .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
                               ).mkString("\n")
                             )
-                          ) + Patch.removeGlobalImport(GraphQLSubqueryAnnotation.symbol)
+                          ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
                         }
                       }
                     }
