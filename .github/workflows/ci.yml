@@ -28,7 +28,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        scala: [2.13.10, 3.2.1]
+        scala: [2.13.10, 3.2.2]
         java: [temurin@11, temurin@17]
         project: [rootJS, rootJVM]
         exclude:
@@ -37,21 +37,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout current branch (full)
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Download Java (temurin@11)
         id: download-java-temurin-11
         if: matrix.java == 'temurin@11'
-        uses: typelevel/download-java@v1
+        uses: typelevel/download-java@v2
         with:
           distribution: temurin
           java-version: 11
 
       - name: Setup Java (temurin@11)
         if: matrix.java == 'temurin@11'
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: jdkfile
           java-version: 11
@@ -60,21 +60,21 @@ jobs:
       - name: Download Java (temurin@17)
         id: download-java-temurin-17
         if: matrix.java == 'temurin@17'
-        uses: typelevel/download-java@v1
+        uses: typelevel/download-java@v2
         with:
           distribution: temurin
           java-version: 17
 
       - name: Setup Java (temurin@17)
         if: matrix.java == 'temurin@17'
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: jdkfile
           java-version: 17
           jdkFile: ${{ steps.download-java-temurin-17.outputs.jdkFile }}
 
       - name: Cache sbt
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.sbt
@@ -100,11 +100,11 @@ jobs:
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' test
 
       - name: Check scalafix lints
-        if: matrix.java == 'temurin@11'
+        if: matrix.java == 'temurin@11' && matrix.os == 'ubuntu-latest'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' 'scalafixAll --check'
 
       - name: Check binary compatibility
-        if: matrix.java == 'temurin@11'
+        if: matrix.java == 'temurin@11' && matrix.os == 'ubuntu-latest'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' mimaReportBinaryIssues
 
       - name: Aggregate coverage reports
@@ -125,21 +125,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout current branch (full)
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Download Java (temurin@11)
         id: download-java-temurin-11
         if: matrix.java == 'temurin@11'
-        uses: typelevel/download-java@v1
+        uses: typelevel/download-java@v2
         with:
           distribution: temurin
           java-version: 11
 
       - name: Setup Java (temurin@11)
         if: matrix.java == 'temurin@11'
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: jdkfile
           java-version: 11
@@ -148,21 +148,21 @@ jobs:
       - name: Download Java (temurin@17)
         id: download-java-temurin-17
         if: matrix.java == 'temurin@17'
-        uses: typelevel/download-java@v1
+        uses: typelevel/download-java@v2
         with:
           distribution: temurin
           java-version: 17
 
       - name: Setup Java (temurin@17)
         if: matrix.java == 'temurin@17'
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: jdkfile
           java-version: 17
           jdkFile: ${{ steps.download-java-temurin-17.outputs.jdkFile }}
 
       - name: Cache sbt
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.sbt

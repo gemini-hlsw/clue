@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2022 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue
@@ -312,6 +312,8 @@ class ApolloClient[F[_], S, CP, CE](
             F.unit
           case Initialized(stateConnectionId, _, _, _) if connectionId =!= stateConnectionId =>
             F.unit
+          case s @ Disconnected(_)                                                           =>
+            s"Complete RECEIVED for subscription [$subscriptionId] on Disconnected state: [$s]".debugF
           case s @ _                                                                         =>
             s"UNEXPECTED Complete RECEIVED for subscription [$subscriptionId]. State is: [$s]".warnF
         }
