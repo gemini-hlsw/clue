@@ -142,34 +142,6 @@ class GraphQLGen(config: GraphQLGenConfig)
                 }
             }
           case obj @ Defn.Trait(
-                mods @ GraphQLAnnotation(_),
-                templateName,
-                Nil,
-                _,
-                Template(early, inits, self, stats)
-              ) =>
-            val objName = templateName.value
-            config.getSchema(objName).map { schema =>
-              val modObjDefs = scala.Function.chain(
-                List(addScalars, addEnums(schema, config), addInputs(schema, config))
-              )
-
-              // Can't get RemoveUnused to remove the unused import, since rules in the same run are note applied incrementally.
-              // See https://github.com/scalacenter/scalafix/issues/1204
-              val newMods = GraphQLSchemaAnnotation.removeFrom(mods)
-
-              Patch.replaceTree(
-                obj,
-                indented(obj)(
-                  List(
-                    q"sealed trait ${Type.Name(objName)}".toString,
-                    q"..$newMods object ${Term
-                        .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
-                  ).mkString("\n")
-                )
-              ) + Patch.removeGlobalImport(GraphQLSchemaAnnotation.symbol)
-            }
-          case obj @ Defn.Trait(
                 mods @ GraphQLSubqueryAnnotation(_),
                 templateName,
                 Nil,
