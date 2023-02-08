@@ -3,6 +3,7 @@
 
 package clue.gen
 
+import cats.data.State
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all._
 import edu.gemini.grackle.UntypedOperation._
@@ -23,6 +24,38 @@ trait QueryGen extends Generator {
         tpe
     }.headOption
 
+  protected def extractSchemaAndRootTypes(list: List[Init]): Option[(Type.Name, String)] =
+    list.collect {
+      case Init(
+            Type.Apply(Type.Name("GraphQLSubquery"), List(tpe @ Type.Name(_))),
+            _,
+            List(List(Lit.String(rootType)))
+          ) =>
+        (tpe, rootType)
+    }.headOption
+
+  case class InterpolatedDocument(parts: List[DocumentPart]) {
+    def render = parts
+      .traverse {
+        case DocumentPart.Literal(value) => State.pure[Int, String](value)
+        case _                           =>
+          State.inspect[Int, String](i => s"{ subquery$i }") <* State.modify(_ + 1)
+      }
+      .runA(0)
+      .value
+      .mkString
+
+    def subqueries = parts.collect { case DocumentPart.Subquery(term) =>
+      term
+    }
+  }
+
+  sealed abstract class DocumentPart
+  object DocumentPart {
+    case class Literal(value: String) extends DocumentPart
+    case class Subquery(term: Term)   extends DocumentPart
+  }
+
   // TODO Support concatenation and stripMargin?
   // Actually when we support gql"" that should delimit things...
   // Actually(2)... Scalafix runs in a completely different context than the actual code.
@@ -31,10 +64,34 @@ trait QueryGen extends Generator {
   // kicked in after macro expansion, and not before.
   // Actually(3)... We are out of luck, scalafix doesn't see macro expansions:
   // https://scalacenter.github.io/scalafix/docs/developers/semantic-tree.html#macros
-  protected def extractDocument(stats: List[Stat]): Option[String] =
+  protected def extractDocument(stats: List[Stat]): Option[InterpolatedDocument] =
     stats.collectFirst {
       case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
           if valName == "document" =>
+        InterpolatedDocument(List(DocumentPart.Literal(value)))
+      case Defn.Val(_,
+                    List(Pat.Var(Term.Name(valName))),
+                    _,
+                    Term.Interpolate(_, rawLiterals, rawArgs)
+          ) if valName == "document" =>
+        val literals: List[DocumentPart] = rawLiterals.collect { case Lit.String(value) =>
+          DocumentPart.Literal(value)
+        }
+
+        val args: List[DocumentPart] = rawArgs.map(DocumentPart.Subquery(_))
+
+        val parts = literals.map(Some(_)).zipAll(args.map(Some(_)), None, None).flatMap {
+          case (literal, arg) =>
+            List(literal, arg).flatten
+        }
+
+        InterpolatedDocument(parts)
+    }
+
+  protected def extractSubquery(stats: List[Stat]): Option[String] =
+    stats.collectFirst {
+      case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
+          if valName == "subquery" =>
         value
     }
 
@@ -161,9 +218,10 @@ trait QueryGen extends Generator {
    * Recurse the query AST and collect the necessary [[CaseClass]] es to hold its results.
    */
   protected def resolveData(
-    schema:   Schema,
-    algebra:  Query,
-    rootType: Option[GType]
+    schema:     Schema,
+    algebra:    Query,
+    subqueries: List[Term],
+    rootType:   Option[GType]
   ): CaseClass = {
     import Query._
 
@@ -180,7 +238,28 @@ trait QueryGen extends Generator {
       nameOverride:   Option[String] = none
     ): ClassAccumulator =
       currentAlgebra match {
-        case Select(name, _, child) =>
+        case Select(name, _, Select(fieldName, _, _)) if fieldName.startsWith("subquery") =>
+          val param = MetaTypes
+            .get(name)
+            .orElse(currentType.flatMap(_.field(name)))
+            .fold(
+              throw new Exception(
+                s"Could not resolve type for field [$name] - Is this a valid field present in the schema?"
+              )
+            ) { nextType =>
+              val i = fieldName.substring("subquery".length).toInt
+
+              ClassParam.fromGrackleType(
+                name,
+                nextType.dealias,
+                isInput = false,
+                typeOverride =
+                  Some(Type.Select(subqueries(i).asInstanceOf[Term.Ref], Type.Name("Data")))
+              )
+            }
+
+          ClassAccumulator(parAccum = List(param))
+        case Select(name, _, child)                                                       =>
           val paramName = nameOverride.getOrElse(name)
 
           MetaTypes
@@ -300,9 +379,11 @@ trait QueryGen extends Generator {
   }
 
   protected def addData(
-    schema:    Schema,
-    operation: UntypedOperation,
-    config:    GraphQLGenConfig
+    schema:           Schema,
+    operation:        UntypedOperation,
+    config:           GraphQLGenConfig,
+    subqueries:       List[Term],
+    rootTypeOverride: Option[NamedType] = None
   ): List[Stat] => List[Stat] =
     parentBody =>
       mustDefineType("Data")(parentBody) match {
@@ -332,14 +413,15 @@ trait QueryGen extends Generator {
             case _: UntypedSubscription => schemaType.field("subscription").flatMap(_.asNamed)
           }
 
-          resolveData(schema, operation.query, rootType).addToParentBody(
-            config.catsEq,
-            config.catsShow,
-            config.monocleLenses,
-            config.scalaJSReactReuse,
-            circeDecoder = true,
-            forceModule = true
-          )(parentBody)
+          resolveData(schema, operation.query, subqueries, rootTypeOverride.orElse(rootType))
+            .addToParentBody(
+              config.catsEq,
+              config.catsShow,
+              config.monocleLenses,
+              config.scalaJSReactReuse,
+              circeDecoder = true,
+              forceModule = true
+            )(parentBody)
       }
 
   private def isTermDefined(termName: String): List[Stat] => Boolean =

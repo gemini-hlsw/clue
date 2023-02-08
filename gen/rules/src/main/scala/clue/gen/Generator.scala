@@ -116,7 +116,8 @@ trait Generator {
       name:         String,
       tpe:          grackle.Type,
       isInput:      Boolean,
-      nameOverride: Option[String] = None
+      nameOverride: Option[String] = None,
+      typeOverride: Option[Type] = None
     ): ClassParam = {
       def resolveType(tpe: grackle.Type): Type =
         tpe match {
@@ -127,8 +128,9 @@ trait Generator {
               t"Option[${resolveType(tpe)}]"
           case grackle.ListType(tpe)     => t"List[${resolveType(tpe)}]"
           case nt: grackle.NamedType     =>
-            DefaultMappings.getOrElse(nt.name,
-                                      Type.Name(snakeToCamel(nameOverride.getOrElse(nt.name)))
+            DefaultMappings.getOrElse(
+              nt.name,
+              typeOverride.getOrElse(Type.Name(snakeToCamel(nameOverride.getOrElse(nt.name))))
             )
         }
 

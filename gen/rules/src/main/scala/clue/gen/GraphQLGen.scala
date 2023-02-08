@@ -42,6 +42,12 @@ class GraphQLGen(config: GraphQLGenConfig)
     val genPatch: List[IO[Patch]] =
       doc.tree
         .collect {
+          case obj @ Defn.Object(
+                GraphQLStubAnnotation(_),
+                _,
+                _
+              ) =>
+            IO.pure(Patch.replaceTree(obj, ""))
           case obj @ Defn.Trait(
                 mods @ GraphQLSchemaAnnotation(_),
                 templateName,
@@ -76,7 +82,10 @@ class GraphQLGen(config: GraphQLGenConfig)
                 Nil,
                 _,
                 Template(early, inits, self, stats)
-              ) =>
+              ) if inits.exists {
+                case Init(Type.Apply(Type.Name("GraphQLOperation"), _), _, _) => true
+                case _                                                        => false
+              } =>
             val objName = templateName.value
 
             extractSchemaType(inits) match {
@@ -93,7 +102,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                   case Some(document) =>
                     config.getSchema(schemaType.value).flatMap { schema =>
                       // Parse the operation.
-                      val queryResult = QueryParser.parseText(document)
+                      val queryResult = QueryParser.parseText(document.render)
                       if (queryResult.isLeft)
                         abort(
                           s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
@@ -111,7 +120,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                             List(
                               addImports(schemaType.value),
                               addVars(schema, operation, config),
-                              addData(schema, operation, config),
+                              addData(schema, operation, config, document.subqueries),
                               addVarEncoder,
                               addDataDecoder,
                               addConvenienceMethod(schemaType, operation)
@@ -119,6 +128,80 @@ class GraphQLGen(config: GraphQLGenConfig)
                           )
 
                           val newMods = GraphQLAnnotation.removeFrom(mods)
+
+                          // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
+                          Patch.replaceTree(
+                            obj,
+                            indented(obj)(
+                              List(
+                                q"..$newMods object ${Term
+                                    .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
+                              ).mkString("\n")
+                            )
+                          ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
+                        }
+                      }
+                    }
+                }
+            }
+          case obj @ Defn.Class(
+                mods @ GraphQLAnnotation(_),
+                templateName,
+                Nil,
+                _,
+                Template(early, inits, self, stats)
+              ) if inits.exists {
+                case Init(Type.Apply(Type.Name("GraphQLSubquery"), _), _, _) => true
+                case _                                                       => false
+              } =>
+            val objName = templateName.value
+
+            extractSchemaAndRootTypes(inits) match {
+              case None                             =>
+                abort(
+                  "Invalid annotation target: must be a trait extending GraphQLOperation[Schema](rootType) where 'rootType` is a literal String value."
+                )
+              case Some((schemaType, rootTypeName)) =>
+                extractSubquery(stats) match {
+                  case None           =>
+                    abort(
+                      "The GraphQLOperation must define a 'val subquery' with a literal String value."
+                    )
+                  case Some(subquery) =>
+                    config.getSchema(schemaType.value).flatMap { schema =>
+                      // Parse the operation.
+                      val queryResult = QueryParser.parseText(s"query $subquery")
+                      if (queryResult.isLeft)
+                        abort(
+                          s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                        )
+                      else {
+                        IO.whenA(queryResult.isBoth)(
+                          log(
+                            s"Warning parsing document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                          )
+                        ) >> IO {
+                          val operation = queryResult.toOption.get
+
+                          // Modifications to add the missing definitions.
+                          val modObjDefs = scala.Function.chain(
+                            List(
+                              addImports(schemaType.value),
+                              addData(schema,
+                                      operation,
+                                      config,
+                                      Nil,
+                                      schema.types.find(_.name == rootTypeName)
+                              ),
+                              addDataDecoder,
+                              addConvenienceMethod(schemaType, operation)
+                            )
+                          )
+
+                          val newMods = GraphQLAnnotation.removeFrom(mods).filterNot {
+                            case Mod.Abstract() => true
+                            case _              => false
+                          }
 
                           // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
                           Patch.replaceTree(
