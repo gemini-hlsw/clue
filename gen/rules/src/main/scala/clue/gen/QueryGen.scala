@@ -22,12 +22,16 @@ trait QueryGen extends Generator {
             Nil
           ) =>
         tpe
+    }.headOption
+
+  protected def extractSchemaAndRootTypes(list: List[Init]): Option[(Type.Name, String)] =
+    list.collect {
       case Init(
             Type.Apply(Type.Name("GraphQLSubquery"), List(tpe @ Type.Name(_))),
             _,
-            Nil
+            List(List(Lit.String(rootType)))
           ) =>
-        tpe
+        (tpe, rootType)
     }.headOption
 
   case class InterpolatedDocument(parts: List[DocumentPart]) {
@@ -84,19 +88,12 @@ trait QueryGen extends Generator {
         InterpolatedDocument(parts)
     }
 
-  protected def extractSubquery(stats: List[Stat]): Option[(String, String)] = {
-    val subquery   = stats.collectFirst {
+  protected def extractSubquery(stats: List[Stat]): Option[String] =
+    stats.collectFirst {
       case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
           if valName == "subquery" =>
         value
     }
-    val schemaType = stats.collectFirst {
-      case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
-          if valName == "rootType" =>
-        value
-    }
-    subquery.zip(schemaType)
-  }
 
   protected def addImports(schemaName: String): List[Stat] => List[Stat] =
     parentBody => {

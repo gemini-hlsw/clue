@@ -8,8 +8,7 @@ import io.circe.Decoder
 /*
  * A subquery must extend this trait.
  */
-trait GraphQLSubquery[S] {
-  val rootType: String
+abstract class GraphQLSubquery[S](val rootType: String) {
   val subquery: String
   type Data
 

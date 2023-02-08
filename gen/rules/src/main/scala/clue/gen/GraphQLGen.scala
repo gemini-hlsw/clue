@@ -144,7 +144,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                     }
                 }
             }
-          case obj @ Defn.Trait(
+          case obj @ Defn.Class(
                 mods @ GraphQLAnnotation(_),
                 templateName,
                 Nil,
@@ -156,18 +156,18 @@ class GraphQLGen(config: GraphQLGenConfig)
               } =>
             val objName = templateName.value
 
-            extractSchemaType(inits) match {
-              case None             =>
+            extractSchemaAndRootTypes(inits) match {
+              case None                             =>
                 abort(
-                  "Invalid annotation target: must be a trait extending GraphQLOperation[Schema]"
+                  "Invalid annotation target: must be a trait extending GraphQLOperation[Schema](rootType) where 'rootType` is a literal String value."
                 )
-              case Some(schemaType) =>
+              case Some((schemaType, rootTypeName)) =>
                 extractSubquery(stats) match {
-                  case None                           =>
+                  case None           =>
                     abort(
-                      "The GraphQLOperation must define a 'val subquery' and 'val schemaType' with a literal String value."
+                      "The GraphQLOperation must define a 'val subquery' with a literal String value."
                     )
-                  case Some((subquery, rootTypeName)) =>
+                  case Some(subquery) =>
                     config.getSchema(schemaType.value).flatMap { schema =>
                       // Parse the operation.
                       val queryResult = QueryParser.parseText(s"query $subquery")
@@ -198,7 +198,10 @@ class GraphQLGen(config: GraphQLGenConfig)
                             )
                           )
 
-                          val newMods = GraphQLAnnotation.removeFrom(mods)
+                          val newMods = GraphQLAnnotation.removeFrom(mods).filterNot {
+                            case Mod.Abstract() => true
+                            case _              => false
+                          }
 
                           // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
                           Patch.replaceTree(

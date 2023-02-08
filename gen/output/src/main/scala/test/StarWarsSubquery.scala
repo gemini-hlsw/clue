@@ -9,14 +9,13 @@ import clue.GraphQLSubquery
 import test.StarWars
 
 
-object StarWarsSubquery extends GraphQLSubquery[StarWars] {
+object StarWarsSubquery extends GraphQLSubquery[StarWars]("Character") {
   import StarWars.Scalars._
   ignoreUnusedImportScalars()
   import StarWars.Enums._
   ignoreUnusedImportEnums()
   import StarWars.Types._
   ignoreUnusedImportTypes()
-  override val rootType: String = "Character"
   override val subquery: String = """
         {
           name

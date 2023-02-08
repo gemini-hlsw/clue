@@ -13,9 +13,7 @@ import clue.annotation.GraphQL
 import test.StarWars
 
 @GraphQL
-trait StarWarsSubquery extends GraphQLSubquery[StarWars] {
-
-  override val rootType: String = "Character"
+abstract class StarWarsSubquery extends GraphQLSubquery[StarWars]("Character") {
 
   override val subquery: String = """
         {
