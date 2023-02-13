@@ -9,14 +9,22 @@ import io.circe.Decoder
  * A subquery must extend this trait.
  */
 abstract class GraphQLSubquery[S](val rootType: String) {
-  val subquery: String
   type Data
 
   val dataDecoder: Decoder[Data]
+
+  val subquery: String
 
   object implicits {
     implicit val implicitDataDecoder: Decoder[Data] = dataDecoder
   }
 
   final override def toString = subquery
+}
+
+object GraphQLSubquery {
+  abstract class Typed[S, T: Decoder](rootType: String) extends GraphQLSubquery[S](rootType) {
+    override type Data = T
+    override val dataDecoder = implicitly[Decoder[T]]
+  }
 }
