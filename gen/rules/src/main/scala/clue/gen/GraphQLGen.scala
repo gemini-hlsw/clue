@@ -170,7 +170,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                   case Some(subquery) =>
                     config.getSchema(schemaType.value).flatMap { schema =>
                       // Parse the operation.
-                      val queryResult = QueryParser.parseText(s"query $subquery")
+                      val queryResult = QueryParser.parseText(s"query ${subquery.render}")
                       if (queryResult.isLeft)
                         abort(
                           s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
@@ -190,7 +190,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                               addData(schema,
                                       operation,
                                       config,
-                                      Nil,
+                                      subquery.subqueries,
                                       schema.types.find(_.name == rootTypeName)
                               ),
                               addDataDecoder,

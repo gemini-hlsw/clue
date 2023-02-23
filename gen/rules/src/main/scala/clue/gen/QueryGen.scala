@@ -56,6 +56,28 @@ trait QueryGen extends Generator {
     case class Subquery(term: Term)   extends DocumentPart
   }
 
+  case class InterpolatedSubquery(parts: List[SubqueryPart]) {
+    def render = parts
+      .traverse {
+        case SubqueryPart.Literal(value) => State.pure[Int, String](value)
+        case _                           =>
+          State.inspect[Int, String](i => s"{ subquery$i }") <* State.modify(_ + 1)
+      }
+      .runA(0)
+      .value
+      .mkString
+
+    def subqueries = parts.collect { case SubqueryPart.Subquery(term) =>
+      term
+    }
+  }
+
+  sealed abstract class SubqueryPart
+  object SubqueryPart {
+    case class Literal(value: String) extends SubqueryPart
+    case class Subquery(term: Term)   extends SubqueryPart
+  }
+
   // TODO Support concatenation and stripMargin?
   // Actually when we support gql"" that should delimit things...
   // Actually(2)... Scalafix runs in a completely different context than the actual code.
@@ -88,11 +110,29 @@ trait QueryGen extends Generator {
         InterpolatedDocument(parts)
     }
 
-  protected def extractSubquery(stats: List[Stat]): Option[String] =
+  protected def extractSubquery(stats: List[Stat]): Option[InterpolatedSubquery] =
     stats.collectFirst {
       case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
           if valName == "subquery" =>
-        value
+        InterpolatedSubquery(List(SubqueryPart.Literal(value)))
+
+      case Defn.Val(_,
+                    List(Pat.Var(Term.Name(valName))),
+                    _,
+                    Term.Interpolate(_, rawLiterals, rawArgs)
+          ) if valName == "subquery" =>
+        val literals: List[SubqueryPart] = rawLiterals.collect { case Lit.String(value) =>
+          SubqueryPart.Literal(value)
+        }
+
+        val args: List[SubqueryPart] = rawArgs.map(SubqueryPart.Subquery(_))
+
+        val parts = literals.map(Some(_)).zipAll(args.map(Some(_)), None, None).flatMap {
+          case (literal, arg) =>
+            List(literal, arg).flatten
+        }
+
+        InterpolatedSubquery(parts)
     }
 
   protected def addImports(schemaName: String): List[Stat] => List[Stat] =
