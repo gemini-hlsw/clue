@@ -34,27 +34,33 @@ trait QueryGen extends Generator {
         (tpe, rootType)
     }.headOption
 
-  case class InterpolatedDocument(parts: List[DocumentPart]) {
+  case class InterpolatedGql(parts: List[GqlPart]) {
     def render = parts
       .traverse {
-        case DocumentPart.Literal(value) => State.pure[Int, String](value)
-        case _                           =>
+        case GqlPart.Literal(value) => State.pure[Int, String](value)
+        case _                      =>
           State.inspect[Int, String](i => s"{ subquery$i }") <* State.modify(_ + 1)
       }
       .runA(0)
       .value
       .mkString
 
-    def subqueries = parts.collect { case DocumentPart.Subquery(term) =>
+    def subqueries = parts.collect { case GqlPart.Subquery(term) =>
       term
     }
   }
 
-  sealed abstract class DocumentPart
-  object DocumentPart {
-    case class Literal(value: String) extends DocumentPart
-    case class Subquery(term: Term)   extends DocumentPart
+  sealed abstract class GqlPart
+  object GqlPart {
+    case class Literal(value: String) extends GqlPart
+    case class Subquery(term: Term)   extends GqlPart
   }
+
+  protected def extractDocument(stats: List[Stat]): Option[InterpolatedGql] =
+    extractGql("document", stats)
+
+  protected def extractSubquery(stats: List[Stat]): Option[InterpolatedGql] =
+    extractGql("subquery", stats)
 
   // TODO Support concatenation and stripMargin?
   // Actually when we support gql"" that should delimit things...
@@ -64,35 +70,27 @@ trait QueryGen extends Generator {
   // kicked in after macro expansion, and not before.
   // Actually(3)... We are out of luck, scalafix doesn't see macro expansions:
   // https://scalacenter.github.io/scalafix/docs/developers/semantic-tree.html#macros
-  protected def extractDocument(stats: List[Stat]): Option[InterpolatedDocument] =
+  private def extractGql(typ: String, stats: List[Stat]): Option[InterpolatedGql] =
     stats.collectFirst {
-      case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
-          if valName == "document" =>
-        InterpolatedDocument(List(DocumentPart.Literal(value)))
+      case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value)) if valName == typ =>
+        InterpolatedGql(List(GqlPart.Literal(value)))
       case Defn.Val(_,
                     List(Pat.Var(Term.Name(valName))),
                     _,
                     Term.Interpolate(_, rawLiterals, rawArgs)
-          ) if valName == "document" =>
-        val literals: List[DocumentPart] = rawLiterals.collect { case Lit.String(value) =>
-          DocumentPart.Literal(value)
+          ) if valName == typ =>
+        val literals: List[GqlPart] = rawLiterals.collect { case Lit.String(value) =>
+          GqlPart.Literal(value)
         }
 
-        val args: List[DocumentPart] = rawArgs.map(DocumentPart.Subquery(_))
+        val args: List[GqlPart] = rawArgs.map(GqlPart.Subquery(_))
 
         val parts = literals.map(Some(_)).zipAll(args.map(Some(_)), None, None).flatMap {
           case (literal, arg) =>
             List(literal, arg).flatten
         }
 
-        InterpolatedDocument(parts)
-    }
-
-  protected def extractSubquery(stats: List[Stat]): Option[String] =
-    stats.collectFirst {
-      case Defn.Val(_, List(Pat.Var(Term.Name(valName))), _, Lit.String(value))
-          if valName == "subquery" =>
-        value
+        InterpolatedGql(parts)
     }
 
   protected def addImports(schemaName: String): List[Stat] => List[Stat] =
