@@ -11,6 +11,14 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.FiniteDuration
 
 package object clue {
+  type ErrorPolicy
+
+  object ErrorPolicy {
+    type IgnoreOnData <: ErrorPolicy
+    type Raise <: ErrorPolicy
+    type Return <: ErrorPolicy
+  }
+
   type CloseReason[CE]               = Either[Throwable, CE]
   // Int = Attempt #. Will only be 0 immediately after a close.
   // For first connection, it will be called the first time with 1, after 1st connection attempt.

@@ -4,9 +4,10 @@
 package clue
 
 import cats.Applicative
-import cats.MonadError
 import cats.effect.Resource
+import cats.effect.Sync
 import cats.syntax.all._
+import clue.ErrorPolicy
 import io.circe._
 import io.circe.syntax._
 import org.http4s.Headers
@@ -18,41 +19,59 @@ import org.typelevel.log4cats.Logger
  */
 trait TransactionalClient[F[_], S] {
 
-  case class RequestApplied[V, D] protected[TransactionalClient] (
+  case class RequestApplied[V, D, R] protected[TransactionalClient] (
     operation:     GraphQLOperation[S],
-    operationName: Option[String]
-  )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
-    def apply(variables: V): F[D] =
-      requestInternal[D](operation.document, operationName, variables.asJson.some)
+    operationName: Option[String],
+    errorPolicy:   ErrorPolicyProcessor[D, R]
+  )(implicit
+    varEncoder:    Encoder[V],
+    dataDecoder:   Decoder[D]
+  ) {
+    def apply(variables: V): F[R] =
+      requestInternal(operation.document, operationName, variables.asJson.some, errorPolicy)
 
-    def apply: F[D] =
-      requestInternal(operation.document, operationName, none)
+    def apply: F[R] =
+      requestInternal(operation.document, operationName, none, errorPolicy)
   }
 
   object RequestApplied {
-    implicit def withoutVariables[V, D](applied: RequestApplied[V, D]): F[D] = applied.apply
+    implicit def withoutVariables[V, D, R](
+      applied: RequestApplied[V, D, R]
+    ): F[R] = applied.apply
   }
 
-  def request(
+  def request[EP](
+    operation:       GraphQLOperation[S],
+    operationName:   Option[String] = None
+  )(implicit
+    errorPolicyInfo: ErrorPolicyInfo[EP]
+  ): RequestApplied[
+    operation.Variables,
+    operation.Data,
+    errorPolicyInfo.ReturnType[operation.Data]
+  ] = {
+    import operation.implicits._
+    RequestApplied(operation, operationName, errorPolicyInfo.processor[operation.Data])
+  }
+
+  def request_(
     operation:     GraphQLOperation[S],
     operationName: Option[String] = None
-  ): RequestApplied[operation.Variables, operation.Data] = {
-    import operation.implicits._
-    RequestApplied(operation, operationName)
-  }
+  ) = request[ErrorPolicy.Raise](operation, operationName)
 
-  protected def requestInternal[D: Decoder](
+  protected def requestInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String] = None,
-    variables:     Option[Json] = None
-  ): F[D]
+    variables:     Option[Json] = None,
+    errorPolicy:   ErrorPolicyProcessor[D, R]
+  ): F[R]
 }
 
 object TransactionalClient {
   def of[F[_], S](uri: Uri, name: String = "", headers: Headers = Headers.empty)(implicit
-    F:       MonadError[F, Throwable],
-    backend: TransactionalBackend[F],
-    logger:  Logger[F]
+    F:                 Sync[F],
+    backend:           TransactionalBackend[F],
+    logger:            Logger[F]
   ): F[TransactionalClient[F, S]] = {
     val logPrefix = s"clue.TransactionalClient[${if (name.isEmpty) uri else name}]"
 
@@ -71,36 +90,52 @@ object TransactionalClient {
  */
 trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
 
-  case class SubscriptionApplied[V, D] protected[StreamingClient] (
+  case class SubscriptionApplied[V, D, R] protected[StreamingClient] (
     subscription:  GraphQLOperation[S],
-    operationName: Option[String] = None
-  )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
-    def apply(variables: V): Resource[F, fs2.Stream[F, D]] =
-      subscribeInternal[D](subscription.document, operationName, variables.asJson.some)
+    operationName: Option[String] = None,
+    errorPolicy:   ErrorPolicyProcessor[D, R]
+  )(implicit
+    varEncoder:    Encoder[V],
+    dataDecoder:   Decoder[D]
+  ) {
+    def apply(variables: V): Resource[F, fs2.Stream[F, R]] =
+      subscribeInternal(subscription.document, operationName, variables.asJson.some, errorPolicy)
 
-    def apply: Resource[F, fs2.Stream[F, D]] =
-      subscribeInternal[D](subscription.document, operationName)
+    def apply: Resource[F, fs2.Stream[F, R]] =
+      subscribeInternal(subscription.document, operationName, none, errorPolicy)
   }
   object SubscriptionApplied {
-    implicit def withoutVariables[V, D](
-      applied: SubscriptionApplied[V, D]
-    ): Resource[F, fs2.Stream[F, D]] =
+    implicit def withoutVariables[V, D, R](
+      applied: SubscriptionApplied[V, D, R]
+    ): Resource[F, fs2.Stream[F, R]] =
       applied.apply
   }
 
-  def subscribe(
-    subscription:  GraphQLOperation[S],
-    operationName: Option[String] = None
-  ): SubscriptionApplied[subscription.Variables, subscription.Data] = {
+  def subscribe[EP](
+    subscription:    GraphQLOperation[S],
+    operationName:   Option[String] = None
+  )(implicit
+    errorPolicyInfo: ErrorPolicyInfo[EP]
+  ): SubscriptionApplied[
+    subscription.Variables,
+    subscription.Data,
+    errorPolicyInfo.ReturnType[subscription.Data]
+  ] = {
     import subscription.implicits._
-    SubscriptionApplied(subscription, operationName)
+    SubscriptionApplied(subscription, operationName, errorPolicyInfo.processor[subscription.Data])
   }
 
-  protected def subscribeInternal[D: Decoder](
+  def subscribe_(
+    subscription:  GraphQLOperation[S],
+    operationName: Option[String] = None
+  ) = subscribe[ErrorPolicy.Raise](subscription, operationName)
+
+  protected def subscribeInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String] = None,
-    variables:     Option[Json] = None
-  ): Resource[F, fs2.Stream[F, D]]
+    variables:     Option[Json] = None,
+    errorPolicy:   ErrorPolicyProcessor[D, R]
+  ): Resource[F, fs2.Stream[F, R]]
 }
 
 /**

@@ -4,6 +4,7 @@
 package clue.model
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.Json
 
@@ -119,9 +120,7 @@ object StreamingMessage {
      * @param payload
      *   error information
      */
-    final case class ConnectionError(payload: Map[String, Json])
-        extends FromServer
-        with Payload[Map[String, Json]]
+    final case class ConnectionError(payload: Json) extends FromServer with Payload[Json]
 
     object ConnectionError {
       implicit val EqConnectionError: Eq[ConnectionError] =
@@ -133,15 +132,11 @@ object StreamingMessage {
      */
     case object ConnectionKeepAlive extends FromServer
 
-    final case class DataWrapper(data: Json, errors: Option[Json])
+    final case class DataWrapper(data: Json, errors: Option[NonEmptyList[GraphQLError]] = none)
 
     object DataWrapper {
       implicit val EqDataWrapper: Eq[DataWrapper] =
-        Eq.by(_.data)
-
-      def fromData(data: Json): DataWrapper = DataWrapper(data, none)
-
-      def fromErrors(errors: Json): DataWrapper = DataWrapper(Json.Null, errors.some)
+        Eq.by(x => (x.data, x.errors))
     }
 
     /**
@@ -163,11 +158,11 @@ object StreamingMessage {
         Eq.by(a => (a.id, a.payload))
     }
 
-    object DataJson {
-      def unapply(data: Data): Option[(String, Json, Option[Json])] = Some(
-        (data.id, data.payload.data, data.payload.errors)
-      )
-    }
+    // object DataJson {
+    //   def unapply(data: Data): Option[(String, Json, Option[Json])] = Some(
+    //     (data.id, data.payload.data, data.payload.errors)
+    //   )
+    // }
 
     /**
      * Server-provided error information for a failed GraphQL operation, previously started with a
@@ -178,10 +173,10 @@ object StreamingMessage {
      * @param payload
      *   error information
      */
-    final case class Error(id: String, payload: Json)
+    final case class Error(id: String, payload: NonEmptyList[GraphQLError])
         extends FromServer
         with Identifier
-        with Payload[Json]
+        with Payload[NonEmptyList[GraphQLError]]
 
     object Error {
       implicit val EqError: Eq[Error] =
