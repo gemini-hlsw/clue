@@ -20,32 +20,37 @@ trait TransactionalClient[F[_], S] {
 
   case class RequestApplied[V, D] protected[TransactionalClient] (
     operation:           GraphQLOperation[S],
-    operationName:       Option[String]
+    operationName:       Option[String],
+    errorPolicy:         ErrorPolicy = ErrorPolicy.Raise
   )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
-    def apply(variables: V): F[D] =
-      requestInternal[D](operation.document, operationName, variables.asJson.some)
+    def apply(variables: V): F[errorPolicy.ReturnType[D]] =
+      requestInternal[D](operation.document, operationName, variables.asJson.some, errorPolicy)
 
-    def apply: F[D] =
-      requestInternal(operation.document, operationName, none)
+    def apply: F[errorPolicy.ReturnType[D]] =
+      requestInternal(operation.document, operationName, none, errorPolicy)
   }
 
   object RequestApplied {
-    implicit def withoutVariables[V, D](applied: RequestApplied[V, D]): F[D] = applied.apply
+    implicit def withoutVariables[V, D](
+      applied: RequestApplied[V, D]
+    ): F[applied.errorPolicy.ReturnType[D]] = applied.apply
   }
 
   def request(
     operation:     GraphQLOperation[S],
-    operationName: Option[String] = None
+    operationName: Option[String] = None,
+    errorPolicy:   ErrorPolicy = ErrorPolicy.Raise
   ): RequestApplied[operation.Variables, operation.Data] = {
     import operation.implicits._
-    RequestApplied(operation, operationName)
+    RequestApplied(operation, operationName, errorPolicy)
   }
 
   protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
-    variables:     Option[Json] = None
-  ): F[D]
+    variables:     Option[Json] = None,
+    errorPolicy:   ErrorPolicy = ErrorPolicy.Raise
+  ): F[errorPolicy.ReturnType[D]]
 }
 
 object TransactionalClient {

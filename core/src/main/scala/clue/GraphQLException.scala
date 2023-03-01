@@ -3,32 +3,35 @@
 
 package clue
 
-import cats.syntax.traverse._
+// import cats.syntax.traverse._
 import clue.model.GraphQLError
-import clue.model.json.DecoderGraphQLError
-import io.circe.Decoder
-import io.circe.Json
+// import clue.model.json.DecoderGraphQLError
+// import io.circe.Decoder
+// import io.circe.Json
+import cats.data.NonEmptyList
 
 class GraphQLException(msg: String) extends Exception(msg)
 
-class ConnectionException() extends GraphQLException("Could not establish connection")
+case object ConnectionException extends GraphQLException("Could not establish connection")
 
-class DisconnectedException() extends GraphQLException("Connection was closed")
+case object DisconnectedException extends GraphQLException("Connection was closed")
 
-class InvalidSubscriptionIdException(id: String)
+case class InvalidSubscriptionIdException(id: String)
     extends GraphQLException(s"Invalid subscription id: $id")
 
-class ResponseException(errors: List[Json])
-    extends GraphQLException(errors.map(_.spaces2).mkString(",")) {
+// class ResponseException(errors: List[Json])
+// extends GraphQLException(errors.map(_.spaces2).mkString(",")) {
+case class ResponseException(errors: NonEmptyList[GraphQLError])
+    extends GraphQLException(errors.toString) {
 
-  /**
-   * Decodes and returns the errors as a list of `GraphQLError` if possible.
-   *
-   * @return
-   *   None if there is a problem parsing the JSON as an array of GraphQLError,
-   *   Some(List[GraphQLError]) if successful
-   */
-  def asGraphQLErrors: Option[List[GraphQLError]] =
-    errors.traverse(Decoder[GraphQLError].decodeJson).toOption
+  // /**
+  //  * Decodes and returns the errors as a list of `GraphQLError` if possible.
+  //  *
+  //  * @return
+  //  *   None if there is a problem parsing the JSON as an array of GraphQLError,
+  //  *   Some(List[GraphQLError]) if successful
+  //  */
+  // def asGraphQLErrors: Option[List[GraphQLError]] =
+  //   errors.traverse(Decoder[GraphQLError].decodeJson).toOption
 
 }
