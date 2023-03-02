@@ -24,6 +24,8 @@ import org.typelevel.log4cats.Logger
 
 import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
+import cats.data.NonEmptyList
+import clue.model.GraphQLError
 
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {
@@ -574,17 +576,23 @@ class ApolloClient[F[_], S, CP, CE](
       } yield ()
   }
 
-  private type DataQueue[D] = Queue[F, Either[Throwable, Option[D]]]
+  private type DataQueue[D] = Queue[F, Option[Ior[NonEmptyList[GraphQLError], D]]]
 
   private case class QueueEmitter[D: Decoder](
     val queue:   DataQueue[D],
     val request: GraphQLRequest
   ) extends Emitter[F] {
 
-    def emitData(json: Json): F[Unit] = {
-      val data = json.as[D]
-      queue.offer(data.map(_.some))
-    }
+    def emitData(dataJson: Json, errorsJson: Option[Json]): F[Unit] =
+      for {
+        data   <- F.delay(dataJson.as[D]).rethrow
+        errors <-
+          errorsJson
+            .fold(F.delay(none[NonEmptyList[GraphQLError]]))(e =>
+              F.delay(e.as[NonEmptyList[GraphQLError]]).rethrow.map(_.some)
+            )
+        _      <- queue.offer(Ior.fromOptions(errors, data.some))
+      } yield ()
 
     def emitError(json: Json): F[Unit] = {
       // Should `json` be the full response with an `errors` field or just the actual errors?
