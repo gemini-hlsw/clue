@@ -496,23 +496,32 @@ trait QueryGen extends Generator {
             case Term.Param(_, Name(name), _, _) => Term.Name(name)
             case other                           => throw new Exception(s"Unexpected param structure [$other]")
           })
-          parentBody :+
+          parentBody ++
             (operation match {
               case _: UntypedQuery        =>
                 val allParamss = paramss :+ List(
                   param"implicit client: clue.TransactionalClient[F, $schemaType]"
                 )
-                q"def query[F[_]](...$allParamss) = client.request(this)(Variables(...$variablesNames))"
+                List(
+                  q"def query[F[_], EP](...$allParamss) = client.request[EP](this)(Variables(...$variablesNames))",
+                  q"def query_[F[_]](...$allParamss) = client.request_(this)(Variables(...$variablesNames))"
+                )
               case _: UntypedMutation     =>
                 val allParamss = paramss :+ List(
                   param"implicit client: clue.TransactionalClient[F, $schemaType]"
                 )
-                q"def execute[F[_]](...$allParamss) = client.request(this)(Variables(...$variablesNames))"
+                List(
+                  q"def execute[F[_], EP](...$allParamss) = client.request[EP](this)(Variables(...$variablesNames))",
+                  q"def execute_[F[_]](...$allParamss) = client.request_(this)(Variables(...$variablesNames))"
+                )
               case _: UntypedSubscription =>
                 val allParamss = paramss :+ List(
                   param"implicit client: clue.StreamingClient[F, $schemaType]"
                 )
-                q"def subscribe[F[_]](...$allParamss) = client.subscribe(this)(Variables(...$variablesNames))"
+                List(
+                  q"def subscribe[F[_], EP](...$allParamss) = client.subscribe[EP](this)(Variables(...$variablesNames))",
+                  q"def subscribe_[F[_]](...$allParamss) = client.subscribe_(this)(Variables(...$variablesNames))"
+                )
             })
         }
         .getOrElse(parentBody)

@@ -103,7 +103,6 @@ object Demo extends IOApp.Simple {
     for {
       id     <- IO(ids(Random.between(0, ids.length)))
       status <- IO(allStatus(Random.between(0, allStatus.length)))
-      // FIXME The following notation, let's avoid apply
       _      <- client.request_(Mutation)(Mutation.Variables(id, status))
     } yield ()
 
