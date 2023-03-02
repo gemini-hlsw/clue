@@ -9,6 +9,7 @@ import clue.GraphQLOperation
 import test.StarWars
 import japgolly.scalajs.react.Dummy._
 
+import clue.ErrorPolicyInfo
 object Wrapper extends Something {
   
   object StarWarsQuery2 extends GraphQLOperation[StarWars] {

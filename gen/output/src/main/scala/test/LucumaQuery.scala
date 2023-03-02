@@ -7,6 +7,7 @@ package test
 
 import clue.GraphQLOperation
 
+import clue.ErrorPolicyInfo
 
 object LucumaQuery extends GraphQLOperation[LucumaODB] {
   import LucumaODB.Scalars._

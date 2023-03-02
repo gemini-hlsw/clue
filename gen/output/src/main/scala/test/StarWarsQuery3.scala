@@ -8,6 +8,7 @@ package test
 import clue.GraphQLOperation
 import test.StarWars
 
+import clue.ErrorPolicyInfo
 
 object StarWarsQuery3 extends GraphQLOperation[StarWars] {
   import StarWars.Scalars._
