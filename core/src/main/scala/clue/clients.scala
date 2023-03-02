@@ -78,18 +78,19 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
 
   case class SubscriptionApplied[V, D] protected[StreamingClient] (
     subscription:        GraphQLOperation[S],
-    operationName:       Option[String] = None
+    operationName:       Option[String] = None,
+    errorPolicy:         ErrorPolicy = ErrorPolicy.Raise
   )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
-    def apply(variables: V): Resource[F, fs2.Stream[F, D]] =
-      subscribeInternal[D](subscription.document, operationName, variables.asJson.some)
+    def apply(variables: V): Resource[F, fs2.Stream[F, errorPolicy.ReturnType[D]]] =
+      subscribeInternal[D](subscription.document, operationName, variables.asJson.some, errorPolicy)
 
-    def apply: Resource[F, fs2.Stream[F, D]] =
-      subscribeInternal[D](subscription.document, operationName)
+    def apply: Resource[F, fs2.Stream[F, errorPolicy.ReturnType[D]]] =
+      subscribeInternal[D](subscription.document, operationName, none, errorPolicy)
   }
   object SubscriptionApplied {
     implicit def withoutVariables[V, D](
       applied: SubscriptionApplied[V, D]
-    ): Resource[F, fs2.Stream[F, D]] =
+    ): Resource[F, fs2.Stream[F, applied.errorPolicy.ReturnType[D]]] =
       applied.apply
   }
 
@@ -104,8 +105,9 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
   protected def subscribeInternal[D: Decoder](
     document:      String,
     operationName: Option[String] = None,
-    variables:     Option[Json] = None
-  ): Resource[F, fs2.Stream[F, D]]
+    variables:     Option[Json] = None,
+    errorPolicy:   ErrorPolicy = ErrorPolicy.Raise
+  ): Resource[F, fs2.Stream[F, errorPolicy.ReturnType[D]]]
 }
 
 /**
