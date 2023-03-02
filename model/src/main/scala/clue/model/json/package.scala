@@ -6,6 +6,8 @@ package clue.model
 import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
+import cats.data.NonEmptyList
+import cats.data.Ior
 
 /**
  * JSON codecs for `clue.model`.
@@ -269,6 +271,20 @@ package object json {
         locations  <- c.getOrElse[List[GraphQLError.Location]]("locations")(List.empty)
         extensions <- c.getOrElse[Map[String, String]]("extensions")(Map.empty)
       } yield GraphQLError(message, path, locations, extensions)
+
+  implicit def DecoderGraphQLResponse[D: Decoder]: Decoder[GraphQLResponse[D]] =
+    Decoder.instance(c =>
+      for {
+        data   <- c.get[Option[D]]("data")
+        errors <- c.get[Option[NonEmptyList[GraphQLError]]]("errors")
+        result <-
+          Ior
+            .fromOptions(errors, data)
+            .fold[Decoder.Result[GraphQLResponse[D]]](
+              DecodingFailure("Response didn't contain 'data' or 'errors' block", c.history).asLeft
+            )(GraphQLResponse(_).asRight)
+      } yield result
+    )
 
   private def checkType(c: HCursor, expected: String): Decoder.Result[Unit] =
     c.downField("type")
