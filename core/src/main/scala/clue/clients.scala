@@ -12,6 +12,7 @@ import io.circe.syntax._
 import org.http4s.Headers
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
+import clue.ErrorPolicy
 
 /**
  * A client that allows one-shot queries and mutations.
@@ -52,6 +53,11 @@ trait TransactionalClient[F[_], S] {
     import operation.implicits._
     RequestApplied(operation, operationName, errorPolicyInfo.processor[operation.Data])
   }
+
+  def request_(
+    operation:     GraphQLOperation[S],
+    operationName: Option[String] = None
+  ) = request[ErrorPolicy.Raise](operation, operationName)
 
   protected def requestInternal[D: Decoder, R](
     document:      String,
@@ -118,6 +124,11 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
     import subscription.implicits._
     SubscriptionApplied(subscription, operationName, errorPolicyInfo.processor[subscription.Data])
   }
+
+  def subscribe_(
+    subscription:  GraphQLOperation[S],
+    operationName: Option[String] = None
+  ) = subscribe[ErrorPolicy.Raise](subscription, operationName)
 
   protected def subscribeInternal[D: Decoder, R](
     document:      String,
