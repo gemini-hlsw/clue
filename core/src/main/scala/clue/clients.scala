@@ -4,7 +4,7 @@
 package clue
 
 import cats.Applicative
-import cats.MonadError
+import cats.effect.Sync
 import cats.effect.Resource
 import cats.syntax.all._
 import io.circe._
@@ -55,7 +55,7 @@ trait TransactionalClient[F[_], S] {
 
 object TransactionalClient {
   def of[F[_], S](uri: Uri, name: String = "", headers: Headers = Headers.empty)(implicit
-    F:                 MonadError[F, Throwable],
+    F:                 Sync[F],
     backend:           TransactionalBackend[F],
     logger:            Logger[F]
   ): F[TransactionalClient[F, S]] = {
