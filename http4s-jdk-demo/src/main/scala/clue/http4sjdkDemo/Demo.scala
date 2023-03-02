@@ -26,6 +26,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.duration._
 import scala.util.Random
+import clue.ErrorPolicy
 
 object Demo extends IOApp.Simple {
 
