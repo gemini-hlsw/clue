@@ -496,31 +496,26 @@ trait QueryGen extends Generator {
             case Term.Param(_, Name(name), _, _) => Term.Name(name)
             case other                           => throw new Exception(s"Unexpected param structure [$other]")
           })
+          val epiParam       = param"implicit errorPolicyInfo: clue.ErrorPolicyInfo[EP]"
           parentBody ++
             (operation match {
               case _: UntypedQuery        =>
-                val allParamss = paramss :+ List(
-                  param"implicit client: clue.TransactionalClient[F, $schemaType]"
-                )
+                val clientParam = param"implicit client: clue.TransactionalClient[F, $schemaType]"
                 List(
-                  q"def query[F[_], EP](...$allParamss) = client.request[EP](this)(Variables(...$variablesNames))",
-                  q"def query_[F[_]](...$allParamss) = client.request_(this)(Variables(...$variablesNames))"
+                  q"def query[F[_], EP](...${paramss :+ List(clientParam, epiParam)}) = client.request(this)(errorPolicyInfo)(Variables(...$variablesNames))",
+                  q"def query_[F[_]](...${paramss :+ List(clientParam)}) = client.request_(this)(Variables(...$variablesNames))"
                 )
               case _: UntypedMutation     =>
-                val allParamss = paramss :+ List(
-                  param"implicit client: clue.TransactionalClient[F, $schemaType]"
-                )
+                val clientParam = param"implicit client: clue.TransactionalClient[F, $schemaType]"
                 List(
-                  q"def execute[F[_], EP](...$allParamss) = client.request[EP](this)(Variables(...$variablesNames))",
-                  q"def execute_[F[_]](...$allParamss) = client.request_(this)(Variables(...$variablesNames))"
+                  q"def execute[F[_], EP](...${paramss :+ List(clientParam, epiParam)}) = client.request(this)(errorPolicyInfo)(Variables(...$variablesNames))",
+                  q"def execute_[F[_]](...${paramss :+ List(clientParam)}) = client.request_(this)(Variables(...$variablesNames))"
                 )
               case _: UntypedSubscription =>
-                val allParamss = paramss :+ List(
-                  param"implicit client: clue.StreamingClient[F, $schemaType]"
-                )
+                val clientParam = param"implicit client: clue.StreamingClient[F, $schemaType]"
                 List(
-                  q"def subscribe[F[_], EP](...$allParamss) = client.subscribe[EP](this)(Variables(...$variablesNames))",
-                  q"def subscribe_[F[_]](...$allParamss) = client.subscribe_(this)(Variables(...$variablesNames))"
+                  q"def subscribe[F[_], EP](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this)(errorPolicyInfo)(Variables(...$variablesNames))",
+                  q"def subscribe_[F[_]](...${paramss :+ List(clientParam)}) = client.subscribe_(this)(Variables(...$variablesNames))"
                 )
             })
         }
