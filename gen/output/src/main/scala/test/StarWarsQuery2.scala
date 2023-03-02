@@ -133,7 +133,7 @@ object Wrapper extends Something {
     }
     val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
     val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-    def query[F[_], EP](charId: String)(implicit client: clue.TransactionalClient[F, StarWars], errorPolicyInfo: clue.ErrorPolicyInfo[EP]) = client.request(this)(errorPolicyInfo)(Variables(charId))
+    def query[F[_], EP](charId: String)(implicit client: clue.TransactionalClient[F, StarWars], errorPolicyInfo: clue.ErrorPolicy[EP]) = client.request(this)(errorPolicyInfo)(Variables(charId))
     def query_[F[_]](charId: String)(implicit client: clue.TransactionalClient[F, StarWars]) = client.request_(this)(Variables(charId))
   }
 }

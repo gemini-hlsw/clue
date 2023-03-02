@@ -14,6 +14,8 @@ import org.http4s.Headers
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
 
+import clue.{ErrorPolicy, ErrorPolicyProcessor}
+
 /**
  * A client that allows one-shot queries and mutations.
  */
@@ -40,11 +42,11 @@ trait TransactionalClient[F[_], S] {
     ): F[R] = applied.apply
   }
 
-  def request[EP](
+  def request(
     operation:       GraphQLOperation[S],
     operationName:   Option[String] = None
   )(implicit
-    errorPolicyInfo: ErrorPolicyInfo[EP]
+    errorPolicyInfo: ErrorPolicy
   ): RequestApplied[
     operation.Variables,
     operation.Data,
@@ -54,10 +56,18 @@ trait TransactionalClient[F[_], S] {
     RequestApplied(operation, operationName, errorPolicyInfo.processor[operation.Data])
   }
 
-  def request_(
-    operation:     GraphQLOperation[S],
-    operationName: Option[String] = None
-  ) = request[ErrorPolicy.Raise](operation, operationName)
+  // def request_[EP](
+  //   operation:          GraphQLOperation[S],
+  //   operationName:      Option[String] = None
+  // )(implicit epDefault: ErrorPolicy.Default[EP]): RequestApplied[
+  //   operation.Variables,
+  //   operation.Data,
+  //   epDefault.info.ReturnType[operation.Data]
+  // ] = {
+  //   import operation.implicits._
+  //   RequestApplied(operation, operationName, epDefault.info.processor[operation.Data])
+  // }
+  // request[EP](operation, operationName)(epDefault.info)
 
   protected def requestInternal[D: Decoder, R](
     document:      String,
@@ -111,11 +121,11 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
       applied.apply
   }
 
-  def subscribe[EP](
+  def subscribe(
     subscription:    GraphQLOperation[S],
     operationName:   Option[String] = None
   )(implicit
-    errorPolicyInfo: ErrorPolicyInfo[EP]
+    errorPolicyInfo: ErrorPolicy
   ): SubscriptionApplied[
     subscription.Variables,
     subscription.Data,
@@ -125,10 +135,10 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
     SubscriptionApplied(subscription, operationName, errorPolicyInfo.processor[subscription.Data])
   }
 
-  def subscribe_(
-    subscription:  GraphQLOperation[S],
-    operationName: Option[String] = None
-  ) = subscribe[ErrorPolicy.Raise](subscription, operationName)
+  // def subscribe_(
+  //   subscription:  GraphQLOperation[S],
+  //   operationName: Option[String] = None
+  // ) = subscribe[ErrorPolicy.RaiseAlways](subscription, operationName)
 
   protected def subscribeInternal[D: Decoder, R](
     document:      String,
