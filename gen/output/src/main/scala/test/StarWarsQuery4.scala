@@ -37,6 +37,6 @@ object StarWarsQuery4 extends GraphQLOperation[StarWars] {
   }
   val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-  def query[F[_]](charId: String)(implicit client: clue.TransactionalClient[F, StarWars]) = client.request(this)(Variables(charId))
+  def query[F[_]](charId: String)(implicit client: clue.TransactionalClient[F, StarWars]) = client.request_(this)(Variables(charId))
 }
 // format: on
