@@ -225,24 +225,22 @@ class ApolloClient[F[_], S, CP, CE](
     }
 
   // <StreamingClient>
-  override protected def subscribeInternal[D: Decoder](
+  override protected def subscribeInternal[D: Decoder, R](
     subscription:  String,
     operationName: Option[String],
     variables:     Option[Json],
-    errorPolicy:   ErrorPolicy
-  ): Resource[F, fs2.Stream[F, errorPolicy.ReturnType[D]]] =
-    subscriptionResource(subscription, operationName, variables, errorPolicy)(
-      implicitly[Decoder[D]]
-    )
+    errorPolicy:   ErrorPolicyProcessor[D, R]
+  ): Resource[F, fs2.Stream[F, R]] =
+    subscriptionResource(subscription, operationName, variables, errorPolicy)
 
   // <TransactionalClient>
-  override protected def requestInternal[D: Decoder](
+  override protected def requestInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String],
     variables:     Option[Json],
-    errorPolicy:   ErrorPolicy = ErrorPolicy.Raise
-  ): F[errorPolicy.ReturnType[D]] = F.async[errorPolicy.ReturnType[D]] { cb =>
-    startSubscription[D](document, operationName, variables, errorPolicy).flatMap(
+    errorPolicy:   ErrorPolicyProcessor[D, R]
+  ): F[R] = F.async[R] { cb =>
+    startSubscription[D, R](document, operationName, variables, errorPolicy).flatMap(
       _.stream.attempt
         // FIXME Temporary implementation, for the moment errors are always raised despite errorPolicy
         .evalMap(result => F.delay(cb(result)))
@@ -609,25 +607,25 @@ class ApolloClient[F[_], S, CP, CE](
 
   // TODO Handle interruptions in subscription and query.
 
-  private def subscriptionResource[D: Decoder](
+  private def subscriptionResource[D: Decoder, R](
     subscription:  String,
     operationName: Option[String],
     variables:     Option[Json],
-    errorPolicy:   ErrorPolicy
-  ): Resource[F, fs2.Stream[F, errorPolicy.ReturnType[D]]] =
+    errorPolicy:   ErrorPolicyProcessor[D, R]
+  ): Resource[F, fs2.Stream[F, R]] =
     Resource
-      .make(startSubscription[D](subscription, operationName, variables, errorPolicy))(
+      .make(startSubscription[D, R](subscription, operationName, variables, errorPolicy))(
         _.stop()
           .handleErrorWith(_.logF("Error stopping subscription"))
       )
       .map(_.stream)
 
-  private def startSubscription[D: Decoder](
+  private def startSubscription[D: Decoder, R](
     subscription:  String,
     operationName: Option[String],
     variables:     Option[Json],
-    errorPolicy:   ErrorPolicy
-  ): F[GraphQLSubscription[F, errorPolicy.ReturnType[D]]] =
+    errorPolicy:   ErrorPolicyProcessor[D, R]
+  ): F[GraphQLSubscription[F, R]] =
     state.get.flatMap {
       case Initialized(_, _, _, _)               =>
         val request = GraphQLRequest(subscription, operationName, variables)

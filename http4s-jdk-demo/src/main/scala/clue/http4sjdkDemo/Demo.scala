@@ -27,6 +27,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import scala.concurrent.duration._
 import scala.util.Random
 import clue.ErrorPolicy
+import clue.ErrorPolicy
 
 object Demo extends IOApp.Simple {
 
@@ -102,7 +103,8 @@ object Demo extends IOApp.Simple {
     for {
       id     <- IO(ids(Random.between(0, ids.length)))
       status <- IO(allStatus(Random.between(0, allStatus.length)))
-      _      <- client.request(Mutation)(Mutation.Variables(id, status))
+      // FIXME The following notation, let's avoid apply
+      _      <- client.request[ErrorPolicy.Raise](Mutation).apply(Mutation.Variables(id, status))
     } yield ()
 
   def mutator(client: TransactionalClient[IO, Unit], ids: List[String]) =
@@ -119,16 +121,16 @@ object Demo extends IOApp.Simple {
     withLogger[IO].use { implicit logger =>
       withStreamingClient[IO].use { implicit client =>
         for {
-          result         <- client.request(Query)
+          result         <- client.request[ErrorPolicy.Raise](Query)
           _              <- IO.println(result)
-          subscription   <- client.subscribe(Subscription).allocated
+          subscription   <- client.subscribe[ErrorPolicy.Raise](Subscription).allocated
           (stream, close) = subscription
           fiber          <- stream.evalTap(_ => IO.println("UPDATE!")).compile.drain.start
           _              <- mutator(client, (result \\ "id").map(_.as[String].toOption.get)).start
           _              <- IO.sleep(10.seconds)
           _              <- close
           _              <- fiber.join
-          result         <- client.request(Query)
+          result         <- client.request[ErrorPolicy.Raise](Query)
           _              <- IO.println(result)
 
         } yield ()

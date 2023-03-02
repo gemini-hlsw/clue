@@ -23,12 +23,12 @@ class TransactionalClientImpl[F[_]: Sync: TransactionalBackend: Logger, S](
   uri:     Uri,
   headers: Headers
 ) extends clue.TransactionalClient[F, S] {
-  override protected def requestInternal[D: Decoder](
+  override protected def requestInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String] = None,
     variables:     Option[Json] = None,
-    errorPolicy:   ErrorPolicy = ErrorPolicy.Raise
-  ): F[errorPolicy.ReturnType[D]] =
+    errorPolicy:   ErrorPolicyProcessor[D, R]
+  ): F[R] =
     TransactionalBackend[F]
       .request(uri, GraphQLRequest(document, operationName, variables), headers)
       .map(decode[GraphQLResponse[D]])
