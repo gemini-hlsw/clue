@@ -3,6 +3,7 @@
 
 package clue
 
+import cats.data.Ior
 import cats.effect.Ref
 import cats.effect.Temporal
 import cats.effect._
@@ -233,11 +234,18 @@ class ApolloClient[F[_], S, CP, CE](
   override protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String],
-    variables:     Option[Json]
-  ): F[D] = F.async[D] { cb =>
+    variables:     Option[Json],
+    errorPolicy:   ErrorPolicy = ErrorPolicy.Raise
+  ): F[errorPolicy.ReturnType[D]] = F.async[errorPolicy.ReturnType[D]] { cb =>
     startSubscription[D](document, operationName, variables).flatMap(
       _.stream.attempt
-        .evalMap(result => F.delay(cb(result)))
+        // FIXME Temporary implementation, for the moment errors are always raised despite errorPolicy
+        .evalMap(result =>
+          result.fold(
+            t => F.delay(cb(t.asLeft)),
+            data => errorPolicy.process(Ior.right(data)).map(r => cb(r.asRight))
+          )
+        )
         .compile
         .drain
         .as(none)
@@ -581,7 +589,8 @@ class ApolloClient[F[_], S, CP, CE](
       //       case Right(StreamingMessage.FromServer.DataJson(subscriptionId, data, errors)) =>
       // and pass just the errors to `emitError`
 //      val error = new ResponseException(json.hcursor.get[List[Json]]("errors").getOrElse(Nil))
-      val error = new ResponseException(json.asArray.fold(List(json))(_.toList))
+      // val error = new ResponseException(json.asArray.fold(List(json))(_.toList))
+      val error = new ResponseException(null)
       // TODO When an Error message is received, we terminate the stream and halt the subscription. Do we want that?
       s"Emitting error $error".traceF >> queue.offer(error.asLeft)
     }
