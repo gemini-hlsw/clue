@@ -26,10 +26,10 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.duration._
 import scala.util.Random
-import clue.ErrorPolicyInfo
+import clue.ErrorPolicy
 
 object Demo extends IOApp.Simple {
-  implicit private val defaultErrorPolicyInfo = ErrorPolicyInfo.ReturnAlwaysInfo
+  implicit private val defaultErrorPolicyInfo = ErrorPolicy.ReturnAlways
   // implicit private val defaultErrorPolicyInfo = ErrorPolicyInfo.RaiseAlwaysInfo
 
   object Query extends GraphQLOperation[Unit] {
@@ -105,7 +105,7 @@ object Demo extends IOApp.Simple {
       id     <- IO(ids(Random.between(0, ids.length)))
       status <- IO(allStatus(Random.between(0, allStatus.length)))
       _      <-
-        client.request(Mutation)(implicitly[ErrorPolicyInfo[_]])(
+        client.request(Mutation)(implicitly[ErrorPolicy])(
           Mutation.Variables(id, status)
         )
     } yield ()
@@ -133,7 +133,7 @@ object Demo extends IOApp.Simple {
           _              <- IO.sleep(10.seconds)
           _              <- close
           _              <- fiber.join
-          result         <- client.request(Query)(ErrorPolicyInfo.RaiseAlwaysInfo)
+          result         <- client.request(Query)(ErrorPolicy.RaiseAlways)
           _              <- IO.println(result)
 
         } yield ()
