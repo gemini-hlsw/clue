@@ -4,15 +4,15 @@
 package clue
 
 import cats.Applicative
-import cats.effect.Sync
 import cats.effect.Resource
+import cats.effect.Sync
 import cats.syntax.all._
+import clue.ErrorPolicy
 import io.circe._
 import io.circe.syntax._
 import org.http4s.Headers
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
-import clue.ErrorPolicy
 
 /**
  * A client that allows one-shot queries and mutations.

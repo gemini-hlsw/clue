@@ -4,6 +4,7 @@
 package clue
 
 import cats.data.Ior
+import cats.data.NonEmptyList
 import cats.effect.Ref
 import cats.effect.Temporal
 import cats.effect._
@@ -12,6 +13,7 @@ import cats.effect.std.Queue
 import cats.effect.std.UUIDGen
 import cats.syntax.all._
 import clue.GraphQLSubscription
+import clue.model.GraphQLError
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
 import clue.model.json._
@@ -24,8 +26,6 @@ import org.typelevel.log4cats.Logger
 
 import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
-import cats.data.NonEmptyList
-import clue.model.GraphQLError
 
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {

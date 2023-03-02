@@ -3,11 +3,11 @@
 
 package clue
 
+import cats.MonadThrow
 import cats.data.Ior
 import cats.data.NonEmptyList
-import clue.model.GraphQLError
 import cats.effect.Sync
-import cats.MonadThrow
+import clue.model.GraphQLError
 
 sealed trait ErrorPolicyInfo[A] {
   type ReturnType[D]

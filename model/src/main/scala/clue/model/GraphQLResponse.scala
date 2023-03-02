@@ -3,9 +3,9 @@
 
 package clue.model
 
+import cats.Eq
 import cats.data.Ior
 import cats.data.NonEmptyList
-import cats.Eq
 
 final case class GraphQLResponse[D](result: Ior[NonEmptyList[GraphQLError], D])
 

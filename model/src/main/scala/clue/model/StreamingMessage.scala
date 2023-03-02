@@ -4,9 +4,9 @@
 package clue.model
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.Json
-import cats.data.NonEmptyList
 
 /**
  * GraphQL web socket protocol streaming messages. Messages are cleanly divided in those coming
