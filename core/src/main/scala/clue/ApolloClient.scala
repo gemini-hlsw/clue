@@ -27,6 +27,7 @@ import org.typelevel.log4cats.Logger
 import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
 
+import clue.ErrorPolicyProcessor
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {
   val request: GraphQLRequest

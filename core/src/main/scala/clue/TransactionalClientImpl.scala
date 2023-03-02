@@ -14,6 +14,7 @@ import org.http4s.Headers
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
 
+import clue.ErrorPolicyProcessor
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
 // {
 //   "data": { ... }, // Typed

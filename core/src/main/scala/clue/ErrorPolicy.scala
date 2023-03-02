@@ -9,7 +9,7 @@ import cats.data.NonEmptyList
 import cats.effect.Sync
 import clue.model.GraphQLError
 
-sealed trait ErrorPolicyInfo[A] {
+sealed trait ErrorPolicy {
   type ReturnType[D]
 
   def processor[D]: ErrorPolicyProcessor[D, ReturnType[D]]
@@ -19,14 +19,15 @@ sealed trait ErrorPolicyProcessor[D, R] {
   def process[F[_]: Sync](result: Ior[NonEmptyList[GraphQLError], D]): F[R]
 }
 
-object ErrorPolicyInfo {
+object ErrorPolicy {
   protected sealed trait Distinct[D] extends ErrorPolicyProcessor[D, D] {
     protected def processData[F[_]: Sync, D](data: D): F[D] = Sync[F].delay(data)
     protected def processErrors[F[_]: MonadThrow, D](errors: NonEmptyList[GraphQLError]): F[D] =
       MonadThrow[F].raiseError(ResponseException(errors))
   }
 
-  implicit object IgoreOnDataInfo extends ErrorPolicyInfo[ErrorPolicy.IgnoreOnData] {
+  object IgoreOnData extends ErrorPolicy {
+    // implicit object IgoreOnDataInfo extends ErrorPolicyInfo[ErrorPolicy.IgnoreOnData] {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
@@ -39,7 +40,8 @@ object ErrorPolicyInfo {
     }
   }
 
-  implicit object RaiseInfo extends ErrorPolicyInfo[ErrorPolicy.Raise] {
+  object RaiseAlways extends ErrorPolicy {
+    // implicit object RaiseAlwaysInfo extends ErrorPolicyInfo[ErrorPolicy.RaiseAlways] {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
@@ -52,7 +54,8 @@ object ErrorPolicyInfo {
     }
   }
 
-  implicit object ReturnInfo extends ErrorPolicyInfo[ErrorPolicy.Return] {
+  object ReturnAlways extends ErrorPolicy {
+    // implicit object ReturnAlwaysInfo extends ErrorPolicyInfo[ErrorPolicy.ReturnAlways] {
     type ReturnType[D] = Ior[NonEmptyList[GraphQLError], D]
 
     def processor[D]: ErrorPolicyProcessor[D, Ior[NonEmptyList[GraphQLError], D]] =

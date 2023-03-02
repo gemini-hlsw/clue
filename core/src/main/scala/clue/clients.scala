@@ -7,12 +7,13 @@ import cats.Applicative
 import cats.effect.Resource
 import cats.effect.Sync
 import cats.syntax.all._
-import clue.ErrorPolicy
 import io.circe._
 import io.circe.syntax._
 import org.http4s.Headers
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
+
+import clue.ErrorPolicy
 
 /**
  * A client that allows one-shot queries and mutations.
@@ -40,24 +41,45 @@ trait TransactionalClient[F[_], S] {
     ): F[R] = applied.apply
   }
 
-  def request[EP](
-    operation:       GraphQLOperation[S],
-    operationName:   Option[String] = None
+  def request(
+    operation:     GraphQLOperation[S],
+    operationName: Option[String] = None
   )(implicit
-    errorPolicyInfo: ErrorPolicyInfo[EP]
+    errorPolicy:   ErrorPolicy
   ): RequestApplied[
     operation.Variables,
     operation.Data,
-    errorPolicyInfo.ReturnType[operation.Data]
+    errorPolicy.ReturnType[operation.Data]
   ] = {
     import operation.implicits._
-    RequestApplied(operation, operationName, errorPolicyInfo.processor[operation.Data])
+    RequestApplied(operation, operationName, errorPolicy.processor[operation.Data])
   }
 
-  def request_(
-    operation:     GraphQLOperation[S],
-    operationName: Option[String] = None
-  ) = request[ErrorPolicy.Raise](operation, operationName)
+  // def request(
+  //   operation:       GraphQLOperation[S],
+  //   operationName:   Option[String] = None
+  // )(variables:       operation.Variables)(implicit
+  //   errorPolicyInfo: ErrorPolicy
+  // ): F[
+  //   errorPolicyInfo.ReturnType[operation.Data]
+  // ] = {
+  //   import operation.implicits._
+  //   RequestApplied(operation, operationName, errorPolicyInfo.processor[operation.Data])
+  //     .apply(variables)
+  // }
+
+  // def request_[EP](
+  //   operation:          GraphQLOperation[S],
+  //   operationName:      Option[String] = None
+  // )(implicit epDefault: ErrorPolicy.Default[EP]): RequestApplied[
+  //   operation.Variables,
+  //   operation.Data,
+  //   epDefault.info.ReturnType[operation.Data]
+  // ] = {
+  //   import operation.implicits._
+  //   RequestApplied(operation, operationName, epDefault.info.processor[operation.Data])
+  // }
+  // request[EP](operation, operationName)(epDefault.info)
 
   protected def requestInternal[D: Decoder, R](
     document:      String,
@@ -111,24 +133,24 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
       applied.apply
   }
 
-  def subscribe[EP](
-    subscription:    GraphQLOperation[S],
-    operationName:   Option[String] = None
+  def subscribe(
+    subscription:  GraphQLOperation[S],
+    operationName: Option[String] = None
   )(implicit
-    errorPolicyInfo: ErrorPolicyInfo[EP]
+    errorPolicy:   ErrorPolicy
   ): SubscriptionApplied[
     subscription.Variables,
     subscription.Data,
-    errorPolicyInfo.ReturnType[subscription.Data]
+    errorPolicy.ReturnType[subscription.Data]
   ] = {
     import subscription.implicits._
-    SubscriptionApplied(subscription, operationName, errorPolicyInfo.processor[subscription.Data])
+    SubscriptionApplied(subscription, operationName, errorPolicy.processor[subscription.Data])
   }
 
-  def subscribe_(
-    subscription:  GraphQLOperation[S],
-    operationName: Option[String] = None
-  ) = subscribe[ErrorPolicy.Raise](subscription, operationName)
+  // def subscribe_(
+  //   subscription:  GraphQLOperation[S],
+  //   operationName: Option[String] = None
+  // ) = subscribe[ErrorPolicy.RaiseAlways](subscription, operationName)
 
   protected def subscribeInternal[D: Decoder, R](
     document:      String,
