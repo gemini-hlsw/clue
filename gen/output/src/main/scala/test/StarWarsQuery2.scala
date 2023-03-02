@@ -9,7 +9,6 @@ import clue.GraphQLOperation
 import test.StarWars
 import japgolly.scalajs.react.Dummy._
 
-import clue.ErrorPolicyInfo
 object Wrapper extends Something {
   
   object StarWarsQuery2 extends GraphQLOperation[StarWars] {
@@ -133,8 +132,7 @@ object Wrapper extends Something {
     }
     val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
     val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-    def query[F[_], EP](charId: String)(implicit client: clue.TransactionalClient[F, StarWars], errorPolicyInfo: clue.ErrorPolicy[EP]) = client.request(this)(errorPolicyInfo)(Variables(charId))
-    def query_[F[_]](charId: String)(implicit client: clue.TransactionalClient[F, StarWars]) = client.request_(this)(Variables(charId))
+    def query[F[_]](charId: String)(implicit client: clue.TransactionalClient[F, StarWars], errorPolicy: clue.ErrorPolicy) = client.request(this)(errorPolicy)(Variables(charId))
   }
 }
 // format: on

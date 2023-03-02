@@ -42,18 +42,31 @@ trait TransactionalClient[F[_], S] {
   }
 
   def request(
-    operation:       GraphQLOperation[S],
-    operationName:   Option[String] = None
+    operation:     GraphQLOperation[S],
+    operationName: Option[String] = None
   )(implicit
-    errorPolicyInfo: ErrorPolicy
+    errorPolicy:   ErrorPolicy
   ): RequestApplied[
     operation.Variables,
     operation.Data,
-    errorPolicyInfo.ReturnType[operation.Data]
+    errorPolicy.ReturnType[operation.Data]
   ] = {
     import operation.implicits._
-    RequestApplied(operation, operationName, errorPolicyInfo.processor[operation.Data])
+    RequestApplied(operation, operationName, errorPolicy.processor[operation.Data])
   }
+
+  // def request(
+  //   operation:       GraphQLOperation[S],
+  //   operationName:   Option[String] = None
+  // )(variables:       operation.Variables)(implicit
+  //   errorPolicyInfo: ErrorPolicy
+  // ): F[
+  //   errorPolicyInfo.ReturnType[operation.Data]
+  // ] = {
+  //   import operation.implicits._
+  //   RequestApplied(operation, operationName, errorPolicyInfo.processor[operation.Data])
+  //     .apply(variables)
+  // }
 
   // def request_[EP](
   //   operation:          GraphQLOperation[S],
@@ -121,17 +134,17 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
   }
 
   def subscribe(
-    subscription:    GraphQLOperation[S],
-    operationName:   Option[String] = None
+    subscription:  GraphQLOperation[S],
+    operationName: Option[String] = None
   )(implicit
-    errorPolicyInfo: ErrorPolicy
+    errorPolicy:   ErrorPolicy
   ): SubscriptionApplied[
     subscription.Variables,
     subscription.Data,
-    errorPolicyInfo.ReturnType[subscription.Data]
+    errorPolicy.ReturnType[subscription.Data]
   ] = {
     import subscription.implicits._
-    SubscriptionApplied(subscription, operationName, errorPolicyInfo.processor[subscription.Data])
+    SubscriptionApplied(subscription, operationName, errorPolicy.processor[subscription.Data])
   }
 
   // def subscribe_(

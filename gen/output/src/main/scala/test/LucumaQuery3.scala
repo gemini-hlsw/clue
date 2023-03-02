@@ -7,7 +7,6 @@ package test
 
 import clue.GraphQLOperation
 
-import clue.ErrorPolicyInfo
 
 object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
   import LucumaODB.Scalars._
@@ -86,7 +85,6 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
   }
   val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-  def query[F[_], EP]()(implicit client: clue.TransactionalClient[F, LucumaODB], errorPolicyInfo: clue.ErrorPolicy[EP]) = client.request(this)(errorPolicyInfo)(Variables())
-  def query_[F[_]]()(implicit client: clue.TransactionalClient[F, LucumaODB]) = client.request_(this)(Variables())
+  def query[F[_]]()(implicit client: clue.TransactionalClient[F, LucumaODB], errorPolicy: clue.ErrorPolicy) = client.request(this)(errorPolicy)(Variables())
 }
 // format: on

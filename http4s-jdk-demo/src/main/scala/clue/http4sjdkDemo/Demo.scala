@@ -29,8 +29,7 @@ import scala.util.Random
 import clue.ErrorPolicy
 
 object Demo extends IOApp.Simple {
-  implicit private val defaultErrorPolicyInfo = ErrorPolicy.ReturnAlways
-  // implicit private val defaultErrorPolicyInfo = ErrorPolicyInfo.RaiseAlwaysInfo
+  implicit private val DefaultErrorPolicy = ErrorPolicy.ReturnAlways
 
   object Query extends GraphQLOperation[Unit] {
     type Data      = Json
@@ -105,7 +104,9 @@ object Demo extends IOApp.Simple {
       id     <- IO(ids(Random.between(0, ids.length)))
       status <- IO(allStatus(Random.between(0, allStatus.length)))
       _      <-
-        client.request(Mutation)(implicitly[ErrorPolicy])(
+        client.request(Mutation)(
+          implicitly[ErrorPolicy]
+        )( // FIXME How can we avoid that implicitly here??? I guess contexts params in Scala 3 can help
           Mutation.Variables(id, status)
         )
     } yield ()
