@@ -11,6 +11,7 @@ import cats.effect.Resource
 import cats.effect.Sync
 import cats.syntax.all._
 import clue.ApolloWebSocketClient
+import clue.ErrorPolicy
 import clue.GraphQLOperation
 import clue.PersistentStreamingClient
 import clue.TransactionalClient
@@ -26,7 +27,6 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.duration._
 import scala.util.Random
-import clue.ErrorPolicy
 
 object Demo extends IOApp.Simple {
   implicit private val DefaultErrorPolicy = ErrorPolicy.ReturnAlways

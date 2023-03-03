@@ -24,7 +24,7 @@ trait ArbFromClient {
     Arbitrary {
       for {
         i <- arbitrary[String]
-        p <- arbitrary[GraphQLRequest]
+        p <- arbitrary[GraphQLRequest[Json]]
       } yield Start(i, p)
     }
 

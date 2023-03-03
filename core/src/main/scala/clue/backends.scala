@@ -6,6 +6,7 @@ package clue
 import cats.syntax.all._
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
+import io.circe.Encoder
 import org.http4s.Headers
 import org.http4s.Uri
 
@@ -13,7 +14,7 @@ import org.http4s.Uri
  * One-shot backend.
  */
 trait TransactionalBackend[F[_]] {
-  def request(uri: Uri, request: GraphQLRequest, headers: Headers): F[String]
+  def request[V: Encoder](uri: Uri, request: GraphQLRequest[V], headers: Headers): F[String]
 }
 
 object TransactionalBackend {

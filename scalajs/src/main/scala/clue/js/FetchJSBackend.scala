@@ -8,6 +8,7 @@ import cats.syntax.all._
 import clue._
 import clue.model.GraphQLRequest
 import clue.model.json._
+import io.circe.Encoder
 import io.circe.syntax._
 import org.http4s.Headers
 import org.http4s.Uri
@@ -28,9 +29,9 @@ object FetchMethod {
 }
 
 final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod) extends TransactionalBackend[F] {
-  def request(
+  def request[V: Encoder](
     uri:          Uri,
-    request:      GraphQLRequest,
+    request:      GraphQLRequest[V],
     fetchHeaders: Headers
   ): F[String] =
     Async[F].async_ { cb =>
@@ -48,7 +49,7 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod) extends Transa
                    }
             )
         case FetchMethod.GET  =>
-          val variables = request.variables.foldMap(v => s"&variables=${v.noSpaces}")
+          val variables = request.variables.foldMap(v => s"&variables=${v.asJson.noSpaces}")
           val op        = request.operationName.foldMap(o => s"&operationName=$o")
           Fetch
             .fetch(

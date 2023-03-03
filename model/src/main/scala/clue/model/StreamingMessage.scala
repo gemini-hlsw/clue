@@ -4,9 +4,10 @@
 package clue.model
 
 import cats.Eq
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.Json
+
+// FIXME This should go in json? Be named ApolloMessage?
 
 /**
  * GraphQL web socket protocol streaming messages. Messages are cleanly divided in those coming
@@ -64,10 +65,10 @@ object StreamingMessage {
      * @param payload
      *   the GraphQL request itself
      */
-    final case class Start(id: String, payload: GraphQLRequest)
+    final case class Start(id: String, payload: GraphQLRequest[Json])
         extends FromClient
         with Identifier
-        with Payload[GraphQLRequest]
+        with Payload[GraphQLRequest[Json]]
 
     object Start {
       implicit val EqStart: Eq[Start] =
@@ -132,12 +133,12 @@ object StreamingMessage {
      */
     case object ConnectionKeepAlive extends FromServer
 
-    final case class DataWrapper(data: Json, errors: Option[NonEmptyList[GraphQLError]] = none)
+    // final case class DataWrapper(data: Json, errors: Option[GraphQLErrors] = none)
 
-    object DataWrapper {
-      implicit val EqDataWrapper: Eq[DataWrapper] =
-        Eq.by(x => (x.data, x.errors))
-    }
+    // object DataWrapper {
+    //   implicit val EqDataWrapper: Eq[DataWrapper] =
+    //     Eq.by(x => (x.data, x.errors))
+    // }
 
     /**
      * GraphQL execution result from the server. The result is associated with an operation that was
@@ -148,10 +149,10 @@ object StreamingMessage {
      * @param payload
      *   GraphQL result
      */
-    final case class Data(id: String, payload: DataWrapper)
+    final case class Data(id: String, payload: GraphQLDataResponse[Json])
         extends FromServer
         with Identifier
-        with Payload[DataWrapper]
+        with Payload[GraphQLDataResponse[Json]]
 
     object Data {
       implicit val EqData: Eq[Data] =
@@ -173,10 +174,10 @@ object StreamingMessage {
      * @param payload
      *   error information
      */
-    final case class Error(id: String, payload: NonEmptyList[GraphQLError])
+    final case class Error(id: String, payload: GraphQLErrors)
         extends FromServer
         with Identifier
-        with Payload[NonEmptyList[GraphQLError]]
+        with Payload[GraphQLErrors]
 
     object Error {
       implicit val EqError: Eq[Error] =

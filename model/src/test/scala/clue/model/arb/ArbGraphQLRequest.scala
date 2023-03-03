@@ -10,7 +10,7 @@ import org.scalacheck._
 
 trait ArbGraphQLRequest {
 
-  val arbVariables: Arbitrary[Json] =
+  implicit val arbJsonVariables: Arbitrary[Json] =
     Arbitrary {
       arbitrary[List[(String, String)]].map { lst =>
         val kvs = lst.map { case (k, v) => (k, Json.fromString(v)) }
@@ -18,12 +18,12 @@ trait ArbGraphQLRequest {
       }
     }
 
-  implicit val arbGraphQLRequest: Arbitrary[GraphQLRequest] =
+  implicit def arbGraphQLRequest[V: Arbitrary]: Arbitrary[GraphQLRequest[V]] =
     Arbitrary {
       for {
         q <- arbitrary[String]
         o <- arbitrary[Option[String]]
-        v <- arbitrary[Option[Json]](arbOption(arbVariables))
+        v <- arbitrary[Option[V]]
       } yield GraphQLRequest(q, o, v)
     }
 

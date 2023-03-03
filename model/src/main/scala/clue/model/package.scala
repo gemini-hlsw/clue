@@ -1,15 +1,16 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package clue.model
+package clue
 
-import cats.Eq
 import cats.data.Ior
 import cats.data.NonEmptyList
+import io.circe.Json
 
-final case class GraphQLResponse[D](result: Ior[NonEmptyList[GraphQLError], D])
+package object model {
+  type GraphQLErrors = NonEmptyList[GraphQLError]
 
-object GraphQLResponse {
-  implicit def EqGraphQLResponse[D: Eq]: Eq[GraphQLResponse[D]] =
-    Eq.by(_.result)
+  type GraphQLCombinedResponse[D] = Ior[GraphQLErrors, D]
+
+  type GraphQLExtensions = Map[String, Json]
 }

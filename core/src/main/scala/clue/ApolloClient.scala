@@ -4,7 +4,6 @@
 package clue
 
 import cats.data.Ior
-import cats.data.NonEmptyList
 import cats.effect.Ref
 import cats.effect.Temporal
 import cats.effect._
@@ -12,8 +11,11 @@ import cats.effect.implicits._
 import cats.effect.std.Queue
 import cats.effect.std.UUIDGen
 import cats.syntax.all._
+import clue.ErrorPolicyProcessor
 import clue.GraphQLSubscription
-import clue.model.GraphQLError
+import clue.model.GraphQLCombinedResponse
+import clue.model.GraphQLDataResponse
+import clue.model.GraphQLErrors
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
 import clue.model.json._
@@ -26,14 +28,12 @@ import org.typelevel.log4cats.Logger
 
 import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
-
-import clue.ErrorPolicyProcessor
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {
-  val request: GraphQLRequest
+  val request: GraphQLRequest[Json]
 
-  def emitData(dataJson: Json, errors: Option[NonEmptyList[GraphQLError]]): F[Unit]
-  def emitErrors(errors: NonEmptyList[GraphQLError]): F[Unit]
+  def emitData(dataJson: Json, errors: Option[GraphQLErrors]): F[Unit]
+  def emitErrors(errors: GraphQLErrors): F[Unit]
   val halt: F[Unit]
 }
 
@@ -243,13 +243,7 @@ class ApolloClient[F[_], S, CP, CE](
   ): F[R] = F.async[R] { cb =>
     startSubscription[D, R](document, operationName, variables, errorPolicy).flatMap(
       _.stream.attempt
-        // FIXME Temporary implementation, for the moment errors are always raised despite errorPolicy
         .evalMap(result => F.delay(cb(result)))
-        //   result.fold(
-        //     t => F.delay(cb(t.asLeft)),
-        //     data => errorPolicy.process(Ior.right(data)).map(r => cb(r.asRight))
-        //   )
-        // )
         .compile
         .drain
         .as(none)
@@ -280,9 +274,8 @@ class ApolloClient[F[_], S, CP, CE](
               latch.complete(s"Initialization rejected by server: [$payload].".error).void
           case s => s -> s"Unexpected connection_error received from server.".warnF
         }
-      case Right(
-            StreamingMessage.FromServer
-              .Data(subscriptionId, StreamingMessage.FromServer.DataWrapper(data, errors))
+      case Right( // FIXME Response extensions are lost for now, we need new types to return them to the client.
+            StreamingMessage.FromServer.Data(subscriptionId, GraphQLDataResponse(data, errors, _))
           ) =>
         state.get.flatMap {
           case Initialized(stateConnectionId, _, subscriptions, _)
@@ -578,27 +571,27 @@ class ApolloClient[F[_], S, CP, CE](
       } yield ()
   }
 
-  private type DataQueueType[D] = Option[Ior[NonEmptyList[GraphQLError], D]]
+  private type DataQueueType[D] = Option[GraphQLCombinedResponse[D]]
 
   private case class QueueEmitter[D: Decoder](
     val queue:   Queue[F, DataQueueType[D]],
-    val request: GraphQLRequest
+    val request: GraphQLRequest[Json]
   ) extends Emitter[F] {
 
-    def emitData(dataJson: Json, errors: Option[NonEmptyList[GraphQLError]]): F[Unit] =
+    def emitData(dataJson: Json, errors: Option[GraphQLErrors]): F[Unit] =
       for {
         data <- F.delay(dataJson.as[D]).rethrow
         _    <- queue.offer(Ior.fromOptions(errors, data.some))
       } yield ()
 
-    def emitErrors(errors: NonEmptyList[GraphQLError]): F[Unit] =
+    def emitErrors(errors: GraphQLErrors): F[Unit] =
       s"Emitting error $errors".traceF >> queue.offer(Ior.left(errors).some)
 
     val halt: F[Unit] = queue.offer(none)
   }
 
   private def buildQueue[D: Decoder](
-    request: GraphQLRequest
+    request: GraphQLRequest[Json]
   ): F[(String, QueueEmitter[D])] =
     for {
       queue  <- Queue.unbounded[F, DataQueueType[D]]

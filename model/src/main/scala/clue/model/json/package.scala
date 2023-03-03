@@ -14,24 +14,26 @@ import io.circe.syntax._
  */
 package object json {
 
-  implicit val EncoderGraphQLRequest: Encoder[GraphQLRequest] =
+  implicit def encoderGraphQLRequest[V: Encoder]: Encoder[GraphQLRequest[V]] =
     Encoder.instance(a =>
       Json
         .obj(
           "query"         -> Json.fromString(a.query),
           "operationName" -> a.operationName.asJson,
-          "variables"     -> a.variables.asJson
+          "variables"     -> a.variables.asJson,
+          "extensions"    -> a.extensions.asJson
         )
         .dropNullValues
     )
 
-  implicit val DecoderGraphQLRequest: Decoder[GraphQLRequest] =
+  implicit def decoderGraphQLRequest[V: Decoder]: Decoder[GraphQLRequest[V]] =
     Decoder.instance(c =>
       for {
-        query         <- c.downField("query").as[String]
-        operationName <- c.downField("operationName").as[Option[String]]
-        variables     <- c.downField("variables").as[Option[Json]]
-      } yield GraphQLRequest(query, operationName, variables)
+        query         <- c.get[String]("query")
+        operationName <- c.get[Option[String]]("operationName")
+        variables     <- c.get[Option[V]]("variables")
+        extensions    <- c.get[Option[Map[String, Json]]]("extensions")
+      } yield GraphQLRequest(query, operationName, variables, extensions)
     )
 
   // ---- FromClient
@@ -50,7 +52,7 @@ package object json {
     Decoder.instance(c =>
       for {
         _ <- checkType(c, "connection_init")
-        p <- c.downField("payload").as[Map[String, Json]]
+        p <- c.get[Map[String, Json]]("payload")
       } yield ConnectionInit(p)
     )
 
@@ -67,8 +69,8 @@ package object json {
     Decoder.instance(c =>
       for {
         _ <- checkType(c, "start")
-        i <- c.downField("id").as[String]
-        p <- c.downField("payload").as[GraphQLRequest]
+        i <- c.get[String]("id")
+        p <- c.get[GraphQLRequest[Json]]("payload")
       } yield Start(i, p)
     )
 
@@ -84,7 +86,7 @@ package object json {
     Decoder.instance(c =>
       for {
         _ <- checkType(c, "stop")
-        i <- c.downField("id").as[String]
+        i <- c.get[String]("id")
       } yield Stop(i)
     )
 
@@ -101,8 +103,7 @@ package object json {
 
   implicit val DecoderFromClient: Decoder[StreamingMessage.FromClient] =
     Decoder.instance(c =>
-      c.downField("type")
-        .as[String]
+      c.get[String]("type")
         .flatMap {
           case "connection_init"      => Decoder[ConnectionInit].widen(c)
           case "start"                => Decoder[Start].widen(c)
@@ -135,29 +136,30 @@ package object json {
     Decoder.instance(c =>
       for {
         _ <- checkType(c, "connection_error")
-        p <- c.downField("payload").as[Json]
+        p <- c.get[Json]("payload")
       } yield ConnectionError(p)
     )
 
   implicit val DecoderConnectionKA: Decoder[ConnectionKeepAlive.type] =
     decodeCaseObject("ka", ConnectionKeepAlive)
 
-  implicit val EncoderDataWrapper: Encoder[DataWrapper] =
+  implicit def encoderGraphQLDataResponse[D: Encoder]: Encoder[GraphQLDataResponse[D]] =
     Encoder.instance(a =>
       Json
         .obj(
-          "data"   -> a.data,
+          "data"   -> a.data.asJson,
           "errors" -> a.errors.map(_.asJson).getOrElse(Json.Null)
         )
         .dropNullValues
     )
 
-  implicit val DecoderDataWrapper: Decoder[DataWrapper] =
+  implicit def decoderGraphQLDataResponse[D: Decoder]: Decoder[GraphQLDataResponse[D]] =
     Decoder.instance(c =>
       for {
-        data   <- c.downField("data").as[Json]
-        errors <- c.downField("errors").as[Option[NonEmptyList[GraphQLError]]]
-      } yield DataWrapper(data, errors)
+        data       <- c.get[D]("data")
+        errors     <- c.get[Option[GraphQLErrors]]("errors")
+        extensions <- c.get[Option[Map[String, Json]]]("extensions")
+      } yield GraphQLDataResponse(data, errors, extensions)
     )
 
   implicit val EncoderData: Encoder[Data] =
@@ -173,8 +175,8 @@ package object json {
     Decoder.instance(c =>
       for {
         _ <- checkType(c, "data")
-        i <- c.downField("id").as[String]
-        p <- c.downField("payload").as[DataWrapper]
+        i <- c.get[String]("id")
+        p <- c.get[GraphQLDataResponse[Json]]("payload")
       } yield Data(i, p)
     )
 
@@ -191,8 +193,8 @@ package object json {
     Decoder.instance(c =>
       for {
         _ <- checkType(c, "error")
-        i <- c.downField("id").as[String]
-        p <- c.downField("payload").as[NonEmptyList[GraphQLError]]
+        i <- c.get[String]("id")
+        p <- c.get[GraphQLErrors]("payload")
       } yield Error(i, p)
     )
 
@@ -208,7 +210,7 @@ package object json {
     Decoder.instance(c =>
       for {
         _ <- checkType(c, "complete")
-        i <- c.downField("id").as[String]
+        i <- c.get[String]("id")
       } yield Complete(i)
     )
 
@@ -224,8 +226,7 @@ package object json {
 
   implicit val DecoderFromServer: Decoder[StreamingMessage.FromServer] =
     Decoder.instance(c =>
-      c.downField("type")
-        .as[String]
+      c.get[String]("type")
         .flatMap {
           case "connection_ack"   => c.as[ConnectionAck.type]
           case "connection_error" => c.as[ConnectionError]
@@ -268,50 +269,44 @@ package object json {
       } yield GraphQLError.Location(line, column)
     )
 
-  private def optionalField[A: Encoder](name: String, a: A)(
-    predicate: A => Boolean
-  ): Option[(String, Json)] =
-    if (predicate(a)) (name, a.asJson).some else none
-
   implicit val EncoderGraphQLError: Encoder[GraphQLError] =
     Encoder.instance(a =>
-      Json.fromFields(
-        List(
-          ("message" -> a.message.asJson).some,
-          optionalField[List[GraphQLError.PathElement]]("path", a.path)(_.nonEmpty),
-          optionalField[List[GraphQLError.Location]]("locations", a.locations)(_.nonEmpty),
-          optionalField[Map[String, String]]("extensions", a.extensions)(_.nonEmpty)
-        ).flattenOption
-      )
+      Json
+        .obj(
+          "message"    -> a.message.asJson,
+          "path"       -> a.path.asJson,
+          "locations"  -> a.locations.asJson,
+          "extensions" -> a.extensions.asJson
+        )
+        .dropNullValues
     )
 
   implicit val DecoderGraphQLError: Decoder[GraphQLError] =
     Decoder.instance(c =>
       for {
         message    <- c.get[String]("message")
-        path       <- c.getOrElse[List[GraphQLError.PathElement]]("path")(List.empty)
-        locations  <- c.getOrElse[List[GraphQLError.Location]]("locations")(List.empty)
-        extensions <- c.getOrElse[Map[String, String]]("extensions")(Map.empty)
+        path       <- c.get[Option[NonEmptyList[GraphQLError.PathElement]]]("path")
+        locations  <- c.get[Option[NonEmptyList[GraphQLError.Location]]]("locations")
+        extensions <- c.get[Option[Map[String, Json]]]("extensions")
       } yield GraphQLError(message, path, locations, extensions)
     )
 
-  implicit def DecoderGraphQLResponse[D: Decoder]: Decoder[GraphQLResponse[D]] =
+  implicit def DecoderGraphQLCombinedResponse[D: Decoder]: Decoder[GraphQLCombinedResponse[D]] =
     Decoder.instance(c =>
       for {
         data   <- c.get[Option[D]]("data")
-        errors <- c.get[Option[NonEmptyList[GraphQLError]]]("errors")
+        errors <- c.get[Option[GraphQLErrors]]("errors")
         result <-
           Ior
             .fromOptions(errors, data)
-            .fold[Decoder.Result[GraphQLResponse[D]]](
-              DecodingFailure("Response didn't contain 'data' or 'errors' block", c.history).asLeft
-            )(GraphQLResponse(_).asRight)
+            .fold[Decoder.Result[GraphQLCombinedResponse[D]]](
+              DecodingFailure("Response doesn't contain 'data' or 'errors' block", c.history).asLeft
+            )(_.asRight)
       } yield result
     )
 
   private def checkType(c: HCursor, expected: String): Decoder.Result[Unit] =
-    c.downField("type")
-      .as[String]
+    c.get[String]("type")
       .filterOrElse(_ === expected, DecodingFailure(s"expected '$expected''", c.history))
       .void
 
