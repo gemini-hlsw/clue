@@ -170,5 +170,8 @@ lazy val sbtPlugin = project
     buildInfoOptions += BuildInfoOption.PackagePrivate,
     Test / test        := {
       scripted.toTask("").value
-    }
+    },
+    scripted           := scripted.dependsOn(genRules / publishLocal).evaluated,
+    scriptedLaunchOpts ++= Seq("-Xmx1024M", "-Dplugin.version=" + version.value),
+    scriptedBufferLog  := false
   )
