@@ -3,10 +3,11 @@
 
 package clue
 
-import cats.syntax.all._
 import cats.MonadThrow
 import cats.data.Ior
 import cats.effect.Sync
+import cats.syntax.all._
+import clue.model.GraphQLCombinedResponse
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLErrors
 
@@ -17,7 +18,7 @@ sealed trait ErrorPolicy {
 }
 
 sealed trait ErrorPolicyProcessor[D, R] {
-  def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[R]
+  def process[F[_]: Sync](result: GraphQLCombinedResponse[D]): F[R]
 }
 
 object ErrorPolicy {
@@ -31,7 +32,7 @@ object ErrorPolicy {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
-      def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[D] =
+      def process[F[_]: Sync](result: GraphQLCombinedResponse[D]): F[D] =
         result match {
           case Ior.Left(errors)  => processErrors(errors)
           case Ior.Right(data)   => processData(data)
@@ -44,7 +45,7 @@ object ErrorPolicy {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
-      def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[ReturnType[D]] =
+      def process[F[_]: Sync](result: GraphQLCombinedResponse[D]): F[ReturnType[D]] =
         result match {
           case Ior.Left(errors)    => processErrors(errors)
           case Ior.Right(data)     => processData(data)
@@ -54,12 +55,12 @@ object ErrorPolicy {
   }
 
   object ReturnAlways extends ErrorPolicy {
-    type ReturnType[D] = Ior[GraphQLErrors, D]
+    type ReturnType[D] = GraphQLCombinedResponse[D]
 
-    def processor[D]: ErrorPolicyProcessor[D, Ior[GraphQLErrors, D]] =
-      new ErrorPolicyProcessor[D, Ior[GraphQLErrors, D]] {
+    def processor[D]: ErrorPolicyProcessor[D, GraphQLCombinedResponse[D]] =
+      new ErrorPolicyProcessor[D, GraphQLCombinedResponse[D]] {
 
-        def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[ReturnType[D]] =
+        def process[F[_]: Sync](result: GraphQLCombinedResponse[D]): F[ReturnType[D]] =
           Sync[F].delay(result)
       }
   }
@@ -70,7 +71,7 @@ object ErrorPolicy {
     def processor[D]: ErrorPolicyProcessor[D, GraphQLDataResponse[D]] =
       new ErrorPolicyProcessor[D, GraphQLDataResponse[D]] {
 
-        def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[ReturnType[D]] =
+        def process[F[_]: Sync](result: GraphQLCombinedResponse[D]): F[ReturnType[D]] =
           result match {
             case Ior.Left(errors)       => MonadThrow[F].raiseError(ResponseException(errors))
             case Ior.Right(data)        => Sync[F].delay(GraphQLDataResponse(data, none))

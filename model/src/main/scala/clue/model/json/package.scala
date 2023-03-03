@@ -294,8 +294,7 @@ package object json {
       } yield GraphQLError(message, path, locations, extensions)
     )
 
-  implicit def DecoderGraphQLTransactionalResponse[D: Decoder]
-    : Decoder[GraphQLTransactionalResponse[D]] =
+  implicit def DecoderGraphQLCombinedResponse[D: Decoder]: Decoder[GraphQLCombinedResponse[D]] =
     Decoder.instance(c =>
       for {
         data   <- c.get[Option[D]]("data")
@@ -303,9 +302,9 @@ package object json {
         result <-
           Ior
             .fromOptions(errors, data)
-            .fold[Decoder.Result[GraphQLTransactionalResponse[D]]](
-              DecodingFailure("Response didn't contain 'data' or 'errors' block", c.history).asLeft
-            )(GraphQLTransactionalResponse(_).asRight)
+            .fold[Decoder.Result[GraphQLCombinedResponse[D]]](
+              DecodingFailure("Response doesn't contain 'data' or 'errors' block", c.history).asLeft
+            )(_.asRight)
       } yield result
     )
 

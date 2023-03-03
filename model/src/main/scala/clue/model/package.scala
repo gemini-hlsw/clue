@@ -3,8 +3,11 @@
 
 package clue
 
+import cats.data.Ior
 import cats.data.NonEmptyList
 
 package object model {
   type GraphQLErrors = NonEmptyList[GraphQLError]
+
+  type GraphQLCombinedResponse[D] = Ior[GraphQLErrors, D]
 }

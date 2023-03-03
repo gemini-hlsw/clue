@@ -11,7 +11,9 @@ import cats.effect.implicits._
 import cats.effect.std.Queue
 import cats.effect.std.UUIDGen
 import cats.syntax.all._
+import clue.ErrorPolicyProcessor
 import clue.GraphQLSubscription
+import clue.model.GraphQLCombinedResponse
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLErrors
 import clue.model.GraphQLRequest
@@ -26,8 +28,6 @@ import org.typelevel.log4cats.Logger
 
 import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
-
-import clue.ErrorPolicyProcessor
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {
   val request: GraphQLRequest
@@ -243,13 +243,7 @@ class ApolloClient[F[_], S, CP, CE](
   ): F[R] = F.async[R] { cb =>
     startSubscription[D, R](document, operationName, variables, errorPolicy).flatMap(
       _.stream.attempt
-        // FIXME Temporary implementation, for the moment errors are always raised despite errorPolicy
         .evalMap(result => F.delay(cb(result)))
-        //   result.fold(
-        //     t => F.delay(cb(t.asLeft)),
-        //     data => errorPolicy.process(Ior.right(data)).map(r => cb(r.asRight))
-        //   )
-        // )
         .compile
         .drain
         .as(none)
@@ -577,7 +571,7 @@ class ApolloClient[F[_], S, CP, CE](
       } yield ()
   }
 
-  private type DataQueueType[D] = Option[Ior[GraphQLErrors, D]]
+  private type DataQueueType[D] = Option[GraphQLCombinedResponse[D]]
 
   private case class QueueEmitter[D: Decoder](
     val queue:   Queue[F, DataQueueType[D]],

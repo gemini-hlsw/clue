@@ -5,16 +5,15 @@ package clue
 
 import cats.effect.Sync
 import cats.syntax.all._
+import clue.ErrorPolicyProcessor
+import clue.model.GraphQLCombinedResponse
 import clue.model.GraphQLRequest
-import clue.model.GraphQLTransactionalResponse
 import clue.model.json._
 import io.circe._
 import io.circe.parser._
 import org.http4s.Headers
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
-
-import clue.ErrorPolicyProcessor
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
 // {
 //   "data": { ... }, // Typed
@@ -32,8 +31,8 @@ class TransactionalClientImpl[F[_]: Sync: TransactionalBackend: Logger, S](
   ): F[R] =
     TransactionalBackend[F]
       .request(uri, GraphQLRequest(document, operationName, variables), headers)
-      .map(decode[GraphQLTransactionalResponse[D]])
+      .map(decode[GraphQLCombinedResponse[D]])
       .rethrow
-      .flatMap(response => errorPolicy.process(response.result))
+      .flatMap(errorPolicy.process(_))
       .onError(_.warnF("Error executing query:"))
 }
