@@ -5,6 +5,7 @@ package clue.model.arb
 
 import clue.model.StreamingMessage.FromServer
 import clue.model.StreamingMessage.FromServer._
+import clue.model.GraphQLExtensions
 import io.circe.Json
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
@@ -12,6 +13,7 @@ import org.scalacheck.Gen
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLError
 import cats.data.NonEmptyList
+import clue.model.arb.ArbJsonStringObj._
 
 trait ArbFromServer {
   import ArbJson._
@@ -59,8 +61,13 @@ trait ArbFromServer {
         message    <- arbitrary[String]
         path       <- arbitrary[List[GraphQLError.PathElement]]
         locations  <- arbitrary[List[GraphQLError.Location]]
-        extensions <- arbitrary[Map[String, String]]
-      } yield GraphQLError(message, path, locations, extensions)
+        extensions <- arbitrary[Option[GraphQLExtensions]]
+      } yield GraphQLError(
+        message,
+        NonEmptyList.fromList(path),
+        NonEmptyList.fromList(locations),
+        extensions
+      )
     }
 
   implicit val arbConnectionError: Arbitrary[ConnectionError] =
@@ -71,9 +78,10 @@ trait ArbFromServer {
   implicit val arbDataWrapper: Arbitrary[GraphQLDataResponse[Json]] =
     Arbitrary {
       for {
-        data   <- arbitrary[Json](arbJsonString)
-        errors <- arbitrary[List[GraphQLError]]
-      } yield GraphQLDataResponse(data, NonEmptyList.fromList(errors))
+        data       <- arbitrary[Json](arbJsonString)
+        errors     <- arbitrary[List[GraphQLError]]
+        extensions <- arbitrary[Option[GraphQLExtensions]]
+      } yield GraphQLDataResponse(data, NonEmptyList.fromList(errors), extensions)
     }
 
   implicit val arbData: Arbitrary[Data] =

@@ -6,6 +6,8 @@ package arb
 
 import org.scalacheck.Arbitrary._
 import org.scalacheck._
+import cats.data.NonEmptyList
+import clue.model.arb.ArbJsonStringObj._
 
 trait ArbGraphQLError {
 
@@ -33,8 +35,13 @@ trait ArbGraphQLError {
         message    <- arbitrary[String]
         path       <- arbitrary[List[PathElement]]
         locations  <- arbitrary[List[Location]]
-        extensions <- arbitrary[Map[String, String]]
-      } yield GraphQLError(message, path, locations, extensions)
+        extensions <- arbitrary[Option[GraphQLExtensions]]
+      } yield GraphQLError(
+        message,
+        NonEmptyList.fromList(path),
+        NonEmptyList.fromList(locations),
+        extensions
+      )
     }
 
 }

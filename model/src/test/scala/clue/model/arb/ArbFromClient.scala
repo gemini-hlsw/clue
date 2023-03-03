@@ -10,6 +10,7 @@ import io.circe.Json
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
+import clue.model.arb.ArbJsonStringObj._
 
 trait ArbFromClient {
   import ArbGraphQLRequest._

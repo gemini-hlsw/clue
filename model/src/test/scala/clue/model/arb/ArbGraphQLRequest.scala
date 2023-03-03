@@ -4,19 +4,10 @@
 package clue.model.arb
 
 import clue.model.GraphQLRequest
-import io.circe._
 import org.scalacheck.Arbitrary._
 import org.scalacheck._
 
 trait ArbGraphQLRequest {
-
-  implicit val arbJsonVariables: Arbitrary[Json] =
-    Arbitrary {
-      arbitrary[List[(String, String)]].map { lst =>
-        val kvs = lst.map { case (k, v) => (k, Json.fromString(v)) }
-        Json.fromJsonObject(JsonObject.fromMap(kvs.toMap))
-      }
-    }
 
   implicit def arbGraphQLRequest[V: Arbitrary]: Arbitrary[GraphQLRequest[V]] =
     Arbitrary {
