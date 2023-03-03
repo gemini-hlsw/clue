@@ -13,6 +13,7 @@ import cats.effect.std.Queue
 import cats.effect.std.UUIDGen
 import cats.syntax.all._
 import clue.GraphQLSubscription
+import clue.model.GraphQLDataResponse
 import clue.model.GraphQLError
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
@@ -281,8 +282,7 @@ class ApolloClient[F[_], S, CP, CE](
           case s => s -> s"Unexpected connection_error received from server.".warnF
         }
       case Right(
-            StreamingMessage.FromServer
-              .Data(subscriptionId, StreamingMessage.FromServer.DataWrapper(data, errors))
+            StreamingMessage.FromServer.Data(subscriptionId, GraphQLDataResponse(data, errors))
           ) =>
         state.get.flatMap {
           case Initialized(stateConnectionId, _, subscriptions, _)

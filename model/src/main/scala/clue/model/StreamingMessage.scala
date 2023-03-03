@@ -132,12 +132,12 @@ object StreamingMessage {
      */
     case object ConnectionKeepAlive extends FromServer
 
-    final case class DataWrapper(data: Json, errors: Option[NonEmptyList[GraphQLError]] = none)
+    // final case class DataWrapper(data: Json, errors: Option[NonEmptyList[GraphQLError]] = none)
 
-    object DataWrapper {
-      implicit val EqDataWrapper: Eq[DataWrapper] =
-        Eq.by(x => (x.data, x.errors))
-    }
+    // object DataWrapper {
+    //   implicit val EqDataWrapper: Eq[DataWrapper] =
+    //     Eq.by(x => (x.data, x.errors))
+    // }
 
     /**
      * GraphQL execution result from the server. The result is associated with an operation that was
@@ -148,10 +148,10 @@ object StreamingMessage {
      * @param payload
      *   GraphQL result
      */
-    final case class Data(id: String, payload: DataWrapper)
+    final case class Data(id: String, payload: GraphQLDataResponse[Json])
         extends FromServer
         with Identifier
-        with Payload[DataWrapper]
+        with Payload[GraphQLDataResponse[Json]]
 
     object Data {
       implicit val EqData: Eq[Data] =

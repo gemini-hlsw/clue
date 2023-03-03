@@ -142,22 +142,22 @@ package object json {
   implicit val DecoderConnectionKA: Decoder[ConnectionKeepAlive.type] =
     decodeCaseObject("ka", ConnectionKeepAlive)
 
-  implicit val EncoderDataWrapper: Encoder[DataWrapper] =
+  implicit def encoderGraphQLDataResponse[D: Encoder]: Encoder[GraphQLDataResponse[D]] =
     Encoder.instance(a =>
       Json
         .obj(
-          "data"   -> a.data,
+          "data"   -> a.data.asJson,
           "errors" -> a.errors.map(_.asJson).getOrElse(Json.Null)
         )
         .dropNullValues
     )
 
-  implicit val DecoderDataWrapper: Decoder[DataWrapper] =
+  implicit def decoderGraphQLDataResponse[D: Decoder]: Decoder[GraphQLDataResponse[D]] =
     Decoder.instance(c =>
       for {
-        data   <- c.downField("data").as[Json]
+        data   <- c.downField("data").as[D]
         errors <- c.downField("errors").as[Option[NonEmptyList[GraphQLError]]]
-      } yield DataWrapper(data, errors)
+      } yield GraphQLDataResponse(data, errors)
     )
 
   implicit val EncoderData: Encoder[Data] =
@@ -174,7 +174,7 @@ package object json {
       for {
         _ <- checkType(c, "data")
         i <- c.downField("id").as[String]
-        p <- c.downField("payload").as[DataWrapper]
+        p <- c.downField("payload").as[GraphQLDataResponse[Json]]
       } yield Data(i, p)
     )
 
@@ -295,7 +295,8 @@ package object json {
       } yield GraphQLError(message, path, locations, extensions)
     )
 
-  implicit def DecoderGraphQLResponse[D: Decoder]: Decoder[GraphQLResponse[D]] =
+  implicit def DecoderGraphQLTransactionalResponse[D: Decoder]
+    : Decoder[GraphQLTransactionalResponse[D]] =
     Decoder.instance(c =>
       for {
         data   <- c.get[Option[D]]("data")
@@ -303,9 +304,9 @@ package object json {
         result <-
           Ior
             .fromOptions(errors, data)
-            .fold[Decoder.Result[GraphQLResponse[D]]](
+            .fold[Decoder.Result[GraphQLTransactionalResponse[D]]](
               DecodingFailure("Response didn't contain 'data' or 'errors' block", c.history).asLeft
-            )(GraphQLResponse(_).asRight)
+            )(GraphQLTransactionalResponse(_).asRight)
       } yield result
     )
 

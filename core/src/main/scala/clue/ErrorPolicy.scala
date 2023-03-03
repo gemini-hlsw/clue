@@ -27,7 +27,6 @@ object ErrorPolicy {
   }
 
   object IgoreOnData extends ErrorPolicy {
-    // implicit object IgoreOnDataInfo extends ErrorPolicyInfo[ErrorPolicy.IgnoreOnData] {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
@@ -41,7 +40,6 @@ object ErrorPolicy {
   }
 
   object RaiseAlways extends ErrorPolicy {
-    // implicit object RaiseAlwaysInfo extends ErrorPolicyInfo[ErrorPolicy.RaiseAlways] {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
@@ -55,7 +53,6 @@ object ErrorPolicy {
   }
 
   object ReturnAlways extends ErrorPolicy {
-    // implicit object ReturnAlwaysInfo extends ErrorPolicyInfo[ErrorPolicy.ReturnAlways] {
     type ReturnType[D] = Ior[NonEmptyList[GraphQLError], D]
 
     def processor[D]: ErrorPolicyProcessor[D, Ior[NonEmptyList[GraphQLError], D]] =

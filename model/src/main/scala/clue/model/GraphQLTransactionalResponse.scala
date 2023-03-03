@@ -7,9 +7,9 @@ import cats.Eq
 import cats.data.Ior
 import cats.data.NonEmptyList
 
-final case class GraphQLResponse[D](result: Ior[NonEmptyList[GraphQLError], D])
+final case class GraphQLTransactionalResponse[D](result: Ior[NonEmptyList[GraphQLError], D])
 
-object GraphQLResponse {
-  implicit def EqGraphQLResponse[D: Eq]: Eq[GraphQLResponse[D]] =
+object GraphQLTransactionalResponse {
+  implicit def EqGraphQLTransactionalResponse[D: Eq]: Eq[GraphQLTransactionalResponse[D]] =
     Eq.by(_.result)
 }

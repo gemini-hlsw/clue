@@ -6,7 +6,7 @@ package clue
 import cats.effect.Sync
 import cats.syntax.all._
 import clue.model.GraphQLRequest
-import clue.model.GraphQLResponse
+import clue.model.GraphQLTransactionalResponse
 import clue.model.json._
 import io.circe._
 import io.circe.parser._
@@ -32,7 +32,7 @@ class TransactionalClientImpl[F[_]: Sync: TransactionalBackend: Logger, S](
   ): F[R] =
     TransactionalBackend[F]
       .request(uri, GraphQLRequest(document, operationName, variables), headers)
-      .map(decode[GraphQLResponse[D]])
+      .map(decode[GraphQLTransactionalResponse[D]])
       .rethrow
       .flatMap(response => errorPolicy.process(response.result))
       .onError(_.warnF("Error executing query:"))

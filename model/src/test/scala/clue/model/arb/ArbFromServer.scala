@@ -9,6 +9,7 @@ import io.circe.Json
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
+import clue.model.GraphQLDataResponse
 import clue.model.GraphQLError
 import cats.data.NonEmptyList
 
@@ -67,19 +68,19 @@ trait ArbFromServer {
       arbitrary[Json](arbJsonString).map(ConnectionError(_))
     }
 
-  implicit val arbDataWrapper: Arbitrary[DataWrapper] =
+  implicit val arbDataWrapper: Arbitrary[GraphQLDataResponse[Json]] =
     Arbitrary {
       for {
         data   <- arbitrary[Json](arbJsonString)
         errors <- arbitrary[List[GraphQLError]]
-      } yield DataWrapper(data, NonEmptyList.fromList(errors))
+      } yield GraphQLDataResponse(data, NonEmptyList.fromList(errors))
     }
 
   implicit val arbData: Arbitrary[Data] =
     Arbitrary {
       for {
         i <- arbitrary[String]
-        p <- arbitrary[DataWrapper]
+        p <- arbitrary[GraphQLDataResponse[Json]]
       } yield Data(i, p)
     }
 
