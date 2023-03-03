@@ -28,6 +28,8 @@ final class Http4sWSBackend[F[_]: Concurrent](client: WSClient[F]) extends WebSo
     client
       .connectHighLevel(
         WSRequest(uri).withHeaders(Headers("Sec-WebSocket-Protocol" -> "graphql-ws"))
+        // Should we switch to "graphql-transport-ws"???
+        // We should be able to specify the transport protocol.
       )
       .allocated // TODO replace with allocatedCase
       .flatMap { case (connection, release) =>

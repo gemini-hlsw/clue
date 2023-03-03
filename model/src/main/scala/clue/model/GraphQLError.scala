@@ -4,17 +4,17 @@
 package clue.model
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.syntax.either._
 import cats.syntax.eq._
 import clue.model.GraphQLError.Location
 import clue.model.GraphQLError.PathElement
-import cats.data.NonEmptyList
 import io.circe.Json
 
 /**
  * A GraphQL error.
  *
- * See https://spec.graphql.org/June2018/#sec-Errors
+ * See https://spec.graphql.org/October2021/#sec-Errors
  *
  * @param message
  *   string description of the error
@@ -24,14 +24,14 @@ import io.circe.Json
  * @param locations
  *   lines and columns, in case the error can be associated to particular points in the requested
  *   GraphQL document
- * @param variables
- *   values corresponding to variables in the query
+ * @param extensions
+ *   values for protocol extension
  */
 final case class GraphQLError(
   message:    String,
   path:       Option[NonEmptyList[PathElement]],
   locations:  Option[NonEmptyList[Location]],
-  extensions: Option[Map[String, Json]] // In theory, there could be an empty `extensions` entry.
+  extensions: Option[GraphQLExtensions]
 )
 
 object GraphQLError {
@@ -84,12 +84,7 @@ object GraphQLError {
 
   implicit val EqGraphQLError: Eq[GraphQLError] =
     Eq.by { a =>
-      (
-        a.message,
-        a.path,
-        a.locations,
-        a.extensions
-      )
+      (a.message, a.path, a.locations, a.extensions)
     }
 
 }
