@@ -23,7 +23,8 @@ lazy val root = tlCrossRootProject
     genRules,
     genInput,
     genOutput,
-    genTests
+    genTests,
+    sbtPlugin
   )
   .settings(
     name := "clue"
@@ -161,10 +162,13 @@ lazy val sbtPlugin = project
   .in(file("sbt-plugin"))
   .enablePlugins(SbtPlugin, BuildInfoPlugin)
   .settings(
-    moduleName := "sbt-clue",
+    moduleName         := "sbt-clue",
     crossScalaVersions := List("2.12.17"),
     addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.10.4"),
-    buildInfoPackage := "clue.sbt",
-    buildInfoKeys := Seq[BuildInfoKey](version, organization, (genRules / moduleName)),
-    buildInfoOptions += BuildInfoOption.PackagePrivate
+    buildInfoPackage   := "clue.sbt",
+    buildInfoKeys      := Seq[BuildInfoKey](version, organization, genRules / moduleName),
+    buildInfoOptions += BuildInfoOption.PackagePrivate,
+    Test / test        := {
+      scripted.toTask("").value
+    }
   )
