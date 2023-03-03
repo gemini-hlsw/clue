@@ -5,9 +5,8 @@ package clue.model
 
 import cats.Eq
 import cats.data.Ior
-import cats.data.NonEmptyList
 
-final case class GraphQLTransactionalResponse[D](result: Ior[NonEmptyList[GraphQLError], D])
+final case class GraphQLTransactionalResponse[D](result: Ior[GraphQLErrors, D])
 
 object GraphQLTransactionalResponse {
   implicit def EqGraphQLTransactionalResponse[D: Eq]: Eq[GraphQLTransactionalResponse[D]] =

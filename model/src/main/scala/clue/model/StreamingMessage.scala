@@ -4,7 +4,6 @@
 package clue.model
 
 import cats.Eq
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.Json
 
@@ -132,7 +131,7 @@ object StreamingMessage {
      */
     case object ConnectionKeepAlive extends FromServer
 
-    // final case class DataWrapper(data: Json, errors: Option[NonEmptyList[GraphQLError]] = none)
+    // final case class DataWrapper(data: Json, errors: Option[GraphQLErrors] = none)
 
     // object DataWrapper {
     //   implicit val EqDataWrapper: Eq[DataWrapper] =
@@ -173,10 +172,10 @@ object StreamingMessage {
      * @param payload
      *   error information
      */
-    final case class Error(id: String, payload: NonEmptyList[GraphQLError])
+    final case class Error(id: String, payload: GraphQLErrors)
         extends FromServer
         with Identifier
-        with Payload[NonEmptyList[GraphQLError]]
+        with Payload[GraphQLErrors]
 
     object Error {
       implicit val EqError: Eq[Error] =

@@ -3,9 +3,7 @@
 
 package clue
 
-// import cats.syntax.traverse._
-import cats.data.NonEmptyList
-import clue.model.GraphQLError
+import clue.model.GraphQLErrors
 
 class GraphQLException(msg: String) extends Exception(msg)
 
@@ -15,20 +13,4 @@ case object DisconnectedException extends GraphQLException("Connection was close
 
 case class InvalidSubscriptionIdException(id: String)
     extends GraphQLException(s"Invalid subscription id: $id")
-
-// class ResponseException(errors: List[Json])
-// extends GraphQLException(errors.map(_.spaces2).mkString(",")) {
-case class ResponseException(errors: NonEmptyList[GraphQLError])
-    extends GraphQLException(errors.toString) {
-
-  // /**
-  //  * Decodes and returns the errors as a list of `GraphQLError` if possible.
-  //  *
-  //  * @return
-  //  *   None if there is a problem parsing the JSON as an array of GraphQLError,
-  //  *   Some(List[GraphQLError]) if successful
-  //  */
-  // def asGraphQLErrors: Option[List[GraphQLError]] =
-  //   errors.traverse(Decoder[GraphQLError].decodeJson).toOption
-
-}
+case class ResponseException(errors: GraphQLErrors) extends GraphQLException(errors.toString)

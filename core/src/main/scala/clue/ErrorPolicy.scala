@@ -3,11 +3,12 @@
 
 package clue
 
+import cats.syntax.all._
 import cats.MonadThrow
 import cats.data.Ior
-import cats.data.NonEmptyList
 import cats.effect.Sync
-import clue.model.GraphQLError
+import clue.model.GraphQLDataResponse
+import clue.model.GraphQLErrors
 
 sealed trait ErrorPolicy {
   type ReturnType[D]
@@ -16,21 +17,21 @@ sealed trait ErrorPolicy {
 }
 
 sealed trait ErrorPolicyProcessor[D, R] {
-  def process[F[_]: Sync](result: Ior[NonEmptyList[GraphQLError], D]): F[R]
+  def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[R]
 }
 
 object ErrorPolicy {
   protected sealed trait Distinct[D] extends ErrorPolicyProcessor[D, D] {
     protected def processData[F[_]: Sync, D](data: D): F[D] = Sync[F].delay(data)
-    protected def processErrors[F[_]: MonadThrow, D](errors: NonEmptyList[GraphQLError]): F[D] =
+    protected def processErrors[F[_]: MonadThrow, D](errors: GraphQLErrors): F[D] =
       MonadThrow[F].raiseError(ResponseException(errors))
   }
 
-  object IgoreOnData extends ErrorPolicy {
+  object IgnoreOnData extends ErrorPolicy {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
-      def process[F[_]: Sync](result: Ior[NonEmptyList[GraphQLError], D]): F[D] =
+      def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[D] =
         result match {
           case Ior.Left(errors)  => processErrors(errors)
           case Ior.Right(data)   => processData(data)
@@ -43,7 +44,7 @@ object ErrorPolicy {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
-      def process[F[_]: Sync](result: Ior[NonEmptyList[GraphQLError], D]): F[ReturnType[D]] =
+      def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[ReturnType[D]] =
         result match {
           case Ior.Left(errors)    => processErrors(errors)
           case Ior.Right(data)     => processData(data)
@@ -53,13 +54,29 @@ object ErrorPolicy {
   }
 
   object ReturnAlways extends ErrorPolicy {
-    type ReturnType[D] = Ior[NonEmptyList[GraphQLError], D]
+    type ReturnType[D] = Ior[GraphQLErrors, D]
 
-    def processor[D]: ErrorPolicyProcessor[D, Ior[NonEmptyList[GraphQLError], D]] =
-      new ErrorPolicyProcessor[D, Ior[NonEmptyList[GraphQLError], D]] {
+    def processor[D]: ErrorPolicyProcessor[D, Ior[GraphQLErrors, D]] =
+      new ErrorPolicyProcessor[D, Ior[GraphQLErrors, D]] {
 
-        def process[F[_]: Sync](result: Ior[NonEmptyList[GraphQLError], D]): F[ReturnType[D]] =
+        def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[ReturnType[D]] =
           Sync[F].delay(result)
+      }
+  }
+
+  object RaiseOnNoData extends ErrorPolicy {
+    type ReturnType[D] = GraphQLDataResponse[D]
+
+    def processor[D]: ErrorPolicyProcessor[D, GraphQLDataResponse[D]] =
+      new ErrorPolicyProcessor[D, GraphQLDataResponse[D]] {
+
+        def process[F[_]: Sync](result: Ior[GraphQLErrors, D]): F[ReturnType[D]] =
+          result match {
+            case Ior.Left(errors)       => MonadThrow[F].raiseError(ResponseException(errors))
+            case Ior.Right(data)        => Sync[F].delay(GraphQLDataResponse(data, none))
+            case Ior.Both(errors, data) => Sync[F].delay(GraphQLDataResponse(data, errors.some))
+          }
+
       }
   }
 }

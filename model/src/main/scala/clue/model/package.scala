@@ -6,5 +6,5 @@ package clue
 import cats.data.NonEmptyList
 
 package object model {
-  type GraphQLErrors = NonEmptyList1[GraphQLError]
+  type GraphQLErrors = NonEmptyList[GraphQLError]
 }

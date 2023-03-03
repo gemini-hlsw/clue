@@ -4,7 +4,6 @@
 package clue
 
 import cats.data.Ior
-import cats.data.NonEmptyList
 import cats.effect.Ref
 import cats.effect.Temporal
 import cats.effect._
@@ -14,7 +13,7 @@ import cats.effect.std.UUIDGen
 import cats.syntax.all._
 import clue.GraphQLSubscription
 import clue.model.GraphQLDataResponse
-import clue.model.GraphQLError
+import clue.model.GraphQLErrors
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
 import clue.model.json._
@@ -33,8 +32,8 @@ import clue.ErrorPolicyProcessor
 protected[clue] trait Emitter[F[_]] {
   val request: GraphQLRequest
 
-  def emitData(dataJson: Json, errors: Option[NonEmptyList[GraphQLError]]): F[Unit]
-  def emitErrors(errors: NonEmptyList[GraphQLError]): F[Unit]
+  def emitData(dataJson: Json, errors: Option[GraphQLErrors]): F[Unit]
+  def emitErrors(errors: GraphQLErrors): F[Unit]
   val halt: F[Unit]
 }
 
@@ -578,20 +577,20 @@ class ApolloClient[F[_], S, CP, CE](
       } yield ()
   }
 
-  private type DataQueueType[D] = Option[Ior[NonEmptyList[GraphQLError], D]]
+  private type DataQueueType[D] = Option[Ior[GraphQLErrors, D]]
 
   private case class QueueEmitter[D: Decoder](
     val queue:   Queue[F, DataQueueType[D]],
     val request: GraphQLRequest
   ) extends Emitter[F] {
 
-    def emitData(dataJson: Json, errors: Option[NonEmptyList[GraphQLError]]): F[Unit] =
+    def emitData(dataJson: Json, errors: Option[GraphQLErrors]): F[Unit] =
       for {
         data <- F.delay(dataJson.as[D]).rethrow
         _    <- queue.offer(Ior.fromOptions(errors, data.some))
       } yield ()
 
-    def emitErrors(errors: NonEmptyList[GraphQLError]): F[Unit] =
+    def emitErrors(errors: GraphQLErrors): F[Unit] =
       s"Emitting error $errors".traceF >> queue.offer(Ior.left(errors).some)
 
     val halt: F[Unit] = queue.offer(none)

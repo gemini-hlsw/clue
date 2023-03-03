@@ -4,7 +4,6 @@
 package clue.model
 
 import cats.data.Ior
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
@@ -156,7 +155,7 @@ package object json {
     Decoder.instance(c =>
       for {
         data   <- c.downField("data").as[D]
-        errors <- c.downField("errors").as[Option[NonEmptyList[GraphQLError]]]
+        errors <- c.downField("errors").as[Option[GraphQLErrors]]
       } yield GraphQLDataResponse(data, errors)
     )
 
@@ -192,7 +191,7 @@ package object json {
       for {
         _ <- checkType(c, "error")
         i <- c.downField("id").as[String]
-        p <- c.downField("payload").as[NonEmptyList[GraphQLError]]
+        p <- c.downField("payload").as[GraphQLErrors]
       } yield Error(i, p)
     )
 
@@ -300,7 +299,7 @@ package object json {
     Decoder.instance(c =>
       for {
         data   <- c.get[Option[D]]("data")
-        errors <- c.get[Option[NonEmptyList[GraphQLError]]]("errors")
+        errors <- c.get[Option[GraphQLErrors]]("errors")
         result <-
           Ior
             .fromOptions(errors, data)

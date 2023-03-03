@@ -4,9 +4,8 @@
 package clue.model
 
 import cats.Eq
-import cats.data.NonEmptyList
 
-final case class GraphQLDataResponse[D](data: D, errors: Option[NonEmptyList[GraphQLError]])
+final case class GraphQLDataResponse[D](data: D, errors: Option[GraphQLErrors])
 
 object GraphQLDataResponse {
   implicit def EqGraphQLDataResponse[D: Eq]: Eq[GraphQLDataResponse[D]] =
