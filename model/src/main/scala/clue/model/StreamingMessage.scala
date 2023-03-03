@@ -6,6 +6,7 @@ package clue.model
 import cats.Eq
 import cats.syntax.all._
 import io.circe.Json
+import io.circe.JsonObject
 
 // FIXME This should go in json? Be named ApolloMessage?
 
@@ -65,10 +66,10 @@ object StreamingMessage {
      * @param payload
      *   the GraphQL request itself
      */
-    final case class Start(id: String, payload: GraphQLRequest[Json])
+    final case class Start(id: String, payload: GraphQLRequest[JsonObject])
         extends FromClient
         with Identifier
-        with Payload[GraphQLRequest[Json]]
+        with Payload[GraphQLRequest[JsonObject]]
 
     object Start {
       implicit val EqStart: Eq[Start] =

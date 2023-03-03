@@ -3,7 +3,7 @@
 
 package clue.data
 
-import io.circe.Json
+// import io.circe.Json
 
 package object syntax {
   implicit final class AnyToInputOps[A](private val a: A) extends AnyVal {
@@ -15,7 +15,7 @@ package object syntax {
     def orUnassign: Input[A] = Input.orUnassign(a)
   }
 
-  implicit final class JsonOps(private val json: Json) extends AnyVal {
-    def deepDropIgnore: Json = json.foldWith(Input.dropIgnoreFolder)
-  }
+  // implicit final class JsonOps(private val json: Json) extends AnyVal {
+  //   def deepDropIgnore: Json = json.foldWith(Input.dropIgnoreFolder)
+  // }
 }

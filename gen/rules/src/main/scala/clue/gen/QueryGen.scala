@@ -175,11 +175,12 @@ trait QueryGen extends Generator {
     parentBody =>
       mustDefineType("Variables")(parentBody) match {
         case Skip            =>
-          addModuleDefs("Variables",
-                        config.catsEq,
-                        config.catsShow,
-                        scalaJSReactReuse = false,
-                        circeEncoder = true
+          addModuleDefs(
+            "Variables",
+            config.catsEq,
+            config.catsShow,
+            scalaJSReactReuse = false,
+            circeEncoder = true
           )(
             parentBody
           )
@@ -466,10 +467,11 @@ trait QueryGen extends Generator {
         .getOrElse(parentBody)
 
   protected val addVarEncoder: List[Stat] => List[Stat] =
-    addValRefIntoModule("varEncoder",
-                        "Variables",
-                        "jsonEncoderVariables",
-                        t"io.circe.Encoder[Variables]"
+    addValRefIntoModule(
+      "varEncoder",
+      "Variables",
+      "jsonEncoderVariables",
+      t"io.circe.Encoder.AsObject[Variables]"
     )
 
   protected val addDataDecoder: List[Stat] => List[Stat] =

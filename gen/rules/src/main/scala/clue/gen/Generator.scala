@@ -516,7 +516,7 @@ trait Generator {
 
     val encoderDef = Option.when(circeEncoder)(typeType match {
       case TypeType.CaseClass        =>
-        q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))"
+        q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder.AsObject[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJsonObject(clue.data.Input.dropIgnores)"
       case TypeType.Enum(enumValues) =>
         val cases: List[Case] =
           enumValues.map(enumValue =>
@@ -524,7 +524,7 @@ trait Generator {
           )
         q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.Encoder.encodeString.contramap[$n]{..case $cases}"
       case TypeType.Sum(_)           =>
-        q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.generic.semiauto.deriveEncoder[$n]"
+        q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder.AsObject[$n] = io.circe.generic.semiauto.deriveEncoder[$n]"
     })
 
     val decoderDef = Option.when(circeDecoder)(typeType match {

@@ -10,6 +10,8 @@ import io.circe.Json
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
+import io.circe.testing.instances._
+import io.circe.JsonObject
 
 trait ArbFromClient {
   import ArbGraphQLRequest._
@@ -24,7 +26,7 @@ trait ArbFromClient {
     Arbitrary {
       for {
         i <- arbitrary[String]
-        p <- arbitrary[GraphQLRequest[Json]]
+        p <- arbitrary[GraphQLRequest[JsonObject]]
       } yield Start(i, p)
     }
 
