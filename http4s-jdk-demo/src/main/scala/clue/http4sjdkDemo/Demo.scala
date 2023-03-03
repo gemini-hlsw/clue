@@ -37,8 +37,8 @@ object Demo extends IOApp.Simple {
 
     override val document: String = """
     |query {
-    |  observations(programId: "p-2") {
-    |    nodes {
+    |  observations(WHERE: {programId: {EQ: "p-2"}}) {
+    |    matches {
     |      id
     |      title
     |      status
@@ -71,13 +71,14 @@ object Demo extends IOApp.Simple {
     type Data = Json
     case class Variables(observationId: String, status: String)
 
-    override val document: String = """
+    override val document: String               = """
     |mutation ($observationId: ObservationId!, $status: ObsStatus!){
-    |  updateObservation(input: {observationId: $observationId, status: $status}) {
-    |    id
+    |  updateObservations(input: {WHERE: {id: {EQ: $observationId}}, SET: {status: $status}}) {
+    |    observations {
+    |      id
+    |    }
     |  }
     |}""".stripMargin
-
     override val varEncoder: Encoder[Variables] = deriveEncoder
 
     override val dataDecoder: Decoder[Data] = Decoder[Json]

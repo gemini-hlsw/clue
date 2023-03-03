@@ -4,7 +4,6 @@
 package clue.model
 
 import cats.Eq
-import io.circe.Json
 
 /**
  * A GraphQL response with data.

@@ -9,7 +9,6 @@ import cats.syntax.either._
 import cats.syntax.eq._
 import clue.model.GraphQLError.Location
 import clue.model.GraphQLError.PathElement
-import io.circe.Json
 
 /**
  * A GraphQL error.
