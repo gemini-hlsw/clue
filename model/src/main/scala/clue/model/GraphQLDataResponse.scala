@@ -8,6 +8,6 @@ import cats.Eq
 final case class GraphQLDataResponse[D](data: D, errors: Option[GraphQLErrors])
 
 object GraphQLDataResponse {
-  implicit def EqGraphQLDataResponse[D: Eq]: Eq[GraphQLDataResponse[D]] =
+  implicit def eqGraphQLDataResponse[D: Eq]: Eq[GraphQLDataResponse[D]] =
     Eq.by(x => (x.data, x.errors))
 }

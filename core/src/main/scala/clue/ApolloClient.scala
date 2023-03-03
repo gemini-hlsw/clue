@@ -30,7 +30,7 @@ import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {
-  val request: GraphQLRequest
+  val request: GraphQLRequest[Json]
 
   def emitData(dataJson: Json, errors: Option[GraphQLErrors]): F[Unit]
   def emitErrors(errors: GraphQLErrors): F[Unit]
@@ -575,7 +575,7 @@ class ApolloClient[F[_], S, CP, CE](
 
   private case class QueueEmitter[D: Decoder](
     val queue:   Queue[F, DataQueueType[D]],
-    val request: GraphQLRequest
+    val request: GraphQLRequest[Json]
   ) extends Emitter[F] {
 
     def emitData(dataJson: Json, errors: Option[GraphQLErrors]): F[Unit] =
@@ -591,7 +591,7 @@ class ApolloClient[F[_], S, CP, CE](
   }
 
   private def buildQueue[D: Decoder](
-    request: GraphQLRequest
+    request: GraphQLRequest[Json]
   ): F[(String, QueueEmitter[D])] =
     for {
       queue  <- Queue.unbounded[F, DataQueueType[D]]

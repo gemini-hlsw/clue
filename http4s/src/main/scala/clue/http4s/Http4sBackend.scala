@@ -7,6 +7,7 @@ import cats.effect._
 import clue._
 import clue.model.GraphQLRequest
 import clue.model.json._
+import io.circe.Encoder
 import io.circe.syntax._
 import org.http4s.Headers
 import org.http4s.MediaType
@@ -22,9 +23,9 @@ final class Http4sBackend[F[_]: Concurrent](val client: Client[F]) extends Trans
   object dsl extends Http4sClientDsl[F]
   import dsl._
 
-  def request(
+  def request[V: Encoder](
     uri:     Uri,
-    request: GraphQLRequest,
+    request: GraphQLRequest[V],
     headers: Headers
   ): F[String] =
     client.expect[String](

@@ -13,7 +13,7 @@ import io.circe.syntax._
  */
 package object json {
 
-  implicit val EncoderGraphQLRequest: Encoder[GraphQLRequest] =
+  implicit def encoderGraphQLRequest[V: Encoder]: Encoder[GraphQLRequest[V]] =
     Encoder.instance(a =>
       Json
         .obj(
@@ -24,12 +24,12 @@ package object json {
         .dropNullValues
     )
 
-  implicit val DecoderGraphQLRequest: Decoder[GraphQLRequest] =
+  implicit def decoderGraphQLRequest[V: Decoder]: Decoder[GraphQLRequest[V]] =
     Decoder.instance(c =>
       for {
         query         <- c.downField("query").as[String]
         operationName <- c.downField("operationName").as[Option[String]]
-        variables     <- c.downField("variables").as[Option[Json]]
+        variables     <- c.downField("variables").as[Option[V]]
       } yield GraphQLRequest(query, operationName, variables)
     )
 
@@ -67,7 +67,7 @@ package object json {
       for {
         _ <- checkType(c, "start")
         i <- c.downField("id").as[String]
-        p <- c.downField("payload").as[GraphQLRequest]
+        p <- c.downField("payload").as[GraphQLRequest[Json]]
       } yield Start(i, p)
     )
 

@@ -19,13 +19,10 @@ import org.typelevel.log4cats.Logger
  */
 trait TransactionalClient[F[_], S] {
 
-  case class RequestApplied[V, D, R] protected[TransactionalClient] (
+  case class RequestApplied[V: Encoder, D: Decoder, R] protected[TransactionalClient] (
     operation:     GraphQLOperation[S],
     operationName: Option[String],
     errorPolicy:   ErrorPolicyProcessor[D, R]
-  )(implicit
-    varEncoder:    Encoder[V],
-    dataDecoder:   Decoder[D]
   ) {
     def apply(variables: V): F[R] =
       requestInternal(operation.document, operationName, variables.asJson.some, errorPolicy)
@@ -53,32 +50,6 @@ trait TransactionalClient[F[_], S] {
     import operation.implicits._
     RequestApplied(operation, operationName, errorPolicy.processor[operation.Data])
   }
-
-  // def request(
-  //   operation:       GraphQLOperation[S],
-  //   operationName:   Option[String] = None
-  // )(variables:       operation.Variables)(implicit
-  //   errorPolicyInfo: ErrorPolicy
-  // ): F[
-  //   errorPolicyInfo.ReturnType[operation.Data]
-  // ] = {
-  //   import operation.implicits._
-  //   RequestApplied(operation, operationName, errorPolicyInfo.processor[operation.Data])
-  //     .apply(variables)
-  // }
-
-  // def request_[EP](
-  //   operation:          GraphQLOperation[S],
-  //   operationName:      Option[String] = None
-  // )(implicit epDefault: ErrorPolicy.Default[EP]): RequestApplied[
-  //   operation.Variables,
-  //   operation.Data,
-  //   epDefault.info.ReturnType[operation.Data]
-  // ] = {
-  //   import operation.implicits._
-  //   RequestApplied(operation, operationName, epDefault.info.processor[operation.Data])
-  // }
-  // request[EP](operation, operationName)(epDefault.info)
 
   protected def requestInternal[D: Decoder, R](
     document:      String,
@@ -111,13 +82,10 @@ object TransactionalClient {
  */
 trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
 
-  case class SubscriptionApplied[V, D, R] protected[StreamingClient] (
+  case class SubscriptionApplied[V: Encoder, D: Decoder, R] protected[StreamingClient] (
     subscription:  GraphQLOperation[S],
     operationName: Option[String] = None,
     errorPolicy:   ErrorPolicyProcessor[D, R]
-  )(implicit
-    varEncoder:    Encoder[V],
-    dataDecoder:   Decoder[D]
   ) {
     def apply(variables: V): Resource[F, fs2.Stream[F, R]] =
       subscribeInternal(subscription.document, operationName, variables.asJson.some, errorPolicy)

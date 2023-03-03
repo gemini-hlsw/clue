@@ -7,6 +7,8 @@ import cats.Eq
 import cats.syntax.all._
 import io.circe.Json
 
+// FIXME This should go in json? Be named ApolloMessage?
+
 /**
  * GraphQL web socket protocol streaming messages. Messages are cleanly divided in those coming
  * `FromClient` and those coming `FromServer`. See also
@@ -63,10 +65,10 @@ object StreamingMessage {
      * @param payload
      *   the GraphQL request itself
      */
-    final case class Start(id: String, payload: GraphQLRequest)
+    final case class Start(id: String, payload: GraphQLRequest[Json])
         extends FromClient
         with Identifier
-        with Payload[GraphQLRequest]
+        with Payload[GraphQLRequest[Json]]
 
     object Start {
       implicit val EqStart: Eq[Start] =
