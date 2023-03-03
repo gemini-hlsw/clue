@@ -8,16 +8,33 @@ import cats.syntax.either._
 import cats.syntax.eq._
 import clue.model.GraphQLError.Location
 import clue.model.GraphQLError.PathElement
+import cats.data.NonEmptyList
+import io.circe.Json
 
+/**
+ * A GraphQL error.
+ *
+ * See https://spec.graphql.org/June2018/#sec-Errors
+ *
+ * @param message
+ *   string description of the error
+ * @param path
+ *   list of path segments starting at the root of the response, in case the error can be associated
+ *   to a particular field in the GraphQL result
+ * @param locations
+ *   lines and columns, in case the error can be associated to particular points in the requested
+ *   GraphQL document
+ * @param variables
+ *   values corresponding to variables in the query
+ */
 final case class GraphQLError(
   message:    String,
-  path:       List[PathElement],
-  locations:  List[Location],
-  extensions: Map[String, String]
+  path:       Option[NonEmptyList[PathElement]],
+  locations:  Option[NonEmptyList[Location]],
+  extensions: Option[Map[String, Json]] // In theory, there could be an empty `extensions` entry.
 )
 
 object GraphQLError {
-
   sealed trait PathElement extends Product with Serializable {
 
     def toEither: Either[Int, String] =
@@ -31,7 +48,6 @@ object GraphQLError {
         case StringPathElement(e) => fs(e)
         case IntPathElement(e)    => fi(e)
       }
-
   }
 
   object PathElement {

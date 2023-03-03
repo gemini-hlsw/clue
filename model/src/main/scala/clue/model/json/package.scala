@@ -7,6 +7,7 @@ import cats.data.Ior
 import cats.syntax.all._
 import io.circe._
 import io.circe.syntax._
+import cats.data.NonEmptyList
 
 /**
  * JSON codecs for `clue.model`.
@@ -267,30 +268,25 @@ package object json {
       } yield GraphQLError.Location(line, column)
     )
 
-  private def optionalField[A: Encoder](name: String, a: A)(
-    predicate:                                A => Boolean
-  ): Option[(String, Json)] =
-    if (predicate(a)) (name, a.asJson).some else none
-
   implicit val EncoderGraphQLError: Encoder[GraphQLError] =
     Encoder.instance(a =>
-      Json.fromFields(
-        List(
-          ("message" -> a.message.asJson).some,
-          optionalField[List[GraphQLError.PathElement]]("path", a.path)(_.nonEmpty),
-          optionalField[List[GraphQLError.Location]]("locations", a.locations)(_.nonEmpty),
-          optionalField[Map[String, String]]("extensions", a.extensions)(_.nonEmpty)
-        ).flattenOption
-      )
+      Json
+        .obj(
+          "message"    -> a.message.asJson,
+          "path"       -> a.path.asJson,
+          "locations"  -> a.locations.asJson,
+          "extensions" -> a.extensions.asJson
+        )
+        .dropNullValues
     )
 
   implicit val DecoderGraphQLError: Decoder[GraphQLError] =
     Decoder.instance(c =>
       for {
         message    <- c.get[String]("message")
-        path       <- c.getOrElse[List[GraphQLError.PathElement]]("path")(List.empty)
-        locations  <- c.getOrElse[List[GraphQLError.Location]]("locations")(List.empty)
-        extensions <- c.getOrElse[Map[String, String]]("extensions")(Map.empty)
+        path       <- c.get[Option[NonEmptyList[GraphQLError.PathElement]]]("path")
+        locations  <- c.get[Option[NonEmptyList[GraphQLError.Location]]]("locations")
+        extensions <- c.get[Option[Map[String, Json]]]("extensions")
       } yield GraphQLError(message, path, locations, extensions)
     )
 
