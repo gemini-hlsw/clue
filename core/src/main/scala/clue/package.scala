@@ -11,33 +11,6 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.FiniteDuration
 
 package object clue {
-  // type ErrorPolicy
-
-  // object ErrorPolicy {
-  //   type IgnoreOnData <: ErrorPolicy
-  //   type RaiseAlways <: ErrorPolicy
-  //   type ReturnAlways <: ErrorPolicy
-  //   // TODO: Return when Data+Errors, but raise on only Errors, ret type: (D, Option[Errors]), we have this in messages!  ah but it's just json
-
-  //   trait Default[EP] {
-  //     // type Type = EP
-
-  //     implicit val info: ErrorPolicyInfo[EP]
-  //   }
-
-  //   // object Default {
-  //   //   private def make[EP](implicit epInfo: ErrorPolicyInfo[EP]): Default[EP] = new Default[EP] {
-  //   //     // type Type = EP
-
-  //   //     override implicit val info = epInfo
-  //   //   }
-
-  //   //   val IgnoreOnData = make[IgnoreOnData]
-  //   //   val RaiseAlways  = make[RaiseAlways]
-  //   //   val ReturnAlways = make[ReturnAlways]
-  //   // }
-  // }
-
   type CloseReason[CE]               = Either[Throwable, CE]
   // Int = Attempt #. Will only be 0 immediately after a close.
   // For first connection, it will be called the first time with 1, after 1st connection attempt.

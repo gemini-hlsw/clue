@@ -14,8 +14,4 @@ package object syntax {
     def orIgnore: Input[A]   = Input.orIgnore(a)
     def orUnassign: Input[A] = Input.orUnassign(a)
   }
-
-  // implicit final class JsonOps(private val json: Json) extends AnyVal {
-  //   def deepDropIgnore: Json = json.foldWith(Input.dropIgnoreFolder)
-  // }
 }

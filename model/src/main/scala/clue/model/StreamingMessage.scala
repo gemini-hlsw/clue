@@ -134,13 +134,6 @@ object StreamingMessage {
      */
     case object ConnectionKeepAlive extends FromServer
 
-    // final case class DataWrapper(data: Json, errors: Option[GraphQLErrors] = none)
-
-    // object DataWrapper {
-    //   implicit val EqDataWrapper: Eq[DataWrapper] =
-    //     Eq.by(x => (x.data, x.errors))
-    // }
-
     /**
      * GraphQL execution result from the server. The result is associated with an operation that was
      * previously started by a `Start` message with the associated `id`.
@@ -159,12 +152,6 @@ object StreamingMessage {
       implicit val EqData: Eq[Data] =
         Eq.by(a => (a.id, a.payload))
     }
-
-    // object DataJson {
-    //   def unapply(data: Data): Option[(String, Json, Option[Json])] = Some(
-    //     (data.id, data.payload.data, data.payload.errors)
-    //   )
-    // }
 
     /**
      * Server-provided error information for a failed GraphQL operation, previously started with a

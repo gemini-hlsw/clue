@@ -32,7 +32,7 @@ package object json {
         query         <- c.get[String]("query")
         operationName <- c.get[Option[String]]("operationName")
         variables     <- c.get[Option[V]]("variables")
-        extensions    <- c.get[Option[Map[String, Json]]]("extensions")
+        extensions    <- c.get[Option[GraphQLExtensions]]("extensions")
       } yield GraphQLRequest(query, operationName, variables, extensions)
     )
 
@@ -291,7 +291,7 @@ package object json {
         message    <- c.get[String]("message")
         path       <- c.get[Option[NonEmptyList[GraphQLError.PathElement]]]("path")
         locations  <- c.get[Option[NonEmptyList[GraphQLError.Location]]]("locations")
-        extensions <- c.get[Option[Map[String, Json]]]("extensions")
+        extensions <- c.get[Option[GraphQLExtensions]]("extensions")
       } yield GraphQLError(message, path, locations, extensions)
     )
 
