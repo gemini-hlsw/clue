@@ -30,7 +30,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 object Demo extends IOApp.Simple {
-  implicit private val DefaultErrorPolicy = ErrorPolicy.ReturnAlways
+  implicit private val DefaultErrorPolicy: ErrorPolicy.ReturnAlways.type = ErrorPolicy.ReturnAlways
 
   object Query extends GraphQLOperation[Unit] {
     type Data      = Json
