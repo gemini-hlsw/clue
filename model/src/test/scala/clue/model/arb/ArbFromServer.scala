@@ -13,7 +13,7 @@ import org.scalacheck.Gen
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLError
 import cats.data.NonEmptyList
-import clue.model.arb.ArbJsonStringObj._
+import io.circe.testing.instances._
 
 trait ArbFromServer {
   import ArbJson._

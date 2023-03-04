@@ -7,7 +7,7 @@ package arb
 import org.scalacheck.Arbitrary._
 import org.scalacheck._
 import cats.data.NonEmptyList
-import clue.model.arb.ArbJsonStringObj._
+import io.circe.testing.instances._
 
 trait ArbGraphQLError {
 

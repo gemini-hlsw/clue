@@ -12,11 +12,12 @@ import scala.meta._
 trait SchemaGen extends Generator {
   // Just make sure "object Scalars" exists.
   protected val addScalars: List[Stat] => List[Stat] =
-    addModuleDefs("Scalars",
-                  catsEq = false,
-                  catsShow = false,
-                  scalaJSReactReuse = false,
-                  bodyMod = _ :+ q"def ignoreUnusedImportScalars(): Unit = ()"
+    addModuleDefs(
+      "Scalars",
+      catsEq = false,
+      catsShow = false,
+      scalaJSReactReuse = false,
+      bodyMod = _ :+ q"def ignoreUnusedImportScalars(): Unit = ()"
     )
 
   protected def addEnums(schema: Schema, config: GraphQLGenConfig): List[Stat] => List[Stat] =
@@ -33,11 +34,12 @@ trait SchemaGen extends Generator {
             schema.types
               .collect { case EnumType(name, _, values) => Enum(name, values.map(_.name)) }
               .map(
-                _.addToParentBody(config.catsEq,
-                                  config.catsShow,
-                                  config.scalaJSReactReuse,
-                                  circeEncoder = true,
-                                  circeDecoder = true
+                _.addToParentBody(
+                  config.catsEq,
+                  config.catsShow,
+                  config.scalaJSReactReuse,
+                  circeEncoder = true,
+                  circeDecoder = true
                 )
               )
         )
@@ -67,11 +69,12 @@ trait SchemaGen extends Generator {
               )
             }
             .map(
-              _.addToParentBody(config.catsEq,
-                                config.catsShow,
-                                config.monocleLenses,
-                                scalaJSReactReuse = false,
-                                circeEncoder = true
+              _.addToParentBody(
+                config.catsEq,
+                config.catsShow,
+                config.monocleLenses,
+                scalaJSReactReuse = false,
+                circeEncoder = true
               )
             )
       )

@@ -70,7 +70,7 @@ package object json {
       for {
         _ <- checkType(c, "start")
         i <- c.get[String]("id")
-        p <- c.get[GraphQLRequest[Json]]("payload")
+        p <- c.get[GraphQLRequest[JsonObject]]("payload")
       } yield Start(i, p)
     )
 
@@ -146,11 +146,15 @@ package object json {
   implicit def encoderGraphQLDataResponse[D: Encoder]: Encoder[GraphQLDataResponse[D]] =
     Encoder.instance(a =>
       Json
-        .obj(
-          "data"   -> a.data.asJson,
-          "errors" -> a.errors.map(_.asJson).getOrElse(Json.Null)
+        .obj("data" -> a.data.asJson)
+        .deepMerge(
+          Json
+            .obj(
+              "errors"     -> a.errors.asJson,
+              "extensions" -> a.extensions.asJson
+            )
+            .dropNullValues
         )
-        .dropNullValues
     )
 
   implicit def decoderGraphQLDataResponse[D: Decoder]: Decoder[GraphQLDataResponse[D]] =
@@ -158,7 +162,7 @@ package object json {
       for {
         data       <- c.get[D]("data")
         errors     <- c.get[Option[GraphQLErrors]]("errors")
-        extensions <- c.get[Option[Map[String, Json]]]("extensions")
+        extensions <- c.get[Option[GraphQLExtensions]]("extensions")
       } yield GraphQLDataResponse(data, errors, extensions)
     )
 

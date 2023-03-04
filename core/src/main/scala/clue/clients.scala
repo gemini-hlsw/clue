@@ -19,13 +19,13 @@ import org.typelevel.log4cats.Logger
  */
 trait TransactionalClient[F[_], S] {
 
-  case class RequestApplied[V: Encoder, D: Decoder, R] protected[TransactionalClient] (
+  case class RequestApplied[V: Encoder.AsObject, D: Decoder, R] protected[TransactionalClient] (
     operation:     GraphQLOperation[S],
     operationName: Option[String],
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ) {
     def apply(variables: V): F[R] =
-      requestInternal(operation.document, operationName, variables.asJson.some, errorPolicy)
+      requestInternal(operation.document, operationName, variables.asJsonObject.some, errorPolicy)
 
     def apply: F[R] =
       requestInternal(operation.document, operationName, none, errorPolicy)
@@ -54,7 +54,7 @@ trait TransactionalClient[F[_], S] {
   protected def requestInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String] = None,
-    variables:     Option[Json] = None,
+    variables:     Option[JsonObject] = None,
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): F[R]
 }
@@ -82,13 +82,18 @@ object TransactionalClient {
  */
 trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
 
-  case class SubscriptionApplied[V: Encoder, D: Decoder, R] protected[StreamingClient] (
+  case class SubscriptionApplied[V: Encoder.AsObject, D: Decoder, R] protected[StreamingClient] (
     subscription:  GraphQLOperation[S],
     operationName: Option[String] = None,
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ) {
     def apply(variables: V): Resource[F, fs2.Stream[F, R]] =
-      subscribeInternal(subscription.document, operationName, variables.asJson.some, errorPolicy)
+      subscribeInternal(
+        subscription.document,
+        operationName,
+        variables.asJsonObject.some,
+        errorPolicy
+      )
 
     def apply: Resource[F, fs2.Stream[F, R]] =
       subscribeInternal(subscription.document, operationName, none, errorPolicy)
@@ -122,7 +127,7 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
   protected def subscribeInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String] = None,
-    variables:     Option[Json] = None,
+    variables:     Option[JsonObject] = None,
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): Resource[F, fs2.Stream[F, R]]
 }

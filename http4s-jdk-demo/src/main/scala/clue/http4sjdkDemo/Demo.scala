@@ -19,6 +19,7 @@ import clue.http4s.Http4sWSBackend
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
+import io.circe.JsonObject
 import io.circe.generic.semiauto._
 import org.http4s.implicits._
 import org.http4s.jdkhttpclient.JdkWSClient
@@ -33,7 +34,7 @@ object Demo extends IOApp.Simple {
 
   object Query extends GraphQLOperation[Unit] {
     type Data      = Json
-    type Variables = Json
+    type Variables = JsonObject
 
     override val document: String = """
     |query {
@@ -46,14 +47,14 @@ object Demo extends IOApp.Simple {
     |  }
     |}""".stripMargin
 
-    override val varEncoder: Encoder[Variables] = Encoder[Json]
+    override val varEncoder: Encoder.AsObject[Variables] = Encoder.AsObject[JsonObject]
 
     override val dataDecoder: Decoder[Data] = Decoder[Json]
   }
 
   object Subscription extends GraphQLOperation[Unit] {
     type Data      = Json
-    type Variables = Json
+    type Variables = JsonObject
 
     override val document: String = """
     |subscription {
@@ -62,7 +63,7 @@ object Demo extends IOApp.Simple {
     |  }
     |}""".stripMargin
 
-    override val varEncoder: Encoder[Variables] = Encoder[Json]
+    override val varEncoder: Encoder.AsObject[Variables] = Encoder.AsObject[JsonObject]
 
     override val dataDecoder: Decoder[Data] = Decoder[Json]
   }
@@ -71,7 +72,7 @@ object Demo extends IOApp.Simple {
     type Data = Json
     case class Variables(observationId: String, status: String)
 
-    override val document: String               = """
+    override val document: String                        = """
     |mutation ($observationId: ObservationId!, $status: ObsStatus!){
     |  updateObservations(input: {WHERE: {id: {EQ: $observationId}}, SET: {status: $status}}) {
     |    observations {
@@ -79,7 +80,7 @@ object Demo extends IOApp.Simple {
     |    }
     |  }
     |}""".stripMargin
-    override val varEncoder: Encoder[Variables] = deriveEncoder
+    override val varEncoder: Encoder.AsObject[Variables] = deriveEncoder
 
     override val dataDecoder: Decoder[Data] = Decoder[Json]
   }

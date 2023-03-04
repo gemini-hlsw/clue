@@ -30,7 +30,7 @@ import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
 // Interface for internally handling a subscription queue.
 protected[clue] trait Emitter[F[_]] {
-  val request: GraphQLRequest[Json]
+  val request: GraphQLRequest[JsonObject]
 
   def emitData(dataJson: Json, errors: Option[GraphQLErrors]): F[Unit]
   def emitErrors(errors: GraphQLErrors): F[Unit]
@@ -229,7 +229,7 @@ class ApolloClient[F[_], S, CP, CE](
   override protected def subscribeInternal[D: Decoder, R](
     subscription:  String,
     operationName: Option[String],
-    variables:     Option[Json],
+    variables:     Option[JsonObject],
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): Resource[F, fs2.Stream[F, R]] =
     subscriptionResource(subscription, operationName, variables, errorPolicy)
@@ -238,7 +238,7 @@ class ApolloClient[F[_], S, CP, CE](
   override protected def requestInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String],
-    variables:     Option[Json],
+    variables:     Option[JsonObject],
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): F[R] = F.async[R] { cb =>
     startSubscription[D, R](document, operationName, variables, errorPolicy).flatMap(
@@ -575,7 +575,7 @@ class ApolloClient[F[_], S, CP, CE](
 
   private case class QueueEmitter[D: Decoder](
     val queue:   Queue[F, DataQueueType[D]],
-    val request: GraphQLRequest[Json]
+    val request: GraphQLRequest[JsonObject]
   ) extends Emitter[F] {
 
     def emitData(dataJson: Json, errors: Option[GraphQLErrors]): F[Unit] =
@@ -591,7 +591,7 @@ class ApolloClient[F[_], S, CP, CE](
   }
 
   private def buildQueue[D: Decoder](
-    request: GraphQLRequest[Json]
+    request: GraphQLRequest[JsonObject]
   ): F[(String, QueueEmitter[D])] =
     for {
       queue  <- Queue.unbounded[F, DataQueueType[D]]
@@ -604,7 +604,7 @@ class ApolloClient[F[_], S, CP, CE](
   private def subscriptionResource[D: Decoder, R](
     subscription:  String,
     operationName: Option[String],
-    variables:     Option[Json],
+    variables:     Option[JsonObject],
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): Resource[F, fs2.Stream[F, R]] =
     Resource
@@ -617,7 +617,7 @@ class ApolloClient[F[_], S, CP, CE](
   private def startSubscription[D: Decoder, R](
     subscription:  String,
     operationName: Option[String],
-    variables:     Option[Json],
+    variables:     Option[JsonObject],
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): F[GraphQLSubscription[F, R]] =
     state.get.flatMap {

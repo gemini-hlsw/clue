@@ -154,7 +154,7 @@ object BasicQuery extends GraphQLOperation[StarWars] {
     implicit val showVariables: cats.Show[Variables] = cats.Show.fromToString
 
     // Circe typeclasses
-    implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
+    implicit val jsonEncoderVariables: io.circe.Encoder.AsObject[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJsonObject(clue.data.Input.dropIgnores)
   }
 
   // Operation result.
@@ -249,7 +249,7 @@ object BasicQuery extends GraphQLOperation[StarWars] {
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]
   }
 
-  override val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
+  override val varEncoder: io.circe.Encoder.AsObject[Variables] = Variables.jsonEncoderVariables
   override val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
 
   // A convenience parametrized method is generated.

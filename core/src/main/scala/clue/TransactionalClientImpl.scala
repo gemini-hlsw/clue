@@ -26,7 +26,7 @@ class TransactionalClientImpl[F[_]: Sync: TransactionalBackend: Logger, S](
   override protected def requestInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String] = None,
-    variables:     Option[Json] = None,
+    variables:     Option[JsonObject] = None,
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): F[R] =
     TransactionalBackend[F]

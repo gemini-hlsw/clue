@@ -23,8 +23,8 @@ import arb.ArbInput._
 
 case class SomeInput(value: Input[Int] = Ignore)
 object SomeInput {
-  implicit val someInputEncoder: Encoder[SomeInput] =
-    deriveEncoder[SomeInput].mapJson(_.deepDropIgnore)
+  implicit val someInputEncoder: Encoder.AsObject[SomeInput] =
+    deriveEncoder[SomeInput].mapJsonObject(Input.dropIgnores)
 
   implicit val someInputDecoder: Decoder[SomeInput] = Decoder.instance[SomeInput](
     _.downField("value").success
