@@ -742,6 +742,6 @@ object ApolloWebSocketClient {
     uri:                  Uri,
     name:                 String = "",
     reconnectionStrategy: ReconnectionStrategy[WebSocketCloseEvent] = ReconnectionStrategy.never
-  )(implicit backend:     WebSocketBackend[F]): F[ApolloWebSocketClient[F, S]] =
+  )(implicit backend: WebSocketBackend[F]): F[ApolloWebSocketClient[F, S]] =
     ApolloClient[F, S, WebSocketCloseParams, WebSocketCloseEvent](uri, name, reconnectionStrategy)
 }

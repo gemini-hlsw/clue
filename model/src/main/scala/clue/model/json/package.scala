@@ -246,7 +246,7 @@ package object json {
       } yield GraphQLError.Location(line, column)
 
   private def optionalField[A: Encoder](name: String, a: A)(
-    predicate:                                A => Boolean
+    predicate: A => Boolean
   ): Option[(String, Json)] =
     if (predicate(a)) (name, a.asJson).some else none
 
