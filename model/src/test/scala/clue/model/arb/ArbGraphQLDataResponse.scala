@@ -3,14 +3,14 @@
 
 package clue.model.arb
 
+import cats.data.NonEmptyList
 import clue.model.GraphQLDataResponse
-import clue.model.GraphQLExtensions
-import org.scalacheck.Arbitrary._
-import org.scalacheck._
 import clue.model.GraphQLError
+import clue.model.GraphQLExtensions
 import clue.model.arb.ArbGraphQLError._
 import io.circe.testing.instances._
-import cats.data.NonEmptyList
+import org.scalacheck.Arbitrary._
+import org.scalacheck._
 
 trait ArbGraphQLDataResponse {
 

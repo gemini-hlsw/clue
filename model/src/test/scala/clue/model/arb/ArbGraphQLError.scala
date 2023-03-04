@@ -4,10 +4,10 @@
 package clue.model
 package arb
 
-import org.scalacheck.Arbitrary._
-import org.scalacheck._
 import cats.data.NonEmptyList
 import io.circe.testing.instances._
+import org.scalacheck.Arbitrary._
+import org.scalacheck._
 
 trait ArbGraphQLError {
 

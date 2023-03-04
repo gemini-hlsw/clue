@@ -3,17 +3,18 @@
 
 package clue.model.arb
 
-import clue.model.StreamingMessage.FromServer
-import clue.model.StreamingMessage.FromServer._
-import clue.model.GraphQLExtensions
-import io.circe.Json
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary._
-import org.scalacheck.Gen
+import cats.data.NonEmptyList
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLError
-import cats.data.NonEmptyList
+import clue.model.StreamingMessage.FromServer
+import clue.model.StreamingMessage.FromServer._
+import io.circe.Json
 import io.circe.testing.instances._
+import org.scalacheck.Arbitrary._
+import org.scalacheck.Gen
+
+import clue.model.GraphQLExtensions
+import org.scalacheck.Arbitrary
 
 trait ArbFromServer {
   import ArbJson._

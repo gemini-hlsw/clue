@@ -5,10 +5,10 @@ package clue.model.json
 
 import clue.model.GraphQLRequest
 import clue.model.arb._
+import io.circe.JsonObject
 import io.circe.testing.CodecTests
 import io.circe.testing.instances._
 import munit.DisciplineSuite
-import io.circe.JsonObject
 
 final class GraphQLRequestJsonSpec extends DisciplineSuite {
   import ArbGraphQLRequest._
