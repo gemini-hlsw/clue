@@ -19,8 +19,8 @@ import org.typelevel.log4cats.Logger
 trait TransactionalClient[F[_], S] {
 
   case class RequestApplied[V, D] protected[TransactionalClient] (
-    operation:           GraphQLOperation[S],
-    operationName:       Option[String]
+    operation:     GraphQLOperation[S],
+    operationName: Option[String]
   )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
     def apply(variables: V): F[D] =
       requestInternal[D](operation.document, operationName, variables.asJson.some)
@@ -50,9 +50,9 @@ trait TransactionalClient[F[_], S] {
 
 object TransactionalClient {
   def of[F[_], S](uri: Uri, name: String = "", headers: Headers = Headers.empty)(implicit
-    F:                 MonadError[F, Throwable],
-    backend:           TransactionalBackend[F],
-    logger:            Logger[F]
+    F:       MonadError[F, Throwable],
+    backend: TransactionalBackend[F],
+    logger:  Logger[F]
   ): F[TransactionalClient[F, S]] = {
     val logPrefix = s"clue.TransactionalClient[${if (name.isEmpty) uri else name}]"
 
@@ -72,8 +72,8 @@ object TransactionalClient {
 trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
 
   case class SubscriptionApplied[V, D] protected[StreamingClient] (
-    subscription:        GraphQLOperation[S],
-    operationName:       Option[String] = None
+    subscription:  GraphQLOperation[S],
+    operationName: Option[String] = None
   )(implicit varEncoder: Encoder[V], dataDecoder: Decoder[D]) {
     def apply(variables: V): Resource[F, fs2.Stream[F, D]] =
       subscribeInternal[D](subscription.document, operationName, variables.asJson.some)

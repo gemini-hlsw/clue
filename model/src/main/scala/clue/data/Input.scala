@@ -157,7 +157,7 @@ object Input {
 
     override def traverse[F[_], A, B](
       fa: Input[A]
-    )(f:  A => F[B])(implicit F: Applicative[F]): F[Input[B]] =
+    )(f: A => F[B])(implicit F: Applicative[F]): F[Input[B]] =
       fa match {
         case Ignore    => F.pure(Ignore)
         case Unassign  => F.pure(Unassign)

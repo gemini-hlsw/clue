@@ -52,12 +52,12 @@ package object clue {
 
   final implicit class ThrowableOps(val t: Throwable) extends AnyVal {
     def raiseF[F[_]](
-      msg:        String
+      msg: String
     )(implicit F: MonadError[F, Throwable], logger: Logger[F]): F[Unit] =
       logger.error(t)(msg) >> F.raiseError(t)
 
     def logF[F[_]](
-      msg:             String
+      msg: String
     )(implicit logger: Logger[F]): F[Unit] =
       logger.error(t)(msg)
 
