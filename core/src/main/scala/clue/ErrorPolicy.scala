@@ -73,7 +73,6 @@ object ErrorPolicy {
 
         def process[F[_]: Sync](result: GraphQLCombinedResponse[D]): F[ReturnType[D]] =
           result match {
-            // FIXME Response extensions are lost for now, we need new types to return them to the client in the other cases.
             case Ior.Left(errors)       => MonadThrow[F].raiseError(ResponseException(errors))
             case Ior.Right(data)        => Sync[F].delay(GraphQLDataResponse(data, none, none))
             case Ior.Both(errors, data) =>

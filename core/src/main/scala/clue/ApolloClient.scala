@@ -274,7 +274,7 @@ class ApolloClient[F[_], S, CP, CE](
               latch.complete(s"Initialization rejected by server: [$payload].".error).void
           case s => s -> s"Unexpected connection_error received from server.".warnF
         }
-      case Right( // FIXME Response extensions are lost for now, we need new types to return them to the client.
+      case Right(
             StreamingMessage.FromServer.Data(subscriptionId, GraphQLDataResponse(data, errors, _))
           ) =>
         state.get.flatMap {
