@@ -8,9 +8,8 @@ import clue.model.arb._
 import io.circe.JsonObject
 import io.circe.testing.CodecTests
 import io.circe.testing.instances._
-import munit.DisciplineSuite
 
-final class GraphQLRequestJsonSpec extends DisciplineSuite {
+final class GraphQLRequestJsonSpec extends ListLimitingDisciplineSuite {
   import ArbGraphQLRequest._
 
   checkAll("GraphQLRequest", CodecTests[GraphQLRequest[JsonObject]].codec)

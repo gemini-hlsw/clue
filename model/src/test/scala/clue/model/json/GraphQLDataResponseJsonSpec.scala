@@ -8,9 +8,8 @@ import clue.model.arb._
 import io.circe.Json
 import io.circe.testing.CodecTests
 import io.circe.testing.instances._
-import munit.DisciplineSuite
 
-final class GraphQLDataResponseJsonSpec extends DisciplineSuite {
+final class GraphQLDataResponseJsonSpec extends ListLimitingDisciplineSuite {
   import ArbGraphQLDataResponse._
 
   checkAll("GraphQLDataResponse", CodecTests[GraphQLDataResponse[Json]].codec)
