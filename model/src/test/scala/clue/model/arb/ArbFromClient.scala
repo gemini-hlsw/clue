@@ -10,9 +10,8 @@ import io.circe.Json
 import io.circe.JsonObject
 import io.circe.testing.instances._
 import org.scalacheck.Arbitrary
-import org.scalacheck.Gen
-
 import org.scalacheck.Arbitrary._
+import org.scalacheck.Gen
 
 trait ArbFromClient {
   import ArbGraphQLRequest._

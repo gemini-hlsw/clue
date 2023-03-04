@@ -6,15 +6,14 @@ package clue.model.arb
 import cats.data.NonEmptyList
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLError
+import clue.model.GraphQLExtensions
 import clue.model.StreamingMessage.FromServer
 import clue.model.StreamingMessage.FromServer._
 import io.circe.Json
 import io.circe.testing.instances._
+import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
-
-import clue.model.GraphQLExtensions
-import org.scalacheck.Arbitrary
 
 trait ArbFromServer {
   import ArbJson._
