@@ -127,7 +127,7 @@ object Demo extends IOApp.Simple {
     withLogger[IO].use { implicit logger =>
       withStreamingClient[IO].use { implicit client =>
         for {
-          result         <- client.request(Query) // (ErrorPolicyInfo.RaiseAlwaysInfo)
+          result         <- client.request(Query)
           _              <- IO.println(result)
           subscription   <- client.subscribe(Subscription).allocated
           (stream, close) = subscription

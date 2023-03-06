@@ -119,11 +119,6 @@ trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
     SubscriptionApplied(subscription, operationName, errorPolicy.processor[subscription.Data])
   }
 
-  // def subscribe_(
-  //   subscription:  GraphQLOperation[S],
-  //   operationName: Option[String] = None
-  // ) = subscribe[ErrorPolicy.RaiseAlways](subscription, operationName)
-
   protected def subscribeInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String] = None,

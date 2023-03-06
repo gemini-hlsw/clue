@@ -3,8 +3,6 @@
 
 package clue.data
 
-// import io.circe.Json
-
 package object syntax {
   implicit final class AnyToInputOps[A](private val a: A) extends AnyVal {
     def assign: Input[A] = Assign(a)
