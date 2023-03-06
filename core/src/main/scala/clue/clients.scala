@@ -61,9 +61,9 @@ trait TransactionalClient[F[_], S] {
 
 object TransactionalClient {
   def of[F[_], S](uri: Uri, name: String = "", headers: Headers = Headers.empty)(implicit
-    F:                 Sync[F],
-    backend:           TransactionalBackend[F],
-    logger:            Logger[F]
+    F:       Sync[F],
+    backend: TransactionalBackend[F],
+    logger:  Logger[F]
   ): F[TransactionalClient[F, S]] = {
     val logPrefix = s"clue.TransactionalClient[${if (name.isEmpty) uri else name}]"
 
