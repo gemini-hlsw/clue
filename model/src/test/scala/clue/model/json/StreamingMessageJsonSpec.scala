@@ -8,9 +8,8 @@ import clue.model.StreamingMessage.FromServer
 import clue.model.arb._
 import io.circe.testing.CodecTests
 import io.circe.testing.instances._
-import munit.DisciplineSuite
 
-final class StreamingMessageJsonSpec extends DisciplineSuite {
+final class StreamingMessageJsonSpec extends ListLimitingDisciplineSuite {
 
   import ArbFromClient._
   import ArbFromServer._

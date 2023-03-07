@@ -40,7 +40,7 @@ object Wrapper extends Something {
       val charId: monocle.Lens[Variables, String] = monocle.macros.GenLens[Variables](_.charId)
       implicit val eqVariables: cats.Eq[Variables] = cats.Eq.fromUniversalEquals
       implicit val showVariables: cats.Show[Variables] = cats.Show.fromToString
-      implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
+      implicit val jsonEncoderVariables: io.circe.Encoder.AsObject[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJsonObject(clue.data.Input.dropIgnores)
     }
     case class Data(val character: Option[Data.Character] = None)
     object Data {
@@ -130,9 +130,9 @@ object Wrapper extends Something {
       }
       implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]
     }
-    val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
+    val varEncoder: io.circe.Encoder.AsObject[Variables] = Variables.jsonEncoderVariables
     val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-    def query[F[_]](charId: String)(implicit client: clue.TransactionalClient[F, StarWars]) = client.request(this)(Variables(charId))
+    def query[F[_]](charId: String)(implicit client: clue.TransactionalClient[F, StarWars], errorPolicy: clue.ErrorPolicy) = client.request(this)(errorPolicy)(Variables(charId))
   }
 }
 // format: on

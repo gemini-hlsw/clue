@@ -7,6 +7,8 @@ import clue.model.GraphQLRequest
 import clue.model.StreamingMessage.FromClient
 import clue.model.StreamingMessage.FromClient._
 import io.circe.Json
+import io.circe.JsonObject
+import io.circe.testing.instances._
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
@@ -24,7 +26,7 @@ trait ArbFromClient {
     Arbitrary {
       for {
         i <- arbitrary[String]
-        p <- arbitrary[GraphQLRequest]
+        p <- arbitrary[GraphQLRequest[JsonObject]]
       } yield Start(i, p)
     }
 

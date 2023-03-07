@@ -14,11 +14,11 @@ trait GraphQLOperation[S] {
   type Variables
   type Data
 
-  val varEncoder: Encoder[Variables]
+  val varEncoder: Encoder.AsObject[Variables]
   val dataDecoder: Decoder[Data]
 
   object implicits {
-    implicit val implicitVarEncoder: Encoder[Variables] = varEncoder
-    implicit val implicitDataDecoder: Decoder[Data]     = dataDecoder
+    implicit val implicitVarEncoder: Encoder.AsObject[Variables] = varEncoder
+    implicit val implicitDataDecoder: Decoder[Data]              = dataDecoder
   }
 }

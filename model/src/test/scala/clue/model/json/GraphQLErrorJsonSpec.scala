@@ -7,14 +7,11 @@ import clue.model.GraphQLError
 import clue.model.arb._
 import io.circe.testing.CodecTests
 import io.circe.testing.instances._
-import munit.DisciplineSuite
 
-final class GraphQLErrorJsonSpec extends DisciplineSuite {
-
+final class GraphQLErrorJsonSpec extends ListLimitingDisciplineSuite {
   import ArbGraphQLError._
 
   checkAll("GraphQLError.PathElement", CodecTests[GraphQLError.PathElement].codec)
   checkAll("GraphQLError.Location", CodecTests[GraphQLError.Location].codec)
   checkAll("GraphQLError", CodecTests[GraphQLError].codec)
-
 }

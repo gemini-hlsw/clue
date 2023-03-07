@@ -47,7 +47,7 @@ They must extend `GraphQLOperation[S]`, defining the following members:
   type Variables
   type Data
 
-  val varEncoder: io.circe.Encoder[Variables]
+  val varEncoder: io.circe.Encoder.AsObject[Variables]
   val dataDecoder: io.circe.Decoder[Data]
 ```
 
