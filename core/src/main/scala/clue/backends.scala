@@ -12,7 +12,7 @@ import io.circe.Encoder
  * One-shot backend.
  */
 trait FetchBackend[F[_], P] { // C = Implementation-specific request request params
-  def request[V: Encoder](request: GraphQLRequest[V], requestParams: C): F[String]
+  def request[V: Encoder](request: GraphQLRequest[V], requestParams: P): F[String]
 }
 
 /*

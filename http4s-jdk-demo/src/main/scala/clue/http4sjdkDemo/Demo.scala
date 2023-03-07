@@ -100,7 +100,7 @@ object Demo extends IOApp.Simple {
   val allStatus =
     List("NEW", "INCLUDED", "PROPOSED", "APPROVED", "FOR_REVIEW", "READY", "ONGOING", "OBSERVED")
 
-  def randomMutate(client: FetchClient[IO, Unit], ids: List[String]) =
+  def randomMutate(client: FetchClient[IO, Unit, Unit], ids: List[String]) =
     for {
       id     <- IO(ids(Random.between(0, ids.length)))
       status <- IO(allStatus(Random.between(0, allStatus.length)))
@@ -112,7 +112,7 @@ object Demo extends IOApp.Simple {
         )
     } yield ()
 
-  def mutator(client: FetchClient[IO, Unit], ids: List[String]) =
+  def mutator(client: FetchClient[IO, Unit, Unit], ids: List[String]) =
     for {
       _ <- IO.sleep(3.seconds)
       _ <- randomMutate(client, ids)

@@ -25,9 +25,6 @@ object FetchMethod {
   case object POST extends FetchMethod
 }
 
-// MAYBE CONTEXT HERE CAN BE SOMETHING ELSE CONTAINING URI AND HEADERS, (AND METHOD???)
-// WE SHOULDN'T REQUIRE HTTP4S IN THIS MODULE
-
 final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
     extends FetchBackend[F, FetchJSRequest] {
   override def request[V: Encoder](
@@ -35,18 +32,18 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
     baseRequest: FetchJSRequest
   ): F[String] =
     Async[F].async_ { cb =>
-      val headers =
+      val _headers =
         baseRequest.headers // FIXME We should make a copy here, but I can't figure out how.
       val fetch = fetchMethod match {
         case FetchMethod.POST =>
-          headers.set("Content-Type", "application/json")
+          _headers.set("Content-Type", "application/json")
           Fetch
             .fetch(
               baseRequest.uri.toString,
               new RequestInit {
                 method = HttpMethod.POST
                 body = request.asJson.toString
-                headers = headers
+                headers = _headers
               }
             )
         case FetchMethod.GET  =>
@@ -59,7 +56,7 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
               ),
               new RequestInit {
                 method = HttpMethod.GET
-                headers = headers
+                headers = _headers
               }
             )
       }

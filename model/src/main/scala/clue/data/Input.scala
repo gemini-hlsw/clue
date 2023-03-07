@@ -170,7 +170,7 @@ object Input {
     override def align[A, B](fa: Input[A], fb: Input[B]): Input[Ior[A, B]] =
       alignWith(fa, fb)(identity)
 
-    override def alignWith[A, B, P](fa: Input[A], fb: Input[B])(f: Ior[A, B] => C): Input[C] =
+    override def alignWith[A, B, C](fa: Input[A], fb: Input[B])(f: Ior[A, B] => C): Input[C] =
       fa match {
         case Ignore    =>
           fb match {

@@ -76,7 +76,7 @@ protected object State {
 }
 
 class ApolloClient[F[_], P, S, CP, CE](
-  connectionParams:     C,
+  connectionParams:     P,
   reconnectionStrategy: ReconnectionStrategy[CE],
   state:                Ref[F, State[F, CP]],
   connectionStatus:     SignallingRef[F, PersistentClientStatus]
@@ -238,6 +238,7 @@ class ApolloClient[F[_], P, S, CP, CE](
     document:      String,
     operationName: Option[String],
     variables:     Option[JsonObject],
+    modParams:     Unit => Unit,
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): F[R] = F.async[R] { cb =>
     startSubscription[D, R](document, operationName, variables, errorPolicy).flatMap(
@@ -457,8 +458,8 @@ class ApolloClient[F[_], P, S, CP, CE](
                     ) -> retry(t, wait, connectionId.next)
                 }
               case Right(c) =>
-                Initializing(connectionId, P, subscriptions, initPayload, initLatch) ->
-                  (latch.complete(().asRight) >> doInitialize(initPayload, P, initLatch))
+                Initializing(connectionId, c, subscriptions, initPayload, initLatch) ->
+                  (latch.complete(().asRight) >> doInitialize(initPayload, c, initLatch))
             }
           case s                                                                                 =>
             s -> (latch.complete(connection.void) >>
@@ -627,8 +628,8 @@ class ApolloClient[F[_], P, S, CP, CE](
           def acquire: F[Unit] =
             s"Acquiring queue for subscription [$id]".debugF >>
               stateModify {
-                case Initialized(cid, P, subscriptions, i)                          =>
-                  Initialized(cid, P, subscriptions + (id -> emitter), i) -> F.unit
+                case Initialized(cid, c, subscriptions, i)                          =>
+                  Initialized(cid, c, subscriptions + (id -> emitter), i) -> F.unit
                 case s @ Initializing(_, _, _, _, latch)                            =>
                   s -> (latch.get.rethrow >> acquire)
                 case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
@@ -647,8 +648,8 @@ class ApolloClient[F[_], P, S, CP, CE](
           def release: F[Unit] =
             s"Releasing queue for subscription[$id]".debugF >>
               stateModify {
-                case Initialized(cid, P, subscriptions, i)                          =>
-                  Initialized(cid, P, subscriptions - id, i) -> F.unit
+                case Initialized(cid, c, subscriptions, i)                          =>
+                  Initialized(cid, c, subscriptions - id, i) -> F.unit
                 case s @ Initializing(_, _, _, _, latch)                            =>
                   s -> (latch.get.rethrow >> release)
                 case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
@@ -717,7 +718,7 @@ object ApolloClient {
   type SubscriptionId = UUID
 
   def apply[F[_], P, S, CP, CE](
-    connectionParams:     C,
+    connectionParams:     P,
     name:                 String = "",
     reconnectionStrategy: ReconnectionStrategy[CE] = ReconnectionStrategy.never
   )(implicit

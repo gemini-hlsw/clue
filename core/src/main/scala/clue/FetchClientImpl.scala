@@ -18,17 +18,18 @@ import org.typelevel.log4cats.Logger
 //   "data": { ... }, // Typed
 //   "errors": [ ... ]
 // }
-class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: C)(implicit
+class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(implicit
   backend: FetchBackend[F, P]
-) extends clue.FetchClient[F, S] {
+) extends clue.FetchClient[F, P, S] {
   override protected def requestInternal[D: Decoder, R](
     document:      String,
-    operationName: Option[String] = None,
-    variables:     Option[JsonObject] = None,
+    operationName: Option[String],
+    variables:     Option[JsonObject],
+    modParams:     P => P = identity,
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): F[R] =
     backend
-      .request(GraphQLRequest(document, operationName, variables), requestParams)
+      .request(GraphQLRequest(document, operationName, variables), modParams(requestParams))
       .map(decode[GraphQLCombinedResponse[D]])
       .rethrow
       .flatMap(errorPolicy.process(_))
