@@ -331,7 +331,7 @@ class ApolloClient[F[_], S, CP, CE](
 
   // TODO Handle interruptions? Can callbacks be canceled?
   override def onClose(connectionId: ConnectionId, event: CE): F[Unit] = {
-    val error = DisconnectedException.asLeft
+    val error = DisconnectedException().asLeft
     val debug = s"onClose() called with mismatching connectionId.".debugF
 
     reconnectionStrategy(0, event.asRight) match {

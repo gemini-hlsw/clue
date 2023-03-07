@@ -3,7 +3,7 @@
 
 package clue
 
-import cats.effect.Sync
+import cats.MonadThrow
 import cats.syntax.all._
 import clue.ErrorPolicyProcessor
 import clue.model.GraphQLCombinedResponse
@@ -14,12 +14,13 @@ import io.circe.parser._
 import org.http4s.Headers
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger
+
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
 // {
 //   "data": { ... }, // Typed
 //   "errors": [ ... ]
 // }
-class TransactionalClientImpl[F[_]: Sync: TransactionalBackend: Logger, S](
+class TransactionalClientImpl[F[_]: MonadThrow: TransactionalBackend: Logger, S](
   uri:     Uri,
   headers: Headers
 ) extends clue.TransactionalClient[F, S] {

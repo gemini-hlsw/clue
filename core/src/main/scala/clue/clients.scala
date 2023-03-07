@@ -4,8 +4,8 @@
 package clue
 
 import cats.Applicative
+import cats.MonadThrow
 import cats.effect.Resource
-import cats.effect.Sync
 import cats.syntax.all._
 import clue.ErrorPolicy
 import io.circe._
@@ -18,7 +18,6 @@ import org.typelevel.log4cats.Logger
  * A client that allows one-shot queries and mutations.
  */
 trait TransactionalClient[F[_], S] {
-
   case class RequestApplied[V: Encoder.AsObject, D: Decoder, R] protected[TransactionalClient] (
     operation:     GraphQLOperation[S],
     operationName: Option[String],
@@ -61,7 +60,7 @@ trait TransactionalClient[F[_], S] {
 
 object TransactionalClient {
   def of[F[_], S](uri: Uri, name: String = "", headers: Headers = Headers.empty)(implicit
-    F:       Sync[F],
+    F:       MonadThrow[F],
     backend: TransactionalBackend[F],
     logger:  Logger[F]
   ): F[TransactionalClient[F, S]] = {

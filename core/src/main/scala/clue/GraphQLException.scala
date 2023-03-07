@@ -7,9 +7,9 @@ import clue.model.GraphQLErrors
 
 class GraphQLException(msg: String) extends Exception(msg)
 
-case object ConnectionException extends GraphQLException("Could not establish connection")
+case class ConnectionException() extends GraphQLException("Could not establish connection")
 
-case object DisconnectedException extends GraphQLException("Connection was closed")
+case class DisconnectedException() extends GraphQLException("Connection was closed")
 
 case class InvalidSubscriptionIdException(id: String)
     extends GraphQLException(s"Invalid subscription id: $id")
