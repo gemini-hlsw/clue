@@ -502,10 +502,10 @@ trait QueryGen extends Generator {
           parentBody :+
             (operation match {
               case _: UntypedQuery        =>
-                val clientParam = param"implicit client: clue.TransactionalClient[F, $schemaType]"
+                val clientParam = param"implicit client: clue.FetchClient[F, $schemaType]"
                 q"def query[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.request(this)(errorPolicy)(Variables(...$variablesNames))"
               case _: UntypedMutation     =>
-                val clientParam = param"implicit client: clue.TransactionalClient[F, $schemaType]"
+                val clientParam = param"implicit client: clue.FetchClient[F, $schemaType]"
                 q"def execute[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.request(this)(errorPolicy)(Variables(...$variablesNames))"
               case _: UntypedSubscription =>
                 val clientParam = param"implicit client: clue.StreamingClient[F, $schemaType]"

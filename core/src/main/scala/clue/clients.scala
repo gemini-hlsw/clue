@@ -3,22 +3,18 @@
 
 package clue
 
-import cats.Applicative
-import cats.MonadThrow
 import cats.effect.Resource
 import cats.syntax.all._
 import clue.ErrorPolicy
 import io.circe._
 import io.circe.syntax._
-import org.http4s.Headers
-import org.http4s.Uri
-import org.typelevel.log4cats.Logger
 
 /**
  * A client that allows one-shot queries and mutations.
  */
-trait TransactionalClient[F[_], S] {
-  case class RequestApplied[V: Encoder.AsObject, D: Decoder, R] protected[TransactionalClient] (
+trait FetchClient[F[_], S] {
+
+  case class RequestApplied[V: Encoder.AsObject, D: Decoder, R] protected[FetchClient] (
     operation:     GraphQLOperation[S],
     operationName: Option[String],
     errorPolicy:   ErrorPolicyProcessor[D, R]
@@ -58,28 +54,10 @@ trait TransactionalClient[F[_], S] {
   ): F[R]
 }
 
-object TransactionalClient {
-  def of[F[_], S](uri: Uri, name: String = "", headers: Headers = Headers.empty)(implicit
-    F:       MonadThrow[F],
-    backend: TransactionalBackend[F],
-    logger:  Logger[F]
-  ): F[TransactionalClient[F, S]] = {
-    val logPrefix = s"clue.TransactionalClient[${if (name.isEmpty) uri else name}]"
-
-    Applicative[F].pure(
-      new TransactionalClientImpl[F, S](uri, headers)(
-        F,
-        backend,
-        logger.withModifiedString(s => s"$logPrefix $s")
-      )
-    )
-  }
-}
-
 /**
  * A client that allows subscriptions in addition to one-shot queries and mutations.
  */
-trait StreamingClient[F[_], S] extends TransactionalClient[F, S] {
+trait StreamingClient[F[_], S] extends FetchClient[F, S] {
 
   case class SubscriptionApplied[V: Encoder.AsObject, D: Decoder, R] protected[StreamingClient] (
     subscription:  GraphQLOperation[S],

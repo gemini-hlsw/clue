@@ -23,12 +23,11 @@ import fs2.Stream
 import fs2.concurrent.SignallingRef
 import io.circe._
 import io.circe.parser._
-import org.http4s.Uri
 import org.typelevel.log4cats.Logger
 
 import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
-// Interface for internally handling a subscription queue.
+
 protected[clue] trait Emitter[F[_]] {
   val request: GraphQLRequest[JsonObject]
 
@@ -76,14 +75,14 @@ protected object State {
   ) extends State[F, CP](PersistentClientStatus.Connecting)
 }
 
-class ApolloClient[F[_], S, CP, CE](
-  uri:                  Uri,
+class ApolloClient[F[_], P, S, CP, CE](
+  connectionParams:     C,
   reconnectionStrategy: ReconnectionStrategy[CE],
   state:                Ref[F, State[F, CP]],
   connectionStatus:     SignallingRef[F, PersistentClientStatus]
 )(implicit
   F:                    Async[F],
-  backend:              PersistentBackend[F, CP, CE],
+  backend:              PersistentBackend[F, P, CP, CE],
   logger:               Logger[F]
 ) extends PersistentStreamingClient[F, S, CP, CE]
     with PersistentBackendHandler[F, CE] {
@@ -234,7 +233,7 @@ class ApolloClient[F[_], S, CP, CE](
   ): Resource[F, fs2.Stream[F, R]] =
     subscriptionResource(subscription, operationName, variables, errorPolicy)
 
-  // <TransactionalClient>
+  // <FetchClient>
   override protected def requestInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String],
@@ -249,7 +248,7 @@ class ApolloClient[F[_], S, CP, CE](
         .as(none)
     )
   }
-  // </TransactionalClient>
+  // </FetchClient>
   // </StreamingClient>
   // </ApolloClient>
 
@@ -418,7 +417,7 @@ class ApolloClient[F[_], S, CP, CE](
     attempt:      Int = 1
   ): F[Unit] =
     backend
-      .connect(uri, this, connectionId)
+      .connect(connectionParams, this, connectionId)
       .attempt
       .flatMap { connection =>
         def retry(t: Throwable, wait: FiniteDuration, nextConnectionId: ConnectionId): F[Unit] =
@@ -458,8 +457,8 @@ class ApolloClient[F[_], S, CP, CE](
                     ) -> retry(t, wait, connectionId.next)
                 }
               case Right(c) =>
-                Initializing(connectionId, c, subscriptions, initPayload, initLatch) ->
-                  (latch.complete(().asRight) >> doInitialize(initPayload, c, initLatch))
+                Initializing(connectionId, P, subscriptions, initPayload, initLatch) ->
+                  (latch.complete(().asRight) >> doInitialize(initPayload, P, initLatch))
             }
           case s                                                                                 =>
             s -> (latch.complete(connection.void) >>
@@ -628,8 +627,8 @@ class ApolloClient[F[_], S, CP, CE](
           def acquire: F[Unit] =
             s"Acquiring queue for subscription [$id]".debugF >>
               stateModify {
-                case Initialized(cid, c, subscriptions, i)                          =>
-                  Initialized(cid, c, subscriptions + (id -> emitter), i) -> F.unit
+                case Initialized(cid, P, subscriptions, i)                          =>
+                  Initialized(cid, P, subscriptions + (id -> emitter), i) -> F.unit
                 case s @ Initializing(_, _, _, _, latch)                            =>
                   s -> (latch.get.rethrow >> acquire)
                 case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
@@ -648,8 +647,8 @@ class ApolloClient[F[_], S, CP, CE](
           def release: F[Unit] =
             s"Releasing queue for subscription[$id]".debugF >>
               stateModify {
-                case Initialized(cid, c, subscriptions, i)                          =>
-                  Initialized(cid, c, subscriptions - id, i) -> F.unit
+                case Initialized(cid, P, subscriptions, i)                          =>
+                  Initialized(cid, P, subscriptions - id, i) -> F.unit
                 case s @ Initializing(_, _, _, _, latch)                            =>
                   s -> (latch.get.rethrow >> release)
                 case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
@@ -717,34 +716,25 @@ class ApolloClient[F[_], S, CP, CE](
 object ApolloClient {
   type SubscriptionId = UUID
 
-  def apply[F[_], S, CP, CE](
-    uri:                  Uri,
+  def apply[F[_], P, S, CP, CE](
+    connectionParams:     C,
     name:                 String = "",
     reconnectionStrategy: ReconnectionStrategy[CE] = ReconnectionStrategy.never
   )(implicit
     F:                    Async[F],
-    backend:              PersistentBackend[F, CP, CE],
+    backend:              PersistentBackend[F, P, CP, CE],
     logger:               Logger[F]
-  ): F[ApolloClient[F, S, CP, CE]] = {
-    val logPrefix = s"clue.ApolloClient[${if (name.isEmpty) uri else name}]"
+  ): F[ApolloClient[F, P, S, CP, CE]] = {
+    val logPrefix = s"clue.ApolloClient[${if (name.isEmpty) connectionParams else name}]"
 
     for {
       state            <- Ref[F].of[State[F, CP]](State.Disconnected(ConnectionId.Zero))
       connectionStatus <-
         SignallingRef[F, PersistentClientStatus](PersistentClientStatus.Disconnected)
-    } yield new ApolloClient(uri, reconnectionStrategy, state, connectionStatus)(
+    } yield new ApolloClient(connectionParams, reconnectionStrategy, state, connectionStatus)(
       F,
       backend,
       logger.withModifiedString(s => s"$logPrefix $s")
     )
   }
-}
-
-object ApolloWebSocketClient {
-  def of[F[_]: Async: Logger, S](
-    uri:                  Uri,
-    name:                 String = "",
-    reconnectionStrategy: ReconnectionStrategy[WebSocketCloseEvent] = ReconnectionStrategy.never
-  )(implicit backend: WebSocketBackend[F]): F[ApolloWebSocketClient[F, S]] =
-    ApolloClient[F, S, WebSocketCloseParams, WebSocketCloseEvent](uri, name, reconnectionStrategy)
 }

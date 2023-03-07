@@ -10,12 +10,9 @@ import clue.model.GraphQLRequest
 import clue.model.json._
 import io.circe.Encoder
 import io.circe.syntax._
-import org.http4s.Headers
-import org.http4s.Uri
 import org.scalajs.dom.Fetch
 import org.scalajs.dom.HttpMethod
 import org.scalajs.dom.RequestInit
-import org.scalajs.dom.{Headers => FetchHeaders}
 import org.scalajs.macrotaskexecutor.MacrotaskExecutor.Implicits._
 
 import scala.scalajs.js.URIUtils
@@ -28,25 +25,29 @@ object FetchMethod {
   case object POST extends FetchMethod
 }
 
-final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod) extends TransactionalBackend[F] {
-  def request[V: Encoder](
-    uri:          Uri,
-    request:      GraphQLRequest[V],
-    fetchHeaders: Headers
+// MAYBE CONTEXT HERE CAN BE SOMETHING ELSE CONTAINING URI AND HEADERS, (AND METHOD???)
+// WE SHOULDN'T REQUIRE HTTP4S IN THIS MODULE
+
+final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
+    extends FetchBackend[F, FetchJSRequest] {
+  override def request[V: Encoder](
+    request:     GraphQLRequest[V],
+    baseRequest: FetchJSRequest
   ): F[String] =
     Async[F].async_ { cb =>
-      val headersʹ = new FetchHeaders()
-      fetchHeaders.headers.foreach(h => headersʹ.append(h.name.toString, h.value))
-      val fetch    = fetchMethod match {
+      val headers =
+        baseRequest.headers // FIXME We should make a copy here, but I can't figure out how.
+      val fetch = fetchMethod match {
         case FetchMethod.POST =>
-          headersʹ.set("Content-Type", "application/json")
+          headers.set("Content-Type", "application/json")
           Fetch
-            .fetch(uri.toString,
-                   new RequestInit {
-                     method = HttpMethod.POST
-                     body = request.asJson.toString
-                     headers = headersʹ
-                   }
+            .fetch(
+              baseRequest.uri.toString,
+              new RequestInit {
+                method = HttpMethod.POST
+                body = request.asJson.toString
+                headers = headers
+              }
             )
         case FetchMethod.GET  =>
           val variables = request.variables.foldMap(v => s"&variables=${v.asJson.noSpaces}")
@@ -54,11 +55,11 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod) extends Transa
           Fetch
             .fetch(
               URIUtils.encodeURI(
-                s"$uri?query=${request.query.trim.replaceAll(" +", " ")}$variables$op"
+                s"${baseRequest.uri}?query=${request.query.trim.replaceAll(" +", " ")}$variables$op"
               ),
               new RequestInit {
                 method = HttpMethod.GET
-                headers = headersʹ
+                headers = headers
               }
             )
       }

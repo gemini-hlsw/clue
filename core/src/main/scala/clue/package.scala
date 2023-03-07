@@ -9,26 +9,15 @@ import cats.syntax.all._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
+// import org.http4s.Uri
 
 package object clue {
-  type CloseReason[CE]               = Either[Throwable, CE]
+  type CloseReason[CE]          = Either[Throwable, CE]
   // Int = Attempt #. Will only be 0 immediately after a close.
   // For first connection, it will be called the first time with 1, after 1st connection attempt.
-  type ReconnectionStrategy[CE]      = (Int, CloseReason[CE]) => Option[FiniteDuration]
-  type WebSocketReconnectionStrategy = ReconnectionStrategy[WebSocketCloseEvent]
-
-  type WebSocketClient[F[_], S] =
-    PersistentStreamingClient[F, S, WebSocketCloseParams, WebSocketCloseEvent]
-
-  type WebSocketBackend[F[_]]    = PersistentBackend[F, WebSocketCloseParams, WebSocketCloseEvent]
-  type WebSocketConnection[F[_]] = PersistentConnection[F, WebSocketCloseParams]
-
-  type ApolloWebSocketClient[F[_], S] =
-    ApolloClient[F, S, WebSocketCloseParams, WebSocketCloseEvent]
+  type ReconnectionStrategy[CE] = (Int, CloseReason[CE]) => Option[FiniteDuration]
 
   protected[clue] type Latch[F[_]] = Deferred[F, Either[Throwable, Unit]]
-
-  type WebSocketCloseEvent = Either[Throwable, WebSocketCloseParams]
 
   final implicit class StringOps(val str: String) extends AnyVal {
     def error[A]: Either[Throwable, A] =
@@ -72,10 +61,6 @@ package object clue {
 package clue {
   object ReconnectionStrategy {
     def never[CE]: ReconnectionStrategy[CE] = (_, _) => none
-  }
-
-  object WebSocketReconnectionStrategy {
-    def never: WebSocketReconnectionStrategy = ReconnectionStrategy.never
   }
 
   protected[clue] object Latch {

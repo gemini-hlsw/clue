@@ -80,6 +80,6 @@ object LucumaQuery2 extends GraphQLOperation[LucumaODB] {
   }
   val varEncoder: io.circe.Encoder.AsObject[Variables] = Variables.jsonEncoderVariables
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-  def query[F[_]]()(implicit client: clue.TransactionalClient[F, LucumaODB], errorPolicy: clue.ErrorPolicy) = client.request(this)(errorPolicy)(Variables())
+  def query[F[_]]()(implicit client: clue.FetchClient[F, LucumaODB], errorPolicy: clue.ErrorPolicy) = client.request(this)(errorPolicy)(Variables())
 }
 // format: on
