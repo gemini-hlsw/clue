@@ -479,7 +479,8 @@ trait QueryGen extends Generator {
 
   protected def addConvenienceMethod(
     schemaType: Type,
-    operation:  UntypedOperation
+    operation:  UntypedOperation,
+    objName:    String
   ): List[Stat] => List[Stat] =
     parentBody =>
       parentBody
@@ -498,18 +499,41 @@ trait QueryGen extends Generator {
             case Term.Param(_, Name(name), _, _) => Term.Name(name)
             case other                           => throw new Exception(s"Unexpected param structure [$other]")
           })
-          val epiParam       = param"implicit errorPolicy: clue.ErrorPolicy"
-          parentBody :+
+          val epiParam       = List(param"implicit errorPolicy: clue.ErrorPolicy")
+          val applied        =
+            q"""def apply[F[_]]: clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] =
+                  new clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] {
+                    def applyP[P](client: clue.FetchClient[F, P, $schemaType]) = new ClientAppliedFP(client)
+                  }"""
+          parentBody ++
             (operation match {
-              case _: UntypedQuery        =>
-                val clientParam = param"implicit client: clue.TransactionalClient[F, $schemaType]"
-                q"def query[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.request(this)(errorPolicy)(Variables(...$variablesNames))"
+              case _: UntypedQuery =>
+                List(
+                  applied,
+                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClient[F, P, $schemaType]) {
+                      def query(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
+                        client.request(${Term
+                      .Name(objName)})(errorPolicy)(Variables(...$variablesNames), modParams)
+                    }
+                  """
+                )
+
               case _: UntypedMutation     =>
-                val clientParam = param"implicit client: clue.TransactionalClient[F, $schemaType]"
-                q"def execute[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.request(this)(errorPolicy)(Variables(...$variablesNames))"
+                List(
+                  applied,
+                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClient[F, P, $schemaType]) {
+                      def execute(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
+                        client.request(${Term
+                      .Name(objName)})(errorPolicy)(Variables(...$variablesNames), modParams)
+                    }
+                  """
+                )
               case _: UntypedSubscription =>
+                val epiParam    = param"implicit errorPolicy: clue.ErrorPolicy"
                 val clientParam = param"implicit client: clue.StreamingClient[F, $schemaType]"
-                q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this)(errorPolicy)(Variables(...$variablesNames))"
+                List(
+                  q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this)(errorPolicy)(Variables(...$variablesNames))"
+                )
             })
         }
         .getOrElse(parentBody)

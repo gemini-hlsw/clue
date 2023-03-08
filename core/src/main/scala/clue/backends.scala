@@ -7,18 +7,12 @@ import cats.syntax.all._
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
 import io.circe.Encoder
-import org.http4s.Headers
-import org.http4s.Uri
 
 /*
  * One-shot backend.
  */
-trait TransactionalBackend[F[_]] {
-  def request[V: Encoder](uri: Uri, request: GraphQLRequest[V], headers: Headers): F[String]
-}
-
-object TransactionalBackend {
-  def apply[F[_]: TransactionalBackend]: TransactionalBackend[F] = implicitly
+trait FetchBackend[F[_], P] { // C = Implementation-specific request request params
+  def request[V: Encoder](request: GraphQLRequest[V], requestParams: P): F[String]
 }
 
 /*
@@ -46,16 +40,10 @@ trait PersistentConnection[F[_], CP] {
  * CP = Close Parameters, sent by client when close is requested.
  * CE = Close Event, received by client when connection is closed.
  */
-trait PersistentBackend[F[_], CP, CE] {
+trait PersistentBackend[F[_], P, CP, CE] {
   def connect(
-    uri:          Uri,
-    handler:      PersistentBackendHandler[F, CE],
-    connectionId: ConnectionId
+    connectionParams: P,
+    handler:          PersistentBackendHandler[F, CE],
+    connectionId:     ConnectionId
   ): F[PersistentConnection[F, CP]]
-}
-
-object PersistentBackend {
-  def apply[F[_], CP, CE](implicit
-    backend: PersistentBackend[F, CP, CE]
-  ): PersistentBackend[F, CP, CE] = backend
 }

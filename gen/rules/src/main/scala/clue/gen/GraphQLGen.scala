@@ -70,8 +70,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                 indented(obj)(
                   List(
                     q"sealed trait ${Type.Name(objName)}".toString,
-                    q"..$newMods object ${Term
-                        .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
+                    q"..$newMods object ${Term.Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
                   ).mkString("\n")
                 )
               ) + Patch.removeGlobalImport(GraphQLSchemaAnnotation.symbol)
@@ -123,7 +122,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                               addData(schema, operation, config, document.subqueries),
                               addVarEncoder,
                               addDataDecoder,
-                              addConvenienceMethod(schemaType, operation)
+                              addConvenienceMethod(schemaType, operation, objName)
                             )
                           )
 
@@ -187,14 +186,15 @@ class GraphQLGen(config: GraphQLGenConfig)
                           val modObjDefs = scala.Function.chain(
                             List(
                               addImports(schemaType.value),
-                              addData(schema,
-                                      operation,
-                                      config,
-                                      subquery.subqueries,
-                                      schema.types.find(_.name == rootTypeName)
+                              addData(
+                                schema,
+                                operation,
+                                config,
+                                subquery.subqueries,
+                                schema.types.find(_.name == rootTypeName)
                               ),
                               addDataDecoder,
-                              addConvenienceMethod(schemaType, operation)
+                              addConvenienceMethod(schemaType, operation, objName)
                             )
                           )
 

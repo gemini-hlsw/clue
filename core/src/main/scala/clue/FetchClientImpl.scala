@@ -11,8 +11,6 @@ import clue.model.GraphQLRequest
 import clue.model.json._
 import io.circe._
 import io.circe.parser._
-import org.http4s.Headers
-import org.http4s.Uri
 import org.typelevel.log4cats.Logger
 
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
@@ -20,18 +18,18 @@ import org.typelevel.log4cats.Logger
 //   "data": { ... }, // Typed
 //   "errors": [ ... ]
 // }
-class TransactionalClientImpl[F[_]: MonadThrow: TransactionalBackend: Logger, S](
-  uri:     Uri,
-  headers: Headers
-) extends clue.TransactionalClient[F, S] {
+class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(implicit
+  backend: FetchBackend[F, P]
+) extends clue.FetchClient[F, P, S] {
   override protected def requestInternal[D: Decoder, R](
     document:      String,
-    operationName: Option[String] = None,
-    variables:     Option[JsonObject] = None,
+    operationName: Option[String],
+    variables:     Option[JsonObject],
+    modParams:     P => P = identity,
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ): F[R] =
-    TransactionalBackend[F]
-      .request(uri, GraphQLRequest(document, operationName, variables), headers)
+    backend
+      .request(GraphQLRequest(document, operationName, variables), modParams(requestParams))
       .map(decode[GraphQLCombinedResponse[D]])
       .rethrow
       .flatMap(errorPolicy.process(_))

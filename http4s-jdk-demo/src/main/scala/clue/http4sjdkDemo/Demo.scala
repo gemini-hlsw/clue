@@ -10,12 +10,12 @@ import cats.effect.IOApp
 import cats.effect.Resource
 import cats.effect.Sync
 import cats.syntax.all._
-import clue.ApolloWebSocketClient
 import clue.ErrorPolicy
+import clue.FetchClient
 import clue.GraphQLOperation
-import clue.PersistentStreamingClient
-import clue.TransactionalClient
-import clue.http4s.Http4sWSBackend
+import clue.http4s.Http4sWebSocketBackend
+import clue.http4s.Http4sWebSocketClient
+import clue.websocket.WebSocketClient
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
@@ -88,20 +88,19 @@ object Demo extends IOApp.Simple {
   def withLogger[F[_]: Sync]: Resource[F, Logger[F]] =
     Resource.make(Slf4jLogger.create[F])(_ => Applicative[F].unit)
 
-  def withStreamingClient[F[_]: Async: Logger]
-    : Resource[F, PersistentStreamingClient[F, Unit, _, _]] =
+  def withStreamingClient[F[_]: Async: Logger]: Resource[F, WebSocketClient[F, Unit]] =
     for {
       client <- Resource.eval(JdkWSClient.simple)
-      backend = Http4sWSBackend(client)
+      backend = Http4sWebSocketBackend(client)
       uri     = uri"wss://lucuma-odb-development.herokuapp.com/ws"
-      sc     <- Resource.eval(ApolloWebSocketClient.of[F, Unit](uri)(Async[F], Logger[F], backend))
+      sc     <- Resource.eval(Http4sWebSocketClient.of[F, Unit](uri)(Async[F], Logger[F], backend))
       _      <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
     } yield sc
 
   val allStatus =
     List("NEW", "INCLUDED", "PROPOSED", "APPROVED", "FOR_REVIEW", "READY", "ONGOING", "OBSERVED")
 
-  def randomMutate(client: TransactionalClient[IO, Unit], ids: List[String]) =
+  def randomMutate(client: FetchClient[IO, Unit, Unit], ids: List[String]) =
     for {
       id     <- IO(ids(Random.between(0, ids.length)))
       status <- IO(allStatus(Random.between(0, allStatus.length)))
@@ -113,7 +112,7 @@ object Demo extends IOApp.Simple {
         )
     } yield ()
 
-  def mutator(client: TransactionalClient[IO, Unit], ids: List[String]) =
+  def mutator(client: FetchClient[IO, Unit, Unit], ids: List[String]) =
     for {
       _ <- IO.sleep(3.seconds)
       _ <- randomMutate(client, ids)
