@@ -11,6 +11,7 @@ import clue.model.json._
 import io.circe.Encoder
 import io.circe.syntax._
 import org.scalajs.dom.Fetch
+import org.scalajs.dom.Headers
 import org.scalajs.dom.HttpMethod
 import org.scalajs.dom.RequestInit
 import org.scalajs.macrotaskexecutor.MacrotaskExecutor.Implicits._
@@ -32,10 +33,9 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
     baseRequest: FetchJSRequest
   ): F[String] =
     Async[F].async_ { cb =>
-      val _headers =
-        baseRequest.headers // FIXME We should make a copy here, but I can't figure out how.
       val fetch = fetchMethod match {
         case FetchMethod.POST =>
+          val _headers = new Headers(baseRequest.headers)
           _headers.set("Content-Type", "application/json")
           Fetch
             .fetch(
@@ -56,7 +56,7 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
               ),
               new RequestInit {
                 method = HttpMethod.GET
-                headers = _headers
+                headers = baseRequest.headers
               }
             )
       }
