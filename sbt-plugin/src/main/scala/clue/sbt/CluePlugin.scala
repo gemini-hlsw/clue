@@ -3,6 +3,7 @@
 
 package clue.sbt
 
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 import sbt._
 import scalafix.sbt.ScalafixPlugin
 
@@ -18,11 +19,12 @@ object CluePlugin extends AutoPlugin {
 
   override def buildSettings: Seq[Setting[_]] = Seq(
     scalafixScalaBinaryVersion                     := "2.13",
-    scalafixDependencies += BuildInfo.organization %% BuildInfo.moduleName % BuildInfo.version
+    scalafixDependencies += BuildInfo.organization %% BuildInfo.rulesModule % BuildInfo.version
   )
 
   override def projectSettings: Seq[Setting[_]] = Seq(
-    Compile / clueSourceDirectory := (Compile / sourceDirectory).value / "clue"
+    Compile / clueSourceDirectory                  := sourceDirectory.value / "clue",
+    libraryDependencies += BuildInfo.organization %%% BuildInfo.coreModule % BuildInfo.version
   )
 
   override def derivedProjects(proj: ProjectDefinition[_]): Seq[Project] = Seq(
@@ -35,8 +37,7 @@ object CluePlugin extends AutoPlugin {
         Compile / clueSourceDirectory :=
           (LocalProject(proj.id) / Compile / clueSourceDirectory).value,
         scalaVersion                  := (LocalProject(proj.id) / scalaVersion).value,
-        Compile / sourceDirectories += (Compile / clueSourceDirectory).value / "scala",
-        Compile / resourceDirectories += (Compile / clueSourceDirectory).value / "resources",
+        Compile / unmanagedSourceDirectories += (Compile / clueSourceDirectory).value / "scala",
         Compile / dependencyClasspath :=
           (LocalProject(proj.id) / Compile / dependencyClasspath).value,
 
@@ -55,6 +56,10 @@ object CluePlugin extends AutoPlugin {
             (to ** "*.scala").get
           }
         }.taskValue,
+
+        // scalafix stuff
+        semanticdbEnabled := true,
+        semanticdbVersion := scalafixSemanticdb.revision,
 
         // no publish
         publish         := {},

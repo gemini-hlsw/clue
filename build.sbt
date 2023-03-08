@@ -164,14 +164,28 @@ lazy val sbtPlugin = project
   .settings(
     moduleName         := "sbt-clue",
     crossScalaVersions := List("2.12.17"),
-    addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.10.4"),
+    addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % "0.10.4"),
+    addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.1"),
     buildInfoPackage   := "clue.sbt",
-    buildInfoKeys      := Seq[BuildInfoKey](version, organization, genRules / moduleName),
+    buildInfoKeys      := Seq[BuildInfoKey](version,
+                                       organization,
+                                       "rulesModule" -> (genRules / moduleName).value,
+                                       "coreModule"  -> (core.jvm / moduleName).value
+    ),
     buildInfoOptions += BuildInfoOption.PackagePrivate,
     Test / test        := {
       scripted.toTask("").value
     },
-    scripted           := scripted.dependsOn(genRules / publishLocal).evaluated,
-    scriptedLaunchOpts ++= Seq("-Xmx1024M", "-Dplugin.version=" + version.value),
+    scripted           := scripted
+      .dependsOn(
+        genRules / publishLocal,
+        model.jvm / publishLocal,
+        core.jvm / publishLocal,
+      )
+      .evaluated,
+    scriptedLaunchOpts ++= Seq("-Xmx1024M",
+                               "-Dplugin.version=" + version.value,
+                               "-Dscala.version=" + (core.jvm / scalaVersion).value
+    ),
     scriptedBufferLog  := false
   )
