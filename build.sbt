@@ -178,7 +178,7 @@ lazy val sbtPlugin = project
       .dependsOn(
         genRules / publishLocal,
         model.jvm / publishLocal,
-        core.jvm / publishLocal,
+        core.jvm / publishLocal
       )
       .evaluated,
     scriptedLaunchOpts ++= Seq("-Xmx1024M",
