@@ -57,6 +57,12 @@ object CluePlugin extends AutoPlugin {
           }
         }.taskValue,
 
+        // register clean
+        LocalProject(proj.id) / clean := {
+          val _ = clean.value
+          (LocalProject(proj.id) / clean).value
+        },
+
         // scalafix stuff
         semanticdbEnabled := true,
         semanticdbVersion := scalafixSemanticdb.revision,
