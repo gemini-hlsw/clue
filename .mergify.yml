@@ -77,6 +77,14 @@ pull_request_rules:
       add:
       - rules
       remove: []
+- name: Label sbt-plugin PRs
+  conditions:
+  - files~=^sbt-plugin/
+  actions:
+    label:
+      add:
+      - sbt-plugin
+      remove: []
 - name: Label scalajs PRs
   conditions:
   - files~=^scalajs/

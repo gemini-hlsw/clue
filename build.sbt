@@ -5,7 +5,7 @@ lazy val scala3Version      = "3.2.2"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-ThisBuild / tlBaseVersion              := "0.26"
+ThisBuild / tlBaseVersion              := "0.27"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
@@ -23,7 +23,8 @@ lazy val root = tlCrossRootProject
     genRules,
     genInput,
     genOutput,
-    genTests
+    genTests,
+    sbtPlugin
   )
   .settings(
     name := "clue"
@@ -154,3 +155,35 @@ lazy val genTests = project
     scalafixTestkitInputScalaVersion       := (genInput / Compile / scalaVersion).value
   )
   .dependsOn(genRules)
+
+lazy val sbtPlugin = project
+  .in(file("sbt-plugin"))
+  .enablePlugins(SbtPlugin, BuildInfoPlugin)
+  .settings(
+    moduleName         := "sbt-clue",
+    crossScalaVersions := List("2.12.17"),
+    addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % "0.10.4"),
+    addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.1"),
+    buildInfoPackage   := "clue.sbt",
+    buildInfoKeys      := Seq[BuildInfoKey](version,
+                                       organization,
+                                       "rulesModule" -> (genRules / moduleName).value,
+                                       "coreModule"  -> (core.jvm / moduleName).value
+    ),
+    buildInfoOptions += BuildInfoOption.PackagePrivate,
+    Test / test        := {
+      scripted.toTask("").value
+    },
+    scripted           := scripted
+      .dependsOn(
+        genRules / publishLocal,
+        model.jvm / publishLocal,
+        core.jvm / publishLocal
+      )
+      .evaluated,
+    scriptedLaunchOpts ++= Seq("-Xmx1024M",
+                               "-Dplugin.version=" + version.value,
+                               "-Dscala.version=" + (core.jvm / scalaVersion).value
+    ),
+    scriptedBufferLog  := false
+  )
