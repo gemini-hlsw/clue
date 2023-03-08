@@ -175,11 +175,12 @@ trait QueryGen extends Generator {
     parentBody =>
       mustDefineType("Variables")(parentBody) match {
         case Skip            =>
-          addModuleDefs("Variables",
-                        config.catsEq,
-                        config.catsShow,
-                        scalaJSReactReuse = false,
-                        circeEncoder = true
+          addModuleDefs(
+            "Variables",
+            config.catsEq,
+            config.catsShow,
+            scalaJSReactReuse = false,
+            circeEncoder = true
           )(
             parentBody
           )
@@ -466,10 +467,11 @@ trait QueryGen extends Generator {
         .getOrElse(parentBody)
 
   protected val addVarEncoder: List[Stat] => List[Stat] =
-    addValRefIntoModule("varEncoder",
-                        "Variables",
-                        "jsonEncoderVariables",
-                        t"io.circe.Encoder[Variables]"
+    addValRefIntoModule(
+      "varEncoder",
+      "Variables",
+      "jsonEncoderVariables",
+      t"io.circe.Encoder.AsObject[Variables]"
     )
 
   protected val addDataDecoder: List[Stat] => List[Stat] =
@@ -477,7 +479,8 @@ trait QueryGen extends Generator {
 
   protected def addConvenienceMethod(
     schemaType: Type,
-    operation:  UntypedOperation
+    operation:  UntypedOperation,
+    objName:    String
   ): List[Stat] => List[Stat] =
     parentBody =>
       parentBody
@@ -496,23 +499,41 @@ trait QueryGen extends Generator {
             case Term.Param(_, Name(name), _, _) => Term.Name(name)
             case other                           => throw new Exception(s"Unexpected param structure [$other]")
           })
-          parentBody :+
+          val epiParam       = List(param"implicit errorPolicy: clue.ErrorPolicy")
+          val applied        =
+            q"""def apply[F[_]]: clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] =
+                  new clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] {
+                    def applyP[P](client: clue.FetchClient[F, P, $schemaType]) = new ClientAppliedFP(client)
+                  }"""
+          parentBody ++
             (operation match {
-              case _: UntypedQuery        =>
-                val allParamss = paramss :+ List(
-                  param"implicit client: clue.TransactionalClient[F, $schemaType]"
+              case _: UntypedQuery =>
+                List(
+                  applied,
+                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClient[F, P, $schemaType]) {
+                      def query(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
+                        client.request(${Term
+                      .Name(objName)})(errorPolicy)(Variables(...$variablesNames), modParams)
+                    }
+                  """
                 )
-                q"def query[F[_]](...$allParamss) = client.request(this)(Variables(...$variablesNames))"
+
               case _: UntypedMutation     =>
-                val allParamss = paramss :+ List(
-                  param"implicit client: clue.TransactionalClient[F, $schemaType]"
+                List(
+                  applied,
+                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClient[F, P, $schemaType]) {
+                      def execute(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
+                        client.request(${Term
+                      .Name(objName)})(errorPolicy)(Variables(...$variablesNames), modParams)
+                    }
+                  """
                 )
-                q"def execute[F[_]](...$allParamss) = client.request(this)(Variables(...$variablesNames))"
               case _: UntypedSubscription =>
-                val allParamss = paramss :+ List(
-                  param"implicit client: clue.StreamingClient[F, $schemaType]"
+                val epiParam    = param"implicit errorPolicy: clue.ErrorPolicy"
+                val clientParam = param"implicit client: clue.StreamingClient[F, $schemaType]"
+                List(
+                  q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this)(errorPolicy)(Variables(...$variablesNames))"
                 )
-                q"def subscribe[F[_]](...$allParamss) = client.subscribe(this)(Variables(...$variablesNames))"
             })
         }
         .getOrElse(parentBody)

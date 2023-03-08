@@ -3,32 +3,15 @@
 
 package clue
 
-import cats.syntax.traverse._
-import clue.model.GraphQLError
-import clue.model.json.DecoderGraphQLError
-import io.circe.Decoder
-import io.circe.Json
+import clue.model.GraphQLErrors
 
 class GraphQLException(msg: String) extends Exception(msg)
 
-class ConnectionException() extends GraphQLException("Could not establish connection")
+case class ConnectionException() extends GraphQLException("Could not establish connection")
 
-class DisconnectedException() extends GraphQLException("Connection was closed")
+case class DisconnectedException() extends GraphQLException("Connection was closed")
 
-class InvalidSubscriptionIdException(id: String)
+case class InvalidSubscriptionIdException(id: String)
     extends GraphQLException(s"Invalid subscription id: $id")
 
-class ResponseException(errors: List[Json])
-    extends GraphQLException(errors.map(_.spaces2).mkString(",")) {
-
-  /**
-   * Decodes and returns the errors as a list of `GraphQLError` if possible.
-   *
-   * @return
-   *   None if there is a problem parsing the JSON as an array of GraphQLError,
-   *   Some(List[GraphQLError]) if successful
-   */
-  def asGraphQLErrors: Option[List[GraphQLError]] =
-    errors.traverse(Decoder[GraphQLError].decodeJson).toOption
-
-}
+case class ResponseException(errors: GraphQLErrors) extends GraphQLException(errors.toString)

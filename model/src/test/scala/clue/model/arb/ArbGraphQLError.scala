@@ -4,6 +4,8 @@
 package clue.model
 package arb
 
+import cats.data.NonEmptyList
+import io.circe.testing.instances._
 import org.scalacheck.Arbitrary._
 import org.scalacheck._
 
@@ -33,8 +35,13 @@ trait ArbGraphQLError {
         message    <- arbitrary[String]
         path       <- arbitrary[List[PathElement]]
         locations  <- arbitrary[List[Location]]
-        extensions <- arbitrary[Map[String, String]]
-      } yield GraphQLError(message, path, locations, extensions)
+        extensions <- arbitrary[Option[GraphQLExtensions]]
+      } yield GraphQLError(
+        message,
+        NonEmptyList.fromList(path),
+        NonEmptyList.fromList(locations),
+        extensions
+      )
     }
 
 }

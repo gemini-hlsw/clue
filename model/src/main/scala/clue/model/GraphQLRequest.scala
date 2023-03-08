@@ -4,7 +4,7 @@
 package clue.model
 
 import cats.Eq
-import io.circe.Json
+import cats.syntax.option._
 
 // Request format from Spec: https://github.com/APIs-guru/graphql-over-http
 // {
@@ -14,7 +14,9 @@ import io.circe.Json
 // }
 
 /**
- * A raw (pre-parsed) GraphQL request.
+ * A GraphQL request.
+ *
+ * See https://spec.graphql.org/October2021/#sec-Execution
  *
  * @param query
  *   the query itself
@@ -22,14 +24,17 @@ import io.circe.Json
  *   identifies a particular operation in the query to execute
  * @param variables
  *   values corresponding to variables in the query
+ * @param extensions
+ *   values for protocol extension
  */
-final case class GraphQLRequest(
+final case class GraphQLRequest[V](
   query:         String,
-  operationName: Option[String] = None,
-  variables:     Option[Json] = None
+  operationName: Option[String] = none,
+  variables:     Option[V] = none,
+  extensions:    Option[GraphQLExtensions] = none
 )
 
 object GraphQLRequest {
-  implicit val EqGraphQLRequest: Eq[GraphQLRequest] =
-    Eq.by(a => (a.query, a.operationName, a.variables))
+  implicit def eqGraphQLRequest[V: Eq]: Eq[GraphQLRequest[V]] =
+    Eq.by(a => (a.query, a.operationName, a.variables, a.extensions))
 }

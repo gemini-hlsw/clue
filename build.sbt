@@ -5,7 +5,7 @@ lazy val scala3Version      = "3.2.2"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-ThisBuild / tlBaseVersion              := "0.25"
+ThisBuild / tlBaseVersion              := "0.26"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
@@ -55,7 +55,6 @@ lazy val core =
           Settings.Libraries.CatsEffect.value ++
           Settings.Libraries.Fs2.value ++
           Settings.Libraries.Log4Cats.value ++
-          Settings.Libraries.Http4sCore.value ++
           Settings.Libraries.DisciplineMUnit.value ++
           Settings.Libraries.MUnit.value,
       scalacOptions ++= { if (tlIsScala3.value) Nil else List("-language:implicitConversions") }
@@ -70,7 +69,6 @@ lazy val scalaJS = project
     coverageEnabled := false,
     libraryDependencies ++=
       Settings.Libraries.ScalaJSDom.value ++
-        Settings.Libraries.Http4sDom.value ++
         Settings.Libraries.ScalaJSMacrotaskExecutor.value
   )
   .dependsOn(core.js)

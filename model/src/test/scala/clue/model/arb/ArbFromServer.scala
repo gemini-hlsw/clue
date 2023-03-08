@@ -3,9 +3,14 @@
 
 package clue.model.arb
 
+import cats.data.NonEmptyList
+import clue.model.GraphQLDataResponse
+import clue.model.GraphQLError
+import clue.model.GraphQLExtensions
 import clue.model.StreamingMessage.FromServer
 import clue.model.StreamingMessage.FromServer._
 import io.circe.Json
+import io.circe.testing.instances._
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
@@ -34,27 +39,56 @@ trait ArbFromServer {
       }
     }
 
-  val genErrosJson: Gen[Json] =
-    arbitrary[String].map(s => Json.arr(Json.obj("message" -> Json.fromString(s))))
+  implicit val arbGraphQLErrorPathElement: Arbitrary[GraphQLError.PathElement] =
+    Arbitrary(
+      Gen.oneOf(
+        arbitrary[Int].map(GraphQLError.PathElement.int(_)),
+        arbitrary[String].map(GraphQLError.PathElement.string(_))
+      )
+    )
+
+  implicit val arbGraphQLErrorLocation: Arbitrary[GraphQLError.Location] =
+    Arbitrary(
+      for {
+        line   <- arbitrary[Int]
+        column <- arbitrary[Int]
+      } yield GraphQLError.Location(line, column)
+    )
+
+  implicit val arbGraphQLError: Arbitrary[GraphQLError] =
+    Arbitrary {
+      for {
+        message    <- arbitrary[String]
+        path       <- arbitrary[List[GraphQLError.PathElement]]
+        locations  <- arbitrary[List[GraphQLError.Location]]
+        extensions <- arbitrary[Option[GraphQLExtensions]]
+      } yield GraphQLError(
+        message,
+        NonEmptyList.fromList(path),
+        NonEmptyList.fromList(locations),
+        extensions
+      )
+    }
 
   implicit val arbConnectionError: Arbitrary[ConnectionError] =
     Arbitrary {
-      arbitrary[Map[String, Json]](arbJsonStringMap).map(ConnectionError(_))
+      arbitrary[Json](arbJsonString).map(ConnectionError(_))
     }
 
-  implicit val arbDataWrapper: Arbitrary[DataWrapper] =
+  implicit val arbDataWrapper: Arbitrary[GraphQLDataResponse[Json]] =
     Arbitrary {
       for {
-        data   <- arbitrary[Json](arbJsonString)
-        errors <- Gen.option(genErrosJson)
-      } yield DataWrapper(data, errors)
+        data       <- arbitrary[Json](arbJsonString)
+        errors     <- arbitrary[List[GraphQLError]]
+        extensions <- arbitrary[Option[GraphQLExtensions]]
+      } yield GraphQLDataResponse(data, NonEmptyList.fromList(errors), extensions)
     }
 
   implicit val arbData: Arbitrary[Data] =
     Arbitrary {
       for {
         i <- arbitrary[String]
-        p <- arbitrary[DataWrapper]
+        p <- arbitrary[GraphQLDataResponse[Json]]
       } yield Data(i, p)
     }
 
@@ -62,8 +96,8 @@ trait ArbFromServer {
     Arbitrary {
       for {
         i <- arbitrary[String]
-        p <- arbitrary[Json](arbErrorJson)
-      } yield Error(i, p)
+        p <- arbitrary[List[GraphQLError]].suchThat(_.nonEmpty)
+      } yield Error(i, NonEmptyList.fromListUnsafe(p))
     }
 
   implicit val arbComplete: Arbitrary[Complete] =

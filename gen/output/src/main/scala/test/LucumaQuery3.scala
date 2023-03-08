@@ -37,7 +37,7 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
   object Variables {
     implicit val eqVariables: cats.Eq[Variables] = cats.Eq.fromUniversalEquals
     implicit val showVariables: cats.Show[Variables] = cats.Show.fromToString
-    implicit val jsonEncoderVariables: io.circe.Encoder[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJson(_.foldWith(clue.data.Input.dropIgnoreFolder))
+    implicit val jsonEncoderVariables: io.circe.Encoder.AsObject[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJsonObject(clue.data.Input.dropIgnores)
   }
   case class Data(val observations: Data.Observations)
   object Data {
@@ -83,8 +83,9 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]
   }
-  val varEncoder: io.circe.Encoder[Variables] = Variables.jsonEncoderVariables
+  val varEncoder: io.circe.Encoder.AsObject[Variables] = Variables.jsonEncoderVariables
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-  def query[F[_]]()(implicit client: clue.TransactionalClient[F, LucumaODB]) = client.request(this)(Variables())
+  def apply[F[_]]: clue.ClientAppliedF[F, LucumaODB, ClientAppliedFP] = new clue.ClientAppliedF[F, LucumaODB, ClientAppliedFP] { def applyP[P](client: clue.FetchClient[F, P, LucumaODB]) = new ClientAppliedFP(client) }
+  class ClientAppliedFP[F[_], P](val client: clue.FetchClient[F, P, LucumaODB]) { def query(modParams: P => P = identity)(implicit errorPolicy: clue.ErrorPolicy) = client.request(LucumaQuery3)(errorPolicy)(Variables(), modParams) }
 }
 // format: on

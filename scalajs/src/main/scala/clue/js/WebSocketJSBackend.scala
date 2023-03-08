@@ -11,8 +11,8 @@ import cats.syntax.all._
 import clue._
 import clue.model.StreamingMessage
 import clue.model.json._
+import clue.websocket._
 import io.circe.syntax._
-import org.http4s.Uri
 import org.scalajs.dom.CloseEvent
 import org.scalajs.dom.Event
 import org.scalajs.dom.MessageEvent
@@ -23,20 +23,20 @@ import org.typelevel.log4cats.Logger
  * Streaming backend for JS WebSocket.
  */
 final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
-    extends WebSocketBackend[F] {
+    extends WebSocketBackend[F, String] {
   private val Protocol = "graphql-ws"
 
   override def connect(
-    uri:          Uri,
-    handler:      PersistentBackendHandler[F, WebSocketCloseEvent],
+    uri:          String,
+    handler:      WebSocketHandler[F],
     connectionId: ConnectionId
-  ): F[PersistentConnection[F, WebSocketCloseParams]] =
+  ): F[WebSocketConnection[F]] =
     for {
       isOpen     <- Ref[F].of(false)
       isErrored  <- Ref[F].of(false)
       connection <-
         Async[F].async_[PersistentConnection[F, WebSocketCloseParams]] { cb =>
-          val ws = new WebSocket(uri.toString, Protocol)
+          val ws = new WebSocket(uri, Protocol)
 
           ws.onopen = { (_: Event) =>
             val open: F[Unit] = (
@@ -66,7 +66,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
                 _    <- s"Error on WebSocket for [$uri]".errorF
                 _    <- isErrored.set(true)
                 open <- isOpen.get
-              } yield if (!open) cb(new ConnectionException().asLeft)
+              } yield if (!open) cb(ConnectionException().asLeft)
             ).uncancelable
             dispatcher.unsafeRunAndForget(error)
           }
@@ -76,9 +76,10 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
               for {
                 _       <- s"WebSocket closed for URI [$uri]".traceF
                 errored <- isErrored.get
-                _       <- handler.onClose(connectionId,
-                                           if (errored) new DisconnectedException().asLeft
-                                           else WebSocketCloseParams(e.code, e.reason).asRight
+                _       <- handler.onClose(
+                             connectionId,
+                             if (errored) DisconnectedException().asLeft
+                             else WebSocketCloseParams(e.code, e.reason).asRight
                            )
               } yield ()
             dispatcher.unsafeRunAndForget(close)

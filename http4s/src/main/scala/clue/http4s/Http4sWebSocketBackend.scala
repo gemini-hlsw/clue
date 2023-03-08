@@ -10,6 +10,8 @@ import cats.syntax.all._
 import clue._
 import clue.model.StreamingMessage
 import clue.model.json._
+import clue.websocket.WebSocketCloseParams
+import clue.websocket._
 import io.circe.syntax._
 import org.http4s.Headers
 import org.http4s.Uri
@@ -18,7 +20,8 @@ import org.http4s.client.websocket._
 /**
  * Streaming backend for http4s WebSocket client.
  */
-final class Http4sWSBackend[F[_]: Concurrent](client: WSClient[F]) extends WebSocketBackend[F] {
+final class Http4sWebSocketBackend[F[_]: Concurrent](client: WSClient[F])
+    extends WebSocketBackend[F, Uri] {
 
   override def connect(
     uri:          Uri,
@@ -28,6 +31,8 @@ final class Http4sWSBackend[F[_]: Concurrent](client: WSClient[F]) extends WebSo
     client
       .connectHighLevel(
         WSRequest(uri).withHeaders(Headers("Sec-WebSocket-Protocol" -> "graphql-ws"))
+        // Should we switch to "graphql-transport-ws"???
+        // We should be able to specify the transport protocol.
       )
       .allocated // TODO replace with allocatedCase
       .flatMap { case (connection, release) =>
@@ -61,9 +66,9 @@ final class Http4sWSBackend[F[_]: Concurrent](client: WSClient[F]) extends WebSo
       }
 }
 
-object Http4sWSBackend {
-  def apply[F[_]: Concurrent](client: WSClient[F]): Http4sWSBackend[F] =
-    new Http4sWSBackend(client)
+object Http4sWebSocketBackend {
+  def apply[F[_]: Concurrent](client: WSClient[F]): Http4sWebSocketBackend[F] =
+    new Http4sWebSocketBackend(client)
 }
 
 final class Http4sWSConnection[F[_]: Concurrent /*: Sync: Logger*/ ](

@@ -6,6 +6,9 @@ package clue.model
 import cats.Eq
 import cats.syntax.all._
 import io.circe.Json
+import io.circe.JsonObject
+
+// FIXME This should go in json? Be named ApolloMessage?
 
 /**
  * GraphQL web socket protocol streaming messages. Messages are cleanly divided in those coming
@@ -63,10 +66,10 @@ object StreamingMessage {
      * @param payload
      *   the GraphQL request itself
      */
-    final case class Start(id: String, payload: GraphQLRequest)
+    final case class Start(id: String, payload: GraphQLRequest[JsonObject])
         extends FromClient
         with Identifier
-        with Payload[GraphQLRequest]
+        with Payload[GraphQLRequest[JsonObject]]
 
     object Start {
       implicit val EqStart: Eq[Start] =
@@ -119,9 +122,7 @@ object StreamingMessage {
      * @param payload
      *   error information
      */
-    final case class ConnectionError(payload: Map[String, Json])
-        extends FromServer
-        with Payload[Map[String, Json]]
+    final case class ConnectionError(payload: Json) extends FromServer with Payload[Json]
 
     object ConnectionError {
       implicit val EqConnectionError: Eq[ConnectionError] =
@@ -133,17 +134,6 @@ object StreamingMessage {
      */
     case object ConnectionKeepAlive extends FromServer
 
-    final case class DataWrapper(data: Json, errors: Option[Json])
-
-    object DataWrapper {
-      implicit val EqDataWrapper: Eq[DataWrapper] =
-        Eq.by(_.data)
-
-      def fromData(data: Json): DataWrapper = DataWrapper(data, none)
-
-      def fromErrors(errors: Json): DataWrapper = DataWrapper(Json.Null, errors.some)
-    }
-
     /**
      * GraphQL execution result from the server. The result is associated with an operation that was
      * previously started by a `Start` message with the associated `id`.
@@ -153,20 +143,14 @@ object StreamingMessage {
      * @param payload
      *   GraphQL result
      */
-    final case class Data(id: String, payload: DataWrapper)
+    final case class Data(id: String, payload: GraphQLDataResponse[Json])
         extends FromServer
         with Identifier
-        with Payload[DataWrapper]
+        with Payload[GraphQLDataResponse[Json]]
 
     object Data {
       implicit val EqData: Eq[Data] =
         Eq.by(a => (a.id, a.payload))
-    }
-
-    object DataJson {
-      def unapply(data: Data): Option[(String, Json, Option[Json])] = Some(
-        (data.id, data.payload.data, data.payload.errors)
-      )
     }
 
     /**
@@ -178,10 +162,10 @@ object StreamingMessage {
      * @param payload
      *   error information
      */
-    final case class Error(id: String, payload: Json)
+    final case class Error(id: String, payload: GraphQLErrors)
         extends FromServer
         with Identifier
-        with Payload[Json]
+        with Payload[GraphQLErrors]
 
     object Error {
       implicit val EqError: Eq[Error] =
