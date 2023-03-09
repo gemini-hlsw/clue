@@ -33,9 +33,9 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
     baseRequest: FetchJSRequest
   ): F[String] =
     Async[F].async_ { cb =>
-      val fetch = fetchMethod match {
+      val _headers = new Headers(baseRequest.headers)
+      val fetch    = fetchMethod match {
         case FetchMethod.POST =>
-          val _headers = new Headers(baseRequest.headers)
           _headers.set("Content-Type", "application/json")
           Fetch
             .fetch(
@@ -56,7 +56,7 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
               ),
               new RequestInit {
                 method = HttpMethod.GET
-                headers = baseRequest.headers
+                headers = _headers
               }
             )
       }
