@@ -8,15 +8,7 @@ import cats.effect.Deferred
 import cats.syntax.all._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration.FiniteDuration
-// import org.http4s.Uri
-
 package object clue {
-  type CloseReason[CE]          = Either[Throwable, CE]
-  // Int = Attempt #. Will only be 0 immediately after a close.
-  // For first connection, it will be called the first time with 1, after 1st connection attempt.
-  type ReconnectionStrategy[CE] = (Int, CloseReason[CE]) => Option[FiniteDuration]
-
   protected[clue] type Latch[F[_]] = Deferred[F, Either[Throwable, Unit]]
 
   final implicit class StringOps(val str: String) extends AnyVal {
@@ -59,10 +51,6 @@ package object clue {
 }
 
 package clue {
-  object ReconnectionStrategy {
-    def never[CE]: ReconnectionStrategy[CE] = (_, _) => none
-  }
-
   protected[clue] object Latch {
     def apply[F[_]: Concurrent]: F[Latch[F]] =
       Deferred[F, Either[Throwable, Unit]]

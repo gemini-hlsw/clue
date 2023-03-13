@@ -10,7 +10,6 @@ import cats.syntax.all._
 import clue._
 import clue.model.StreamingMessage
 import clue.model.json._
-import clue.websocket.WebSocketCloseParams
 import clue.websocket._
 import io.circe.syntax._
 import org.http4s.Headers
@@ -25,9 +24,9 @@ final class Http4sWebSocketBackend[F[_]: Concurrent](client: WSClient[F])
 
   override def connect(
     uri:          Uri,
-    handler:      PersistentBackendHandler[F, WebSocketCloseEvent],
+    handler:      WebSocketHandler[F],
     connectionId: ConnectionId
-  ): F[PersistentConnection[F, WebSocketCloseParams]] =
+  ): F[WebSocketConnection[F]] =
     client
       .connectHighLevel(
         WSRequest(uri).withHeaders(Headers("Sec-WebSocket-Protocol" -> "graphql-ws"))
@@ -45,7 +44,7 @@ final class Http4sWebSocketBackend[F[_]: Concurrent](client: WSClient[F])
             case ExitCase.Succeeded  =>
               connection.closeFrame.tryGet.flatMap { closeFrame =>
                 val event = closeFrame
-                  .map(close => WebSocketCloseParams(close.statusCode, close.reason))
+                  .map(close => CloseParams(close.statusCode, close.reason))
                   .toRight(
                     new GraphQLException(
                       s"Unexpected clean close for WS without close frame. URI: [$uri]"
@@ -78,6 +77,6 @@ final class Http4sWSConnection[F[_]: Concurrent /*: Sync: Logger*/ ](
     conn.send(WSFrame.Text(msg.asJson.toString))
 
   // In high-level WS, we cannot specify close code.
-  override def closeInternal(closeParameters: Option[WebSocketCloseParams]): F[Unit] =
+  override def closeInternal(closeParameters: Option[CloseParams]): F[Unit] =
     Concurrent[F].unit // TODO
 }

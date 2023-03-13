@@ -11,7 +11,7 @@ object WebSocketJSClient {
   def of[F[_]: Async: Logger, S](
     uri:                  String,
     name:                 String = "",
-    reconnectionStrategy: WebSocketReconnectionStrategy = WebSocketReconnectionStrategy.never
+    reconnectionStrategy: ReconnectionStrategy = ReconnectionStrategy.never
   )(implicit backend: WebSocketJSBackend[F]): F[WebSocketJSClient[F, S]] =
-    ApolloWebSocketClient.of[F, String, S](uri, name, reconnectionStrategy)
+    ApolloClient.of[F, String, S](uri, name, reconnectionStrategy)
 }
