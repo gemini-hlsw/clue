@@ -3,7 +3,6 @@
 
 package clue.websocket
 
-// import clue._
 import cats.data.Ior
 import cats.effect.Ref
 import cats.effect.Temporal
