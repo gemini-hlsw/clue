@@ -8,20 +8,21 @@ import cats.syntax.all._
 import scala.concurrent.duration.FiniteDuration
 
 package object websocket {
+  // A Left(exception) here indicates an unexpected/errored disconnection from the server.
   type CloseEvent = Either[Throwable, CloseParams]
 
-  type CloseReason          = Either[Throwable, CloseEvent]
-  // Int = Attempt #. Will only be 0 immediately after a close.
-  // For first connection, it will be called the first time with 1, after 1st connection attempt.
-  type ReconnectionStrategy = (Int, CloseReason) => Option[FiniteDuration]
+  // A Left(exception) here indicates an error establishing the connection.
+  type ReconnectReason = Either[Throwable, CloseEvent]
 
-  type WebSocketBackend[F[_], P] =
-    PersistentBackend[F, P, CloseParams, CloseEvent]
+  // Int = Attempt #. Will only be 0 immediately after a close (whether graceful or errored).
+  // If the very fist connection attempt fails, the first invocation will have Attempt = 1.
+  type ReconnectionStrategy = (Int, ReconnectReason) => Option[FiniteDuration]
+
+  type WebSocketBackend[F[_], P] = PersistentBackend[F, P, CloseParams, CloseEvent]
 
   type WebSocketConnection[F[_]] = PersistentConnection[F, CloseParams]
 
-  type WebSocketClient[F[_], S] =
-    PersistentStreamingClient[F, S, CloseParams, CloseEvent]
+  type WebSocketClient[F[_], S] = PersistentStreamingClient[F, S, CloseParams, CloseEvent]
 
   type WebSocketHandler[F[_]] = PersistentBackendHandler[F, CloseEvent]
 }
