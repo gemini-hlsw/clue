@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package clue
+package clue.websocket
 
 import cats.data.Ior
 import cats.effect.Ref
@@ -11,8 +11,7 @@ import cats.effect.implicits._
 import cats.effect.std.Queue
 import cats.effect.std.UUIDGen
 import cats.syntax.all._
-import clue.ErrorPolicyProcessor
-import clue.GraphQLSubscription
+import clue._
 import clue.model.GraphQLCombinedResponse
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLErrors
@@ -39,58 +38,58 @@ protected[clue] trait Emitter[F[_]] {
 // Client internal state for the FSM.
 // We keep a connectionId throughout all states to ensure that callback events (onClose, onMessage)
 // correpond to the current connection iteration. This is important in case of reconnections.
-protected sealed abstract class State[F[_], CP](val status: PersistentClientStatus) {
+protected sealed abstract class State[F[_]](val status: PersistentClientStatus) {
   val connectionId: ConnectionId
 }
 
 protected object State {
-  final case class Disconnected[F[_], CP](connectionId: ConnectionId)
-      extends State[F, CP](PersistentClientStatus.Disconnected)
-  final case class Connecting[F[_], CP](connectionId: ConnectionId, latch: Latch[F])
-      extends State[F, CP](PersistentClientStatus.Connecting)
-  final case class Connected[F[_], CP](
+  final case class Disconnected[F[_]](connectionId: ConnectionId)
+      extends State[F](PersistentClientStatus.Disconnected)
+  final case class Connecting[F[_]](connectionId: ConnectionId, latch: Latch[F])
+      extends State[F](PersistentClientStatus.Connecting)
+  final case class Connected[F[_]](
     connectionId: ConnectionId,
-    connection:   PersistentConnection[F, CP]
-  ) extends State[F, CP](PersistentClientStatus.Connected)
-  final case class Initializing[F[_], CP](
+    connection:   WebSocketConnection[F]
+  ) extends State[F](PersistentClientStatus.Connected)
+  final case class Initializing[F[_]](
     connectionId:  ConnectionId,
-    connection:    PersistentConnection[F, CP],
+    connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]],
     initPayload:   Map[String, Json],
     latch:         Latch[F]
-  ) extends State[F, CP](PersistentClientStatus.Initializing)
-  final case class Initialized[F[_], CP](
+  ) extends State[F](PersistentClientStatus.Initializing)
+  final case class Initialized[F[_]](
     connectionId:  ConnectionId,
-    connection:    PersistentConnection[F, CP],
+    connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]],
     initPayload:   Map[String, Json]
-  ) extends State[F, CP](PersistentClientStatus.Initialized)
+  ) extends State[F](PersistentClientStatus.Initialized)
   // Reestablishing = We are in the process of reconnecting + reinitializing after a low level error/close, but we haven't connected yet.
-  final case class Reestablishing[F[_], CP](
+  final case class Reestablishing[F[_]](
     connectionId:  ConnectionId,
     subscriptions: Map[String, Emitter[F]],
     initPayload:   Map[String, Json],
     connectLatch:  Latch[F],
     initLatch:     Latch[F]
-  ) extends State[F, CP](PersistentClientStatus.Connecting)
+  ) extends State[F](PersistentClientStatus.Connecting)
 }
 
-class ApolloClient[F[_], P, S, CP, CE](
+class ApolloClient[F[_], P, S](
   connectionParams:     P,
-  reconnectionStrategy: ReconnectionStrategy[CE],
-  state:                Ref[F, State[F, CP]],
+  reconnectionStrategy: ReconnectionStrategy,
+  state:                Ref[F, State[F]],
   connectionStatus:     SignallingRef[F, PersistentClientStatus]
 )(implicit
   F:                    Async[F],
-  backend:              PersistentBackend[F, P, CP, CE],
+  backend:              WebSocketBackend[F, P],
   logger:               Logger[F]
-) extends PersistentStreamingClient[F, S, CP, CE]
-    with PersistentBackendHandler[F, CE] {
+) extends WebSocketClient[F, S]
+    with WebSocketHandler[F] {
   import State._
   val timer = Temporal[F]
 
   // Transition FSM state and execute an action.
-  private def stateModify[A](f: State[F, CP] => (State[F, CP], F[A])): F[A] =
+  private def stateModify[A](f: State[F] => (State[F], F[A])): F[A] =
     state
       .modify { oldState =>
         val (newState, action) = f(oldState)
@@ -169,11 +168,13 @@ class ApolloClient[F[_], P, S, CP, CE](
     // .uncancelable // TODO We have waiting effects, we need to handle interruptions.
   }
 
-  final def disconnect(closeParameters: CP): F[Unit] = disconnectInternal(closeParameters.some)
+  final def disconnect(closeParameters: CloseParams): F[Unit] = disconnectInternal(
+    closeParameters.some
+  )
 
   final def disconnect(): F[Unit] = disconnectInternal(none)
 
-  private def disconnectInternal(closeParameters: Option[CP]): F[Unit] = {
+  private def disconnectInternal(closeParameters: Option[CloseParams]): F[Unit] = {
     val error            = "disconnect() called while disconnected.".raiseError.void
     val interruptedError = "disconnect() called while connecting or initializing.".error
 
@@ -209,11 +210,12 @@ class ApolloClient[F[_], P, S, CP, CE](
           case s @ Reestablishing(_, _, _, _, initLatch)                         =>
             s -> (s"reestablish() called while already reestablishing.".errorF >> initLatch.get.rethrow)
           case Initialized(connectionId, connection, subscriptions, initPayload) =>
-            Reestablishing(connectionId.next,
-                           subscriptions,
-                           initPayload,
-                           newConnectLatch,
-                           newInitLatch
+            Reestablishing(
+              connectionId.next,
+              subscriptions,
+              initPayload,
+              newConnectLatch,
+              newInitLatch
             ) ->
               ((gracefulTerminate(connection, subscriptions) >> connection.close()).start >>
                 doConnect(connectionId.next, newConnectLatch) >>
@@ -330,7 +332,7 @@ class ApolloClient[F[_], P, S, CP, CE](
     }
 
   // TODO Handle interruptions? Can callbacks be canceled?
-  override def onClose(connectionId: ConnectionId, event: CE): F[Unit] = {
+  override def onClose(connectionId: ConnectionId, event: CloseEvent): F[Unit] = {
     val error = DisconnectedException().asLeft
     val debug = s"onClose() called with mismatching connectionId.".debugF
 
@@ -376,31 +378,35 @@ class ApolloClient[F[_], P, S, CP, CE](
                   waitAndConnect(connectionId.next, newConnectLatch)
               case Initializing(stateConnectionId, _, subscriptions, initPayload, latch)
                   if connectionId === stateConnectionId =>
-                Reestablishing(connectionId.next,
-                               subscriptions,
-                               initPayload,
-                               newConnectLatch,
-                               latch
+                Reestablishing(
+                  connectionId.next,
+                  subscriptions,
+                  initPayload,
+                  newConnectLatch,
+                  latch
                 ) -> waitAndConnect(connectionId.next, newConnectLatch)
               case Initialized(stateConnectionId, _, subscriptions, initPayload)
                   if connectionId === stateConnectionId =>
-                Reestablishing(connectionId.next,
-                               subscriptions,
-                               initPayload,
-                               newConnectLatch,
-                               newInitLatch
+                Reestablishing(
+                  connectionId.next,
+                  subscriptions,
+                  initPayload,
+                  newConnectLatch,
+                  newInitLatch
                 ) -> waitAndConnect(connectionId.next, newConnectLatch)
-              case Reestablishing(stateConnectionId,
-                                  subscriptions,
-                                  initPayload,
-                                  connectLatch,
-                                  initLatch
+              case Reestablishing(
+                    stateConnectionId,
+                    subscriptions,
+                    initPayload,
+                    connectLatch,
+                    initLatch
                   ) if connectionId === stateConnectionId =>
-                Reestablishing(connectionId.next,
-                               subscriptions,
-                               initPayload,
-                               connectLatch,
-                               initLatch
+                Reestablishing(
+                  connectionId.next,
+                  subscriptions,
+                  initPayload,
+                  connectLatch,
+                  initLatch
                 ) -> waitAndConnect(connectionId.next, connectLatch)
               case s @ _                                                                     =>
                 s -> debug
@@ -450,11 +456,12 @@ class ApolloClient[F[_], P, S, CP, CE](
                         initLatch.complete(t.asLeft) >>
                         F.raiseError(t)).void
                   case Some(wait) =>
-                    Reestablishing(connectionId.next,
-                                   subscriptions,
-                                   initPayload,
-                                   connectLatch,
-                                   initLatch
+                    Reestablishing(
+                      connectionId.next,
+                      subscriptions,
+                      initPayload,
+                      connectLatch,
+                      initLatch
                     ) -> retry(t, wait, connectionId.next)
                 }
               case Right(c) =>
@@ -489,7 +496,7 @@ class ApolloClient[F[_], P, S, CP, CE](
 
   private def doInitialize(
     payload:    Map[String, Json],
-    connection: PersistentConnection[F, CP],
+    connection: WebSocketConnection[F],
     latch:      Latch[F]
   ): F[Unit] = (for {
     _ <- connection.send(StreamingMessage.FromClient.ConnectionInit(payload))
@@ -512,7 +519,7 @@ class ApolloClient[F[_], P, S, CP, CE](
   }
 
   private def gracefulTerminate(
-    connection:    PersistentConnection[F, CP],
+    connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]]
   ): F[Unit] =
     (stopSubscriptions(connection, subscriptions) >>
@@ -521,7 +528,7 @@ class ApolloClient[F[_], P, S, CP, CE](
 
   // <GraphQLStreamingClient Helpers>
   private def startSubscriptions(
-    connection:    PersistentConnection[F, CP],
+    connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]]
   ): F[Unit] =
     subscriptions.toList.traverse { case (id, emitter) =>
@@ -530,7 +537,7 @@ class ApolloClient[F[_], P, S, CP, CE](
 
   // Stop = Send stop message to server.
   private def stopSubscriptions(
-    connection:    PersistentConnection[F, CP],
+    connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]]
   ): F[Unit] =
     subscriptions.toList.traverse { case (id, _) =>
@@ -717,19 +724,19 @@ class ApolloClient[F[_], P, S, CP, CE](
 object ApolloClient {
   type SubscriptionId = UUID
 
-  def apply[F[_], P, S, CP, CE](
+  def of[F[_], P, S](
     connectionParams:     P,
     name:                 String = "",
-    reconnectionStrategy: ReconnectionStrategy[CE] = ReconnectionStrategy.never
+    reconnectionStrategy: ReconnectionStrategy = ReconnectionStrategy.never
   )(implicit
     F:                    Async[F],
-    backend:              PersistentBackend[F, P, CP, CE],
+    backend:              WebSocketBackend[F, P],
     logger:               Logger[F]
-  ): F[ApolloClient[F, P, S, CP, CE]] = {
+  ): F[ApolloClient[F, P, S]] = {
     val logPrefix = s"clue.ApolloClient[${if (name.isEmpty) connectionParams else name}]"
 
     for {
-      state            <- Ref[F].of[State[F, CP]](State.Disconnected(ConnectionId.Zero))
+      state            <- Ref[F].of[State[F]](State.Disconnected(ConnectionId.Zero))
       connectionStatus <-
         SignallingRef[F, PersistentClientStatus](PersistentClientStatus.Disconnected)
     } yield new ApolloClient(connectionParams, reconnectionStrategy, state, connectionStatus)(

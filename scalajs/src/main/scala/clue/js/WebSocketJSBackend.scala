@@ -35,7 +35,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
       isOpen     <- Ref[F].of(false)
       isErrored  <- Ref[F].of(false)
       connection <-
-        Async[F].async_[PersistentConnection[F, WebSocketCloseParams]] { cb =>
+        Async[F].async_[PersistentConnection[F, CloseParams]] { cb =>
           val ws = new WebSocket(uri, Protocol)
 
           ws.onopen = { (_: Event) =>
@@ -79,7 +79,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
                 _       <- handler.onClose(
                              connectionId,
                              if (errored) DisconnectedException().asLeft
-                             else WebSocketCloseParams(e.code, e.reason).asRight
+                             else CloseParams(e.code, e.reason).asRight
                            )
               } yield ()
             dispatcher.unsafeRunAndForget(close)
@@ -98,10 +98,10 @@ final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
   override def send(msg: StreamingMessage.FromClient): F[Unit] =
     Sync[F].delay(ws.send(msg.asJson.toString))
 
-  override def closeInternal(closeParameters: Option[WebSocketCloseParams]): F[Unit] =
+  override def closeInternal(closeParameters: Option[CloseParams]): F[Unit] =
     "Disconnecting WebSocket...".traceF >>
       Sync[F].delay {
-        val params = closeParameters.getOrElse(WebSocketCloseParams())
+        val params = closeParameters.getOrElse(CloseParams())
         // Facade for "ws.close" should define parameters as js.Undef, but it doesn't. So we contemplate all cases.
         (params.code, params.reason)
           .mapN { case (code, reason) => ws.close(code, reason) }
