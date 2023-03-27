@@ -13,17 +13,20 @@ import ScalafixPlugin.autoImport._
 object CluePlugin extends AutoPlugin {
 
   object autoImport {
-    lazy val clueSourceDirectory = settingKey[File]("Clue input schemas and sources")
+    lazy val clueSourceDirectory  = settingKey[File]("Clue input schemas and sources")
+    lazy val clueSourceGenerators = settingKey[Seq[Task[Seq[File]]]]("Clue source generators")
   }
   import autoImport._
 
   override def buildSettings: Seq[Setting[_]] = Seq(
     scalafixScalaBinaryVersion                     := "2.13",
-    scalafixDependencies += BuildInfo.organization %% BuildInfo.rulesModule % BuildInfo.version
+    scalafixDependencies += BuildInfo.organization %% BuildInfo.rulesModule % BuildInfo.version,
+    Compile / clueSourceGenerators                 := Seq.empty
   )
 
   override def projectSettings: Seq[Setting[_]] = Seq(
-    Compile / clueSourceDirectory                  := sourceDirectory.value / "clue",
+    Compile / clueSourceDirectory := sourceDirectory.value / "clue",
+    Compile / sourceGenerators ++= (Compile / clueSourceGenerators).value, // workaround for sbt/sbt#7173
     libraryDependencies += BuildInfo.organization %%% BuildInfo.coreModule % BuildInfo.version
   )
 
@@ -42,7 +45,7 @@ object CluePlugin extends AutoPlugin {
           (LocalProject(proj.id) / Compile / dependencyClasspath).value,
 
         // register generator
-        LocalProject(proj.id) / Compile / sourceGenerators += Def.taskDyn {
+        LocalProject(proj.id) / Compile / clueSourceGenerators += Def.taskDyn {
           val root    = (LocalRootProject / baseDirectory).value.toPath
           val from    = (Compile / clueSourceDirectory).value
           val to      = (LocalProject(proj.id) / Compile / sourceManaged).value
