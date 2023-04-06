@@ -164,6 +164,7 @@ lazy val sbtPlugin = project
     crossScalaVersions := List("2.12.17"),
     addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % "0.10.4"),
     addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.1"),
+    addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.0"),
     buildInfoPackage   := "clue.sbt",
     buildInfoKeys      := Seq[BuildInfoKey](version,
                                        organization,

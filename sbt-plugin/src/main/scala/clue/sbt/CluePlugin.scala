@@ -3,11 +3,13 @@
 
 package clue.sbt
 
+import sbtcrossproject.CrossPlugin
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 import sbt._
 import scalafix.sbt.ScalafixPlugin
 
 import Keys._
+import CrossPlugin.autoImport._
 import ScalafixPlugin.autoImport._
 
 object CluePlugin extends AutoPlugin {
@@ -25,7 +27,17 @@ object CluePlugin extends AutoPlugin {
   )
 
   override def projectSettings: Seq[Setting[_]] = Seq(
-    Compile / clueSourceDirectory := sourceDirectory.value / "clue",
+    Compile / clueSourceDirectory                  := {
+      crossProjectCrossType.?.value
+        .zip(crossProjectBaseDirectory.?.value)
+        .toList
+        .headOption
+        .flatMap { case (crossType, baseDir) =>
+          println(baseDir)
+          crossType.sharedSrcDir(baseDir, "clue")
+        }
+        .getOrElse(sourceDirectory.value / "clue")
+    },
     Compile / sourceGenerators ++= (Compile / clueSourceGenerators).value, // workaround for sbt/sbt#7173
     libraryDependencies += BuildInfo.organization %%% BuildInfo.coreModule % BuildInfo.version
   )
@@ -49,6 +61,7 @@ object CluePlugin extends AutoPlugin {
           val root    = (LocalRootProject / baseDirectory).value.toPath
           val from    = (Compile / clueSourceDirectory).value
           val to      = (LocalProject(proj.id) / Compile / sourceManaged).value
+          println((root, from))
           val outFrom = root.relativize(from.toPath).normalize
           val outTo   = root.relativize(to.toPath).normalize
           Def.task {
