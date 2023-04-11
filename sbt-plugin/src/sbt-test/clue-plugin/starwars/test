@@ -1,3 +1,4 @@
 > app/compile
 > app/clean
 $ absent app-clue/target/scala-2.13
+> app/compile
