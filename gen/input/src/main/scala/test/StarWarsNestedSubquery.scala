@@ -12,7 +12,6 @@ import clue.GraphQLSubquery
 import clue.annotation.GraphQL
 import test.StarWars
 
-import test.StarWarsSubquery
 @GraphQL
 abstract class StarWarsNestedSubquery extends GraphQLSubquery[StarWars]("Character") {
 
