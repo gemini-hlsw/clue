@@ -12,6 +12,7 @@ import clue.GraphQLOperation
 import clue.annotation.GraphQL
 import test.StarWars
 
+import test.StarWarsSubquery
 @GraphQL
 trait StarWarsQuery3 extends GraphQLOperation[StarWars] {
   override val document: String = s"""

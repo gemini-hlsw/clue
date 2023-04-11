@@ -43,6 +43,18 @@ class GraphQLGen(config: GraphQLGenConfig)
       doc.tree
         .collect {
           case obj @ Defn.Object(
+                GraphQLAnnotation(_),
+                name,
+                template
+              ) => // Annotated objects are copied as-is
+            // TODO: We should be able to validate the query!
+            IO.pure(
+              Patch.replaceTree(
+                obj,
+                indented(obj)(q"object $name $template".toString)
+              ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
+            )
+          case obj @ Defn.Object(
                 GraphQLStubAnnotation(_),
                 _,
                 _

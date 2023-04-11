@@ -10,27 +10,16 @@ package test
 
 import clue.GraphQLSubquery
 import clue.annotation.GraphQL
+import io.circe.Json
 import test.StarWars
 
-import test.StarWarsSubquery
 @GraphQL
-abstract class StarWarsNestedSubquery extends GraphQLSubquery[StarWars]("Character") {
+object StarWarsSubquery2 extends GraphQLSubquery.Typed[StarWars, Json]("Character") {
 
-  override val subquery: String = s"""
+  override val subquery: String = """
         {
-          id
           name
-          ... on Human {
-            homePlanet
-          }
-          friends $StarWarsSubquery
-          ... on Droid {
-            primaryFunction
-          }
         }
       """
 }
-
-@clue.annotation.GraphQLStub
-object StarWarsNestedSubquery
 // format: on
