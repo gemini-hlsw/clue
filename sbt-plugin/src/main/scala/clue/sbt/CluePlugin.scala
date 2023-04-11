@@ -15,19 +15,23 @@ object CluePlugin extends AutoPlugin {
   object autoImport {
     lazy val clueSourceDirectory  = settingKey[File]("Clue input schemas and sources")
     lazy val clueSourceGenerators = settingKey[Seq[Task[Seq[File]]]]("Clue source generators")
+    lazy val clueClean            = taskKey[Unit]("Clue clean task")
   }
   import autoImport._
 
   override def buildSettings: Seq[Setting[_]] = Seq(
     scalafixScalaBinaryVersion                     := "2.13",
     scalafixDependencies += BuildInfo.organization %% BuildInfo.rulesModule % BuildInfo.version,
-    Compile / clueSourceGenerators                 := Seq.empty
+    Compile / clueSourceGenerators                 := Seq.empty,
+    clueClean                                      := {}
   )
 
   override def projectSettings: Seq[Setting[_]] = Seq(
     Compile / clueSourceDirectory := sourceDirectory.value / "clue",
     Compile / sourceGenerators ++= (Compile / clueSourceGenerators).value, // workaround for sbt/sbt#7173
-    libraryDependencies += BuildInfo.organization %%% BuildInfo.coreModule % BuildInfo.version
+    libraryDependencies += BuildInfo.organization %%% BuildInfo.coreModule % BuildInfo.version,
+    // another workaround
+    clean                                          := clean.dependsOn(clueClean).value
   )
 
   override def derivedProjects(proj: ProjectDefinition[_]): Seq[Project] = Seq(
@@ -61,9 +65,8 @@ object CluePlugin extends AutoPlugin {
         }.taskValue,
 
         // register clean
-        LocalProject(proj.id) / clean := {
-          val _ = clean.value
-          (LocalProject(proj.id) / clean).value
+        LocalProject(proj.id) / clueClean := {
+          clean.value
         },
 
         // scalafix stuff
