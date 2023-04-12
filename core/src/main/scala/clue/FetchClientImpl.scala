@@ -20,7 +20,7 @@ import org.typelevel.log4cats.Logger
 // }
 class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(implicit
   backend: FetchBackend[F, P]
-) extends clue.FetchClient[F, P, S] {
+) extends clue.FetchClientWithPars[F, P, S] {
   override protected def requestInternal[D: Decoder, R](
     document:      String,
     operationName: Option[String],

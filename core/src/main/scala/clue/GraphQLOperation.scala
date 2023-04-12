@@ -22,3 +22,17 @@ trait GraphQLOperation[S] {
     implicit val implicitDataDecoder: Decoder[Data]              = dataDecoder
   }
 }
+
+object GraphQLOperation {
+  abstract class Typed[S, V: Encoder.AsObject, T: Decoder] extends GraphQLOperation[S] {
+    override type Variables = V
+    override type Data      = T
+
+    override val varEncoder  = implicitly[Encoder.AsObject[V]]
+    override val dataDecoder = implicitly[Decoder[T]]
+  }
+
+  object Typed {
+    abstract class NoInput[S, T: Decoder] extends Typed[S, Unit, T]
+  }
+}

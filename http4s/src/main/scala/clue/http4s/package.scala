@@ -6,5 +6,5 @@ package clue
 import org.http4s.Request
 
 package object http4s {
-  type Http4sHttpClient[F[_], S] = FetchClient[F, Request[F], S]
+  type Http4sHttpClient[F[_], S] = FetchClientWithPars[F, Request[F], S]
 }

@@ -9,6 +9,8 @@ import cats.syntax.all._
 import org.typelevel.log4cats.Logger
 
 package object clue {
+  type FetchClient[F[_], S] = FetchClientWithPars[F, _, S]
+
   protected[clue] type Latch[F[_]] = Deferred[F, Either[Throwable, Unit]]
 
   final implicit class StringOps(val str: String) extends AnyVal {
