@@ -503,14 +503,14 @@ trait QueryGen extends Generator {
           val applied        =
             q"""def apply[F[_]]: clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] =
                   new clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] {
-                    def applyP[P](client: clue.FetchClient[F, P, $schemaType]) = new ClientAppliedFP(client)
+                    def applyP[P](client: clue.FetchClientWithPars[F, P, $schemaType]) = new ClientAppliedFP(client)
                   }"""
           parentBody ++
             (operation match {
               case _: UntypedQuery =>
                 List(
                   applied,
-                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClient[F, P, $schemaType]) {
+                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
                       def query(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
                         client.request(${Term
                       .Name(objName)})(errorPolicy)(Variables(...$variablesNames), modParams)
@@ -521,7 +521,7 @@ trait QueryGen extends Generator {
               case _: UntypedMutation     =>
                 List(
                   applied,
-                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClient[F, P, $schemaType]) {
+                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
                       def execute(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
                         client.request(${Term
                       .Name(objName)})(errorPolicy)(Variables(...$variablesNames), modParams)

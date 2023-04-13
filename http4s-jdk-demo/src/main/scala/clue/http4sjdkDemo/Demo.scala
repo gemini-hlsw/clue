@@ -19,7 +19,6 @@ import clue.websocket.WebSocketClient
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.JsonObject
 import io.circe.generic.semiauto._
 import org.http4s.implicits._
 import org.http4s.jdkhttpclient.JdkWSClient
@@ -30,45 +29,33 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 object Demo extends IOApp.Simple {
+  type DemoDB
+
   implicit private val DefaultErrorPolicy: ErrorPolicy.ReturnAlways.type = ErrorPolicy.ReturnAlways
 
-  object Query extends GraphQLOperation[Unit] {
-    type Data      = Json
-    type Variables = JsonObject
-
+  object Query extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
     override val document: String = """
-    |query {
-    |  observations(WHERE: {programId: {EQ: "p-2"}}) {
-    |    matches {
-    |      id
-    |      title
-    |      status
-    |    }
-    |  }
-    |}""".stripMargin
-
-    override val varEncoder: Encoder.AsObject[Variables] = Encoder.AsObject[JsonObject]
-
-    override val dataDecoder: Decoder[Data] = Decoder[Json]
+      |query {
+      |  observations(WHERE: {programId: {EQ: "p-2"}}) {
+      |    matches {
+      |      id
+      |      title
+      |      status
+      |    }
+      |  }
+      |}""".stripMargin
   }
 
-  object Subscription extends GraphQLOperation[Unit] {
-    type Data      = Json
-    type Variables = JsonObject
-
+  object Subscription extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
     override val document: String = """
-    |subscription {
-    |  observationEdit(programId:"p-2") {
-    |    id
-    |  }
-    |}""".stripMargin
-
-    override val varEncoder: Encoder.AsObject[Variables] = Encoder.AsObject[JsonObject]
-
-    override val dataDecoder: Decoder[Data] = Decoder[Json]
+      |subscription {
+      |  observationEdit(programId:"p-2") {
+      |    id
+      |  }
+      |}""".stripMargin
   }
 
-  object Mutation extends GraphQLOperation[Unit] {
+  object Mutation extends GraphQLOperation[DemoDB] {
     type Data = Json
     case class Variables(observationId: String, status: String)
 
@@ -88,19 +75,19 @@ object Demo extends IOApp.Simple {
   def withLogger[F[_]: Sync]: Resource[F, Logger[F]] =
     Resource.make(Slf4jLogger.create[F])(_ => Applicative[F].unit)
 
-  def withStreamingClient[F[_]: Async: Logger]: Resource[F, WebSocketClient[F, Unit]] =
+  def withStreamingClient[F[_]: Async: Logger]: Resource[F, WebSocketClient[F, DemoDB]] =
     for {
       client <- Resource.eval(JdkWSClient.simple)
       backend = Http4sWebSocketBackend(client)
       uri     = uri"wss://lucuma-odb-development.herokuapp.com/ws"
-      sc     <- Resource.eval(Http4sWebSocketClient.of[F, Unit](uri)(Async[F], Logger[F], backend))
+      sc     <- Resource.eval(Http4sWebSocketClient.of[F, DemoDB](uri)(Async[F], Logger[F], backend))
       _      <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
     } yield sc
 
   val allStatus =
     List("NEW", "INCLUDED", "PROPOSED", "APPROVED", "FOR_REVIEW", "READY", "ONGOING", "OBSERVED")
 
-  def randomMutate(client: FetchClient[IO, Unit, Unit], ids: List[String]) =
+  def randomMutate(client: FetchClient[IO, DemoDB], ids: List[String]) =
     for {
       id     <- IO(ids(Random.between(0, ids.length)))
       status <- IO(allStatus(Random.between(0, allStatus.length)))
@@ -112,7 +99,7 @@ object Demo extends IOApp.Simple {
         )
     } yield ()
 
-  def mutator(client: FetchClient[IO, Unit, Unit], ids: List[String]) =
+  def mutator(client: FetchClient[IO, DemoDB], ids: List[String]) =
     for {
       _ <- IO.sleep(3.seconds)
       _ <- randomMutate(client, ids)

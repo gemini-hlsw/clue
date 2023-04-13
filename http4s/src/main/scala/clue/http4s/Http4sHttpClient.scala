@@ -18,7 +18,7 @@ object Http4sHttpClient {
     backend: Http4sHttpBackend[F],
     logger:  Logger[F]
   ): F[Http4sHttpClient[F, S]] = {
-    val logPrefix = s"clue.FetchClient[${if (name.isEmpty) uri else name}]"
+    val logPrefix = s"clue.FetchClientWithPars[${if (name.isEmpty) uri else name}]"
 
     val internalLogger = logger.withModifiedString(s => s"$logPrefix $s")
 

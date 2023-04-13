@@ -12,13 +12,16 @@ import io.circe.syntax._
 /**
  * A client that allows one-shot queries and mutations.
  */
-trait FetchClient[F[_], P, S] {
-  case class RequestApplied[V: Encoder.AsObject, D: Decoder, R] protected[FetchClient] (
+trait FetchClientWithPars[F[_], P, S] {
+  case class RequestApplied[V: Encoder.AsObject, D: Decoder, R] protected[FetchClientWithPars] (
     operation:     GraphQLOperation[S],
     operationName: Option[String],
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ) {
-    def apply(variables: V, modParams: P => P = identity): F[R] =
+    def apply(variables: V): F[R] =
+      apply(variables, identity)
+
+    def apply(variables: V, modParams: P => P): F[R] =
       requestInternal(
         operation.document,
         operationName,
@@ -66,7 +69,7 @@ trait FetchClient[F[_], P, S] {
 /**
  * A client that allows subscriptions in addition to one-shot queries and mutations.
  */
-trait StreamingClient[F[_], S] extends FetchClient[F, Unit, S] {
+trait StreamingClient[F[_], S] extends FetchClientWithPars[F, Unit, S] {
   case class SubscriptionApplied[V: Encoder.AsObject, D: Decoder, R] protected[StreamingClient] (
     subscription:  GraphQLOperation[S],
     operationName: Option[String] = none,
