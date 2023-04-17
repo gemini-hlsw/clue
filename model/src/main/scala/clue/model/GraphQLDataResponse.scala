@@ -4,6 +4,7 @@
 package clue.model
 
 import cats.Eq
+import cats.syntax.option._
 
 /**
  * A GraphQL response with data.
@@ -21,8 +22,8 @@ import cats.Eq
  */
 final case class GraphQLDataResponse[D](
   data:       D,
-  errors:     Option[GraphQLErrors],
-  extensions: Option[GraphQLExtensions]
+  errors:     Option[GraphQLErrors] = none,
+  extensions: Option[GraphQLExtensions] = none
 )
 
 object GraphQLDataResponse {
