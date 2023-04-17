@@ -92,11 +92,7 @@ object Demo extends IOApp.Simple {
       id     <- IO(ids(Random.between(0, ids.length)))
       status <- IO(allStatus(Random.between(0, allStatus.length)))
       _      <-
-        client.request(Mutation)(
-          implicitly[ErrorPolicy]
-        )( // FIXME How can we avoid that implicitly here??? I guess contexts params in Scala 3 can help
-          Mutation.Variables(id, status)
-        )
+        client.request(Mutation).withInput(Mutation.Variables(id, status))
     } yield ()
 
   def mutator(client: FetchClient[IO, DemoDB], ids: List[String]) =
