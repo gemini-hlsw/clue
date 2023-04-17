@@ -27,7 +27,7 @@ trait QueryGen extends Generator {
   protected def extractSchemaAndRootTypes(list: List[Init]): Option[(Type.Name, String)] =
     list.collect {
       case Init(
-            Type.Apply(Type.Name("GraphQLSubquery"), List(tpe @ Type.Name(_))),
+            Type.Apply(_, (tpe @ Type.Name(_)) :: _),
             _,
             List(List(Lit.String(rootType)))
           ) =>

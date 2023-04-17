@@ -32,6 +32,37 @@ class GraphQLGen(config: GraphQLGenConfig)
     newLineIndent + lines.replaceAll("\\n", newLineIndent)
   }
 
+  private object GraphQLAnnotated {
+    def unapply(tree: Tree): Option[(List[Mod], String, Template)] = tree match {
+      case Defn.Trait(
+            mods @ GraphQLAnnotation(_),
+            templateName,
+            Nil,
+            _,
+            template
+          ) =>
+        Some((mods, templateName.value, template))
+
+      case Defn.Class(
+            mods @ GraphQLAnnotation(_),
+            templateName,
+            Nil,
+            _,
+            template
+          ) =>
+        Some((mods, templateName.value, template))
+
+      case Defn.Object(
+            mods @ GraphQLAnnotation(_),
+            name,
+            template
+          ) =>
+        Some((mods, name.value, template))
+
+      case _ => None
+    }
+  }
+
   override def fix(implicit doc: SemanticDocument): Patch = {
     val importPatch: List[IO[Patch]] =
       doc.tokens.collect {
@@ -42,18 +73,6 @@ class GraphQLGen(config: GraphQLGenConfig)
     val genPatch: List[IO[Patch]] =
       doc.tree
         .collect {
-          case obj @ Defn.Object(
-                GraphQLAnnotation(_),
-                name,
-                template
-              ) => // Annotated objects are copied as-is
-            // TODO: We should be able to validate the query!
-            IO.pure(
-              Patch.replaceTree(
-                obj,
-                indented(obj)(q"object $name $template".toString)
-              ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
-            )
           case obj @ Defn.Object(
                 GraphQLStubAnnotation(_),
                 _,
@@ -87,18 +106,14 @@ class GraphQLGen(config: GraphQLGenConfig)
                 )
               ) + Patch.removeGlobalImport(GraphQLSchemaAnnotation.symbol)
             }
-          case obj @ Defn.Trait(
-                mods @ GraphQLAnnotation(_),
-                templateName,
-                Nil,
-                _,
+          case obj @ GraphQLAnnotated(
+                mods,
+                objName,
                 Template(early, inits, self, stats)
               ) if inits.exists {
                 case Init(Type.Apply(Type.Name("GraphQLOperation"), _), _, _) => true
                 case _                                                        => false
               } =>
-            val objName = templateName.value
-
             extractSchemaType(inits) match {
               case None             =>
                 abort(
@@ -155,18 +170,20 @@ class GraphQLGen(config: GraphQLGenConfig)
                     }
                 }
             }
-          case obj @ Defn.Class(
+          case obj @ GraphQLAnnotated(
                 mods @ GraphQLAnnotation(_),
-                templateName,
-                Nil,
-                _,
+                objName,
                 Template(early, inits, self, stats)
               ) if inits.exists {
-                case Init(Type.Apply(Type.Name("GraphQLSubquery"), _), _, _) => true
-                case _                                                       => false
+                case Init(
+                      Type.Apply(Type.Name("GraphQLSubquery"), _) |
+                      Type.Apply(Type.Select(Term.Name("GraphQLSubquery"), Type.Name("Typed")), _),
+                      _,
+                      _
+                    ) =>
+                  true
+                case _ => false
               } =>
-            val objName = templateName.value
-
             extractSchemaAndRootTypes(inits) match {
               case None                             =>
                 abort(

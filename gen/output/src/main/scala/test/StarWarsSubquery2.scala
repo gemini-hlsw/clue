@@ -9,7 +9,6 @@ import clue.GraphQLSubquery
 import io.circe.Json
 import test.StarWars
 
-
 object StarWarsSubquery2 extends GraphQLSubquery.Typed[StarWars, Json]("Character") {
   override val subquery: String = """
         {
