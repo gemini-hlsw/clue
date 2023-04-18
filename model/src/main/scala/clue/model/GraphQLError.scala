@@ -7,6 +7,7 @@ import cats.Eq
 import cats.data.NonEmptyList
 import cats.syntax.either._
 import cats.syntax.eq._
+import cats.syntax.option._
 import clue.model.GraphQLError.Location
 import clue.model.GraphQLError.PathElement
 
@@ -28,9 +29,9 @@ import clue.model.GraphQLError.PathElement
  */
 final case class GraphQLError(
   message:    String,
-  path:       Option[NonEmptyList[PathElement]],
-  locations:  Option[NonEmptyList[Location]],
-  extensions: Option[GraphQLExtensions]
+  path:       Option[NonEmptyList[PathElement]] = none,
+  locations:  Option[NonEmptyList[Location]] = none,
+  extensions: Option[GraphQLExtensions] = none
 )
 
 object GraphQLError {

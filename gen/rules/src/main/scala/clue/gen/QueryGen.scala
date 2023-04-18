@@ -513,7 +513,7 @@ trait QueryGen extends Generator {
                   q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
                       def query(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
                         client.request(${Term
-                      .Name(objName)})(errorPolicy)(Variables(...$variablesNames), modParams)
+                      .Name(objName)}).withInput(Variables(...$variablesNames), modParams)
                     }
                   """
                 )
@@ -524,7 +524,7 @@ trait QueryGen extends Generator {
                   q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
                       def execute(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
                         client.request(${Term
-                      .Name(objName)})(errorPolicy)(Variables(...$variablesNames), modParams)
+                      .Name(objName)}).withInput(Variables(...$variablesNames), modParams)
                     }
                   """
                 )
@@ -532,7 +532,7 @@ trait QueryGen extends Generator {
                 val epiParam    = param"implicit errorPolicy: clue.ErrorPolicy"
                 val clientParam = param"implicit client: clue.StreamingClient[F, $schemaType]"
                 List(
-                  q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this)(errorPolicy)(Variables(...$variablesNames))"
+                  q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this).withInput(Variables(...$variablesNames))"
                 )
             })
         }

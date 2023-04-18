@@ -18,10 +18,10 @@ trait FetchClientWithPars[F[_], P, S] {
     operationName: Option[String],
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ) {
-    def apply(variables: V): F[R] =
-      apply(variables, identity)
+    def withInput(variables: V): F[R] =
+      withInput(variables, identity)
 
-    def apply(variables: V, modParams: P => P): F[R] =
+    def withInput(variables: V, modParams: P => P): F[R] =
       requestInternal(
         operation.document,
         operationName,
@@ -30,7 +30,7 @@ trait FetchClientWithPars[F[_], P, S] {
         errorPolicy
       )
 
-    def apply(modParams: P => P): F[R] =
+    def withModParams(modParams: P => P): F[R] =
       requestInternal(operation.document, operationName, none, modParams, errorPolicy)
 
     def apply: F[R] =
@@ -75,7 +75,7 @@ trait StreamingClient[F[_], S] extends FetchClientWithPars[F, Unit, S] {
     operationName: Option[String] = none,
     errorPolicy:   ErrorPolicyProcessor[D, R]
   ) {
-    def apply(variables: V): Resource[F, fs2.Stream[F, R]] =
+    def withInput(variables: V): Resource[F, fs2.Stream[F, R]] =
       subscribeInternal(
         subscription.document,
         operationName,
