@@ -27,14 +27,10 @@ object CluePlugin extends AutoPlugin {
   )
 
   override def projectSettings: Seq[Setting[_]] = Seq(
-    Compile / clueSourceDirectory                  := {
+    Compile / clueSourceDirectory := {
       crossProjectCrossType.?.value
-        .zip(crossProjectBaseDirectory.?.value)
-        .toList
-        .headOption
-        .flatMap { case (crossType, baseDir) =>
-          println(baseDir)
-          crossType.sharedSrcDir(baseDir, "clue")
+        .flatMap { crossType =>
+          crossType.sharedSrcDir(baseDirectory.value, "clue").map(_.getParentFile)
         }
         .getOrElse(sourceDirectory.value / "clue")
     },
@@ -61,7 +57,6 @@ object CluePlugin extends AutoPlugin {
           val root    = (LocalRootProject / baseDirectory).value.toPath
           val from    = (Compile / clueSourceDirectory).value
           val to      = (LocalProject(proj.id) / Compile / sourceManaged).value
-          println((root, from))
           val outFrom = root.relativize(from.toPath).normalize
           val outTo   = root.relativize(to.toPath).normalize
           Def.task {
