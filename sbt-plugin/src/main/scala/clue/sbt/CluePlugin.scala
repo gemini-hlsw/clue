@@ -3,9 +3,9 @@
 
 package clue.sbt
 
-import sbtcrossproject.CrossPlugin
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 import sbt._
+import sbtcrossproject.CrossPlugin
 import scalafix.sbt.ScalafixPlugin
 
 import Keys._
