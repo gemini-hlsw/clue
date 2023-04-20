@@ -5,9 +5,11 @@ package clue.sbt
 
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 import sbt._
+import sbtcrossproject.CrossPlugin
 import scalafix.sbt.ScalafixPlugin
 
 import Keys._
+import CrossPlugin.autoImport._
 import ScalafixPlugin.autoImport._
 
 object CluePlugin extends AutoPlugin {
@@ -27,7 +29,13 @@ object CluePlugin extends AutoPlugin {
   )
 
   override def projectSettings: Seq[Setting[_]] = Seq(
-    Compile / clueSourceDirectory := sourceDirectory.value / "clue",
+    Compile / clueSourceDirectory := {
+      crossProjectCrossType.?.value
+        .flatMap { crossType =>
+          crossType.sharedSrcDir(baseDirectory.value, "clue").map(_.getParentFile)
+        }
+        .getOrElse(sourceDirectory.value / "clue")
+    },
     Compile / sourceGenerators ++= (Compile / clueSourceGenerators).value, // workaround for sbt/sbt#7173
     libraryDependencies += BuildInfo.organization %%% BuildInfo.coreModule % BuildInfo.version,
     // another workaround
