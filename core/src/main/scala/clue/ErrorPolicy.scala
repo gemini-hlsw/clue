@@ -24,8 +24,11 @@ sealed trait ErrorPolicyProcessor[D, R] {
 object ErrorPolicy {
   protected sealed trait Distinct[D] extends ErrorPolicyProcessor[D, D] {
     protected def processData[F[_]: Applicative, D](data: D): F[D] = Applicative[F].pure(data)
-    protected def processErrors[F[_]: ApplicativeThrow, D](errors: GraphQLErrors): F[D] =
-      ApplicativeThrow[F].raiseError(ResponseException(errors))
+    protected def processErrors[F[_]: ApplicativeThrow, D](
+      errors: GraphQLErrors,
+      data:   Option[D] = none
+    ): F[D] =
+      ApplicativeThrow[F].raiseError(ResponseException(errors, data))
   }
 
   object IgnoreOnData extends ErrorPolicy {
@@ -47,9 +50,9 @@ object ErrorPolicy {
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
       def process[F[_]: ApplicativeThrow](result: GraphQLCombinedResponse[D]): F[ReturnType[D]] =
         result match {
-          case Ior.Left(errors)    => processErrors(errors)
-          case Ior.Right(data)     => processData(data)
-          case Ior.Both(errors, _) => processErrors(errors)
+          case Ior.Left(errors)       => processErrors(errors)
+          case Ior.Right(data)        => processData(data)
+          case Ior.Both(errors, data) => processErrors(errors, data.some)
         }
     }
   }
@@ -73,7 +76,7 @@ object ErrorPolicy {
 
         def process[F[_]: ApplicativeThrow](result: GraphQLCombinedResponse[D]): F[ReturnType[D]] =
           result match {
-            case Ior.Left(errors)       => ApplicativeThrow[F].raiseError(ResponseException(errors))
+            case Ior.Left(errors)       => ApplicativeThrow[F].raiseError(ResponseException(errors, none))
             case Ior.Right(data)        => Applicative[F].pure(GraphQLDataResponse(data, none, none))
             case Ior.Both(errors, data) =>
               Applicative[F].pure(GraphQLDataResponse(data, errors.some, none))

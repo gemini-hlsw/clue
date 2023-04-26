@@ -14,4 +14,5 @@ case class DisconnectedException() extends GraphQLException("Connection was clos
 case class InvalidSubscriptionIdException(id: String)
     extends GraphQLException(s"Invalid subscription id: $id")
 
-case class ResponseException(errors: GraphQLErrors) extends GraphQLException(errors.toString)
+case class ResponseException[D](errors: GraphQLErrors, data: Option[D])
+    extends GraphQLException(errors.toString)
