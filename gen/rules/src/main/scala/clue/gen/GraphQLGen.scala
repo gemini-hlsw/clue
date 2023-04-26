@@ -111,8 +111,14 @@ class GraphQLGen(config: GraphQLGenConfig)
                 objName,
                 Template(early, inits, self, stats)
               ) if inits.exists {
-                case Init(Type.Apply(Type.Name("GraphQLOperation"), _), _, _) => true
-                case _                                                        => false
+                case Init(
+                      Type.Apply(Type.Name("GraphQLOperation"), _) |
+                      Type.Apply(Type.Select(Term.Name("GraphQLOperation"), Type.Name("Typed")), _),
+                      _,
+                      _
+                    ) =>
+                  true
+                case _ => false
               } =>
             extractSchemaType(inits) match {
               case None             =>
@@ -141,17 +147,33 @@ class GraphQLGen(config: GraphQLGenConfig)
                         ) >> IO {
                           val operation = queryResult.toOption.get
 
-                          // Modifications to add the missing definitions.
-                          val modObjDefs = scala.Function.chain(
-                            List(
-                              addImports(schemaType.value),
-                              addVars(schema, operation, config),
-                              addData(schema, operation, config, document.subqueries),
-                              addVarEncoder,
-                              addDataDecoder,
-                              addConvenienceMethod(schemaType, operation, objName)
-                            )
-                          )
+                          val typed = inits.exists {
+                            case Init(
+                                  Type.Apply(
+                                    Type.Select(Term.Name("GraphQLOperation"), Type.Name("Typed")),
+                                    _
+                                  ),
+                                  _,
+                                  _
+                                ) =>
+                              true
+                            case _ => false
+                          }
+
+                          val modObjDefs =
+                            if (typed) // everything is already defined
+                              identity[List[Stat]](_)
+                            else // Modifications to add the missing definitions.
+                              scala.Function.chain(
+                                List(
+                                  addImports(schemaType.value),
+                                  addVars(schema, operation, config),
+                                  addData(schema, operation, config, document.subqueries),
+                                  addVarEncoder,
+                                  addDataDecoder,
+                                  addConvenienceMethod(schemaType, operation, objName)
+                                )
+                              )
 
                           val newMods = GraphQLAnnotation.removeFrom(mods)
 
@@ -211,21 +233,37 @@ class GraphQLGen(config: GraphQLGenConfig)
                         ) >> IO {
                           val operation = queryResult.toOption.get
 
-                          // Modifications to add the missing definitions.
-                          val modObjDefs = scala.Function.chain(
-                            List(
-                              addImports(schemaType.value),
-                              addData(
-                                schema,
-                                operation,
-                                config,
-                                subquery.subqueries,
-                                schema.types.find(_.name == rootTypeName)
-                              ),
-                              addDataDecoder,
-                              addConvenienceMethod(schemaType, operation, objName)
-                            )
-                          )
+                          val typed = inits.exists {
+                            case Init(
+                                  Type.Apply(
+                                    Type.Select(Term.Name("GraphQLSubquery"), Type.Name("Typed")),
+                                    _
+                                  ),
+                                  _,
+                                  _
+                                ) =>
+                              true
+                            case _ => false
+                          }
+
+                          val modObjDefs =
+                            if (typed) // everything is already defined
+                              identity[List[Stat]](_)
+                            else       // Modifications to add the missing definitions.
+                              scala.Function.chain(
+                                List(
+                                  addImports(schemaType.value),
+                                  addData(
+                                    schema,
+                                    operation,
+                                    config,
+                                    subquery.subqueries,
+                                    schema.types.find(_.name == rootTypeName)
+                                  ),
+                                  addDataDecoder,
+                                  addConvenienceMethod(schemaType, operation, objName)
+                                )
+                              )
 
                           val newMods = GraphQLAnnotation.removeFrom(mods).filterNot {
                             case Mod.Abstract() => true
