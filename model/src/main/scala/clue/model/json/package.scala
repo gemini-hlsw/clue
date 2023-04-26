@@ -250,12 +250,12 @@ package object json {
     (a: GraphQLError.PathElement) => a.fold(_.asJson, _.asJson)
 
   implicit val DecoderGraphQLErrorPathElement: Decoder[GraphQLError.PathElement] =
-    Decoder.instance(c =>
-      c.as[Int]
-        .map(GraphQLError.PathElement.int)
-        .orElse(c.as[String].map(GraphQLError.PathElement.string))
-        .orElse(DecodingFailure(s"Unexpected PathElement", c.history).asLeft)
-    )
+    Decoder.instance { c =>
+      if (c.value.isNumber)
+        c.as[Int].map(GraphQLError.PathElement.int)
+      else
+        c.as[String].map(GraphQLError.PathElement.string)
+    }
 
   implicit val EncoderGraphQLErrorLocation: Encoder[GraphQLError.Location] =
     Encoder.instance(a =>
