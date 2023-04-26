@@ -63,6 +63,44 @@ class GraphQLGen(config: GraphQLGenConfig)
     }
   }
 
+  private def isGraphQLOperation(inits: List[Init]) =
+    inits.exists {
+      case Init(Type.Apply(Type.Name("GraphQLOperation"), _), _, _) => true
+      case _                                                        => false
+    }
+
+  private def isGraphQLOperationTyped(inits: List[Init]) =
+    inits.exists {
+      case Init(Type.Apply(
+                  Type.Select(Term.Name("GraphQLOperation"), Type.Name("Typed")),
+                  _
+                ),
+                _,
+                _
+          ) =>
+        true
+      case _ => false
+    }
+
+  private def isGraphQLSubquery(inits: List[Init]) =
+    inits.exists {
+      case Init(Type.Apply(Type.Name("GraphQLSubquery"), _), _, _) => true
+      case _                                                       => false
+    }
+
+  private def isGraphQLSubqueryTyped(inits: List[Init]) =
+    inits.exists {
+      case Init(Type.Apply(
+                  Type.Select(Term.Name("GraphQLSubquery"), Type.Name("Typed")),
+                  _
+                ),
+                _,
+                _
+          ) =>
+        true
+      case _ => false
+    }
+
   override def fix(implicit doc: SemanticDocument): Patch = {
     val importPatch: List[IO[Patch]] =
       doc.tokens.collect {
@@ -110,16 +148,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                 mods,
                 objName,
                 Template(early, inits, self, stats)
-              ) if inits.exists {
-                case Init(
-                      Type.Apply(Type.Name("GraphQLOperation"), _) |
-                      Type.Apply(Type.Select(Term.Name("GraphQLOperation"), Type.Name("Typed")), _),
-                      _,
-                      _
-                    ) =>
-                  true
-                case _ => false
-              } =>
+              ) if isGraphQLOperation(inits) || isGraphQLOperationTyped(inits) =>
             extractSchemaType(inits) match {
               case None             =>
                 abort(
@@ -147,23 +176,12 @@ class GraphQLGen(config: GraphQLGenConfig)
                         ) >> IO {
                           val operation = queryResult.toOption.get
 
-                          val typed = inits.exists {
-                            case Init(
-                                  Type.Apply(
-                                    Type.Select(Term.Name("GraphQLOperation"), Type.Name("Typed")),
-                                    _
-                                  ),
-                                  _,
-                                  _
-                                ) =>
-                              true
-                            case _ => false
-                          }
+                          val typed = isGraphQLOperationTyped(inits)
 
                           val modObjDefs =
                             if (typed) // everything is already defined
                               identity[List[Stat]](_)
-                            else // Modifications to add the missing definitions.
+                            else       // Modifications to add the missing definitions.
                               scala.Function.chain(
                                 List(
                                   addImports(schemaType.value),
@@ -196,16 +214,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                 mods @ GraphQLAnnotation(_),
                 objName,
                 Template(early, inits, self, stats)
-              ) if inits.exists {
-                case Init(
-                      Type.Apply(Type.Name("GraphQLSubquery"), _) |
-                      Type.Apply(Type.Select(Term.Name("GraphQLSubquery"), Type.Name("Typed")), _),
-                      _,
-                      _
-                    ) =>
-                  true
-                case _ => false
-              } =>
+              ) if isGraphQLSubquery(inits) || isGraphQLSubqueryTyped(inits) =>
             extractSchemaAndRootTypes(inits) match {
               case None                             =>
                 abort(
@@ -233,18 +242,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                         ) >> IO {
                           val operation = queryResult.toOption.get
 
-                          val typed = inits.exists {
-                            case Init(
-                                  Type.Apply(
-                                    Type.Select(Term.Name("GraphQLSubquery"), Type.Name("Typed")),
-                                    _
-                                  ),
-                                  _,
-                                  _
-                                ) =>
-                              true
-                            case _ => false
-                          }
+                          val typed = isGraphQLSubqueryTyped(inits)
 
                           val modObjDefs =
                             if (typed) // everything is already defined
