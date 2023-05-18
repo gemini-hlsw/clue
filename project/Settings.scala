@@ -19,7 +19,7 @@ object Settings {
     val monocle                  = "3.2.0"
     val munit                    = "0.7.29"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
-    val scalaJSDom               = "2.4.0"
+    val scalaJSDom               = "2.6.0"
     val scalaJSMacrotaskExecutor = "1.1.1"
   }
 
