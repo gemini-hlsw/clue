@@ -87,7 +87,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
           }
 
           Applicative[F].pure(
-            Sync[F].delay(ws.close(1001, "Web Socket initialization canceled by client")).some
+            Sync[F].delay(ws.close(1000, "Web Socket initialization canceled by client")).some
           )
         }
     } yield connection
