@@ -3,6 +3,7 @@
 
 package clue.js
 
+import cats.Applicative
 import cats.effect._
 import cats.syntax.all._
 import clue._
@@ -10,6 +11,7 @@ import clue.model.GraphQLRequest
 import clue.model.json._
 import io.circe.Encoder
 import io.circe.syntax._
+import org.scalajs.dom.AbortController
 import org.scalajs.dom.Fetch
 import org.scalajs.dom.Headers
 import org.scalajs.dom.HttpMethod
@@ -19,8 +21,6 @@ import org.scalajs.macrotaskexecutor.MacrotaskExecutor.Implicits._
 import scala.scalajs.js.URIUtils
 import scala.util.Failure
 import scala.util.Success
-import org.scalajs.dom.AbortController
-import cats.Applicative
 
 sealed trait FetchMethod extends Product with Serializable
 object FetchMethod {

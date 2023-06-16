@@ -3,6 +3,7 @@
 
 package clue.js
 
+import cats.Applicative
 import cats.effect.Ref
 import cats.effect._
 import cats.effect.implicits._
@@ -18,7 +19,6 @@ import org.scalajs.dom.Event
 import org.scalajs.dom.MessageEvent
 import org.scalajs.dom.WebSocket
 import org.typelevel.log4cats.Logger
-import cats.Applicative
 
 /**
  * Streaming backend for JS WebSocket.
