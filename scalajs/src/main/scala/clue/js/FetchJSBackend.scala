@@ -19,6 +19,8 @@ import org.scalajs.macrotaskexecutor.MacrotaskExecutor.Implicits._
 import scala.scalajs.js.URIUtils
 import scala.util.Failure
 import scala.util.Success
+import org.scalajs.dom.AbortController
+import cats.Applicative
 
 sealed trait FetchMethod extends Product with Serializable
 object FetchMethod {
@@ -32,9 +34,11 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
     request:     GraphQLRequest[V],
     baseRequest: FetchJSRequest
   ): F[String] =
-    Async[F].async_ { cb =>
-      val _headers = new Headers(baseRequest.headers)
-      val fetch    = fetchMethod match {
+    Async[F].async { cb =>
+      val controller = new AbortController()
+      val _signal    = controller.signal
+      val _headers   = new Headers(baseRequest.headers)
+      val fetch      = fetchMethod match {
         case FetchMethod.POST =>
           _headers.set("Content-Type", "application/json")
           Fetch
@@ -44,6 +48,7 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
                 method = HttpMethod.POST
                 body = request.asJson.toString
                 headers = _headers
+                signal = _signal
               }
             )
         case FetchMethod.GET  =>
@@ -57,16 +62,21 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
               new RequestInit {
                 method = HttpMethod.GET
                 headers = _headers
+                signal = _signal
               }
             )
       }
 
-      fetch.toFuture
-        .flatMap(_.text().toFuture)
-        .onComplete {
-          case Success(r) => cb(Right(r))
-          case Failure(t) => cb(Left(t))
-        }
+      Applicative[F]
+        .pure(
+          fetch.toFuture
+            .flatMap(_.text().toFuture)
+            .onComplete {
+              case Success(r) => cb(Right(r))
+              case Failure(t) => cb(Left(t))
+            }
+        )
+        .as(Sync[F].delay(controller.abort()).some)
     }
 }
 

@@ -18,6 +18,7 @@ import org.scalajs.dom.Event
 import org.scalajs.dom.MessageEvent
 import org.scalajs.dom.WebSocket
 import org.typelevel.log4cats.Logger
+import cats.Applicative
 
 /**
  * Streaming backend for JS WebSocket.
@@ -35,7 +36,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
       isOpen     <- Ref[F].of(false)
       isErrored  <- Ref[F].of(false)
       connection <-
-        Async[F].async_[PersistentConnection[F, CloseParams]] { cb =>
+        Async[F].async[PersistentConnection[F, CloseParams]] { cb =>
           val ws = new WebSocket(uri, Protocol)
 
           ws.onopen = { (_: Event) =>
@@ -84,6 +85,10 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
               } yield ()
             dispatcher.unsafeRunAndForget(close)
           }
+
+          Applicative[F].pure(
+            Sync[F].delay(ws.close(1001, "Web Socket initialization canceled by client")).some
+          )
         }
     } yield connection
 }
