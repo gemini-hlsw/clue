@@ -242,15 +242,15 @@ class ApolloClient[F[_], P, S](
     variables:     Option[JsonObject],
     modParams:     Unit => Unit,
     errorPolicy:   ErrorPolicyProcessor[D, R]
-  ): F[R] = F.async[R] { cb =>
-    startSubscription[D, R](document, operationName, variables, errorPolicy).flatMap(
-      _.stream.attempt
+  ): F[R] = F.async[R](cb =>
+    startSubscription[D, R](document, operationName, variables, errorPolicy).flatMap(subscription =>
+      subscription.stream.attempt
         .evalMap(result => F.delay(cb(result)))
         .compile
         .drain
-        .as(none)
+        .as(subscription.stop().some)
     )
-  }
+  )
   // </FetchClient>
   // </StreamingClient>
   // </ApolloClient>
