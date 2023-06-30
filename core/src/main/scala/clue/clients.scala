@@ -5,7 +5,6 @@ package clue
 
 import cats.effect.Resource
 import cats.syntax.all._
-import clue.ErrorPolicy
 import io.circe._
 import io.circe.syntax._
 

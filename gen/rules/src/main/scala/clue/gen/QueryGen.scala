@@ -499,7 +499,15 @@ trait QueryGen extends Generator {
             case Term.Param(_, Name(name), _, _) => Term.Name(name)
             case other                           => throw new Exception(s"Unexpected param structure [$other]")
           })
-          val epiParam       = List(param"implicit errorPolicy: clue.ErrorPolicy")
+          // param"implicit errorPolicy: clue.ErrorPolicy"
+          val epiParam       = List(
+            Term.Param(
+              mods = List(Mod.Implicit()),
+              name = Name("errorPolicy"),
+              decltpe = t"clue.ErrorPolicy".some,
+              default = none
+            )
+          )
           val applied        =
             q"""def apply[F[_]]: clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] =
                   new clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] {
@@ -529,8 +537,20 @@ trait QueryGen extends Generator {
                   """
                 )
               case _: UntypedSubscription =>
-                val epiParam    = param"implicit errorPolicy: clue.ErrorPolicy"
-                val clientParam = param"implicit client: clue.StreamingClient[F, $schemaType]"
+                // param"implicit errorPolicy: clue.ErrorPolicy"
+                val epiParam    = Term.Param(
+                  mods = List(Mod.Implicit()),
+                  name = Name("errorPolicy"),
+                  decltpe = t"clue.ErrorPolicy".some,
+                  default = none
+                )
+                // param"implicit client: clue.StreamingClient[F, $schemaType]"
+                val clientParam = Term.Param(
+                  mods = List(Mod.Implicit()),
+                  name = Name("client"),
+                  decltpe = t"clue.StreamingClient[F, $schemaType]".some,
+                  default = none
+                )
                 List(
                   q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this).withInput(Variables(...$variablesNames))"
                 )

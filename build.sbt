@@ -5,7 +5,7 @@ lazy val scala3Version      = "3.3.0"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-ThisBuild / tlBaseVersion              := "0.31"
+ThisBuild / tlBaseVersion              := "0.32"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
