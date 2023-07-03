@@ -10,7 +10,6 @@ package test
 
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
-import test.StarWars
 
 @GraphQL
 trait StarWarsQuery3 extends GraphQLOperation[StarWars] {

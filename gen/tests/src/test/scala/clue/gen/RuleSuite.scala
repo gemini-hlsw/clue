@@ -4,11 +4,10 @@
 package fix
 
 import scalafix.testkit.AbstractSemanticRuleSuite
-import org.scalatest.{Args, FunSuiteLike}
+import org.scalatest.Args
+import org.scalatest.funsuite.AnyFunSuiteLike
 
-class RuleSuite extends AbstractSemanticRuleSuite() with FunSuiteLike {
-  // run is defined in both AbstractSemanticRuleSuite and FunSuiteLike
-  // Scala 3 requires us to explicitly specify which impl to use
+class RuleSuite extends AbstractSemanticRuleSuite() with AnyFunSuiteLike {
   // run is defined in both AbstractSemanticRuleSuite and FunSuiteLike
   // Scala 3 requires us to explicitly specify which impl to use
   override def run(testName: Option[String], args: Args) =
