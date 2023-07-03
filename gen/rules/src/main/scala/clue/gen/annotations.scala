@@ -21,14 +21,13 @@ class AnnotationPattern(fqcn: String) {
   }
 
   def removeFrom(mods: List[Mod]): List[Mod] = mods.filter {
-    case Mod.Annot(Init.After_4_6_0(typeTree, Name(""), _)) if isAnnotationNamed(name)(typeTree) =>
+    case Mod.Annot(Init.Initial(typeTree, Name(""), _)) if isAnnotationNamed(name)(typeTree) =>
       false
-    case _                                                                                       => true
+    case _                                                                                   => true
   }
 
   def unapply(mods: List[Mod]): Option[List[Term]] = mods.reverse.collectFirst {
-    case Mod.Annot(Init.After_4_6_0(typeTree, Name(""), args))
-        if isAnnotationNamed(name)(typeTree) =>
+    case Mod.Annot(Init.Initial(typeTree, Name(""), args)) if isAnnotationNamed(name)(typeTree) =>
       Some(args.toList.flatten)
   }.flatten
 }

@@ -60,12 +60,12 @@ class GraphQLGen(config: GraphQLGenConfig)
                 _
               ) =>
             IO.pure(Patch.replaceTree(obj, ""))
-          case obj @ Defn.Trait.After_4_6_0(
+          case obj @ Defn.Trait.Initial(
                 mods @ GraphQLSchemaAnnotation(_),
                 templateName,
                 Nil,
                 _,
-                Template.After_4_4_0(early, inits, self, stats, _)
+                Template.Initial(early, inits, self, stats)
               ) =>
             val objName = templateName.value
             config.getSchema(objName).map { schema =>
@@ -87,15 +87,15 @@ class GraphQLGen(config: GraphQLGenConfig)
                 )
               ) + Patch.removeGlobalImport(GraphQLSchemaAnnotation.symbol)
             }
-          case obj @ Defn.Trait.After_4_6_0(
+          case obj @ Defn.Trait.Initial(
                 mods @ GraphQLAnnotation(_),
                 templateName,
                 Nil,
                 _,
-                Template.After_4_4_0(early, inits, self, stats, _)
+                Template.Initial(early, inits, self, stats)
               ) if inits.exists {
-                case Init.After_4_6_0(
-                      Type.Apply.After_4_6_0(Type.Name("GraphQLOperation"), _),
+                case Init.Initial(
+                      Type.Apply.Initial(Type.Name("GraphQLOperation"), _),
                       _,
                       _
                     ) =>
@@ -160,15 +160,15 @@ class GraphQLGen(config: GraphQLGenConfig)
                     }
                 }
             }
-          case obj @ Defn.Class.After_4_6_0(
+          case obj @ Defn.Class.Initial(
                 mods @ GraphQLAnnotation(_),
                 templateName,
                 Nil,
                 _,
-                Template.After_4_4_0(early, inits, self, stats, _)
+                Template.Initial(early, inits, self, stats)
               ) if inits.exists {
-                case Init.After_4_6_0(
-                      Type.Apply.After_4_6_0(Type.Name("GraphQLSubquery"), _),
+                case Init.Initial(
+                      Type.Apply.Initial(Type.Name("GraphQLSubquery"), _),
                       _,
                       _
                     ) =>
