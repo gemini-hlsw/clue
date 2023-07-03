@@ -35,7 +35,7 @@ trait Generator {
       val (extensionDefinitions, newParentBody) =
         parentBody.partitionMap {
           // q"..$mods trait $tname[..$tparams] extends $template"
-          case Defn.Trait(_, tname, _, _, Template(early, inits, _, _))
+          case Defn.Trait.After_4_6_0(_, tname, _, _, Template.After_4_4_0(early, inits, _, _, _))
               if tname.value == typeName =>
             (early, inits).asLeft
           case other =>
@@ -46,9 +46,9 @@ trait Generator {
           parentBody
             .collectFirst {
               // q"..$mods type $tname[..$tparams] = $tpe"
-              case Defn.Type(_, tname, _, _) if tname.value == typeName     => Skip
+              case Defn.Type.After_4_6_0(_, tname, _, _, _) if tname.value == typeName  => Skip
               // q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template"
-              case Defn.Class(_, tname, _, _, _) if tname.value == typeName => Skip
+              case Defn.Class.After_4_6_0(_, tname, _, _, _) if tname.value == typeName => Skip
             }
             .getOrElse(Define(parentBody, List.empty, List.empty))
         case Some((early, inits)) =>
@@ -58,11 +58,11 @@ trait Generator {
 
   private def nestedTypeTree(nestTree: Term.Ref, tpe: Type): Type =
     tpe match {
-      case named @ Type.Name(_)   => Type.Select(nestTree, named)
+      case named @ Type.Name(_)               => Type.Select(nestTree, named)
       // case Type.Select?
-      case Type.Apply(ttpe, args) =>
-        Type.Apply(ttpe, args.map(t => nestedTypeTree(nestTree, t)))
-      case other                  =>
+      case Type.Apply.After_4_6_0(ttpe, args) =>
+        Type.Apply.After_4_6_0(ttpe, args.map(t => nestedTypeTree(nestTree, t)))
+      case other                              =>
         throw new Exception(s"Type structure [$other] not supported.")
     }
 
@@ -93,10 +93,10 @@ trait Generator {
       val t: Type         = typeTree(nestTree, nestedTypes)
       val d: Option[Term] = tpe match {
         // case t"Option[$_]"         =>
-        case Type.Apply(Type.Name("Option"), _) =>
+        case Type.Apply.After_4_6_0(Type.Name("Option"), _) =>
           if (!asVals) q"None".some else none
         // case t"clue.data.Input[_]"              =>
-        case Type.Apply(
+        case Type.Apply.After_4_6_0(
               Type.Select(
                 Term.Select(Term.Name("clue"), Term.Name("data")),
                 Type.Name("Input")
@@ -104,7 +104,7 @@ trait Generator {
               _
             ) =>
           if (!asVals) q"clue.data.Ignore".some else none
-        case _                                  => none
+        case _                                              => none
       }
       val mods: List[Mod] = if (!asVals && overrides) List(mod"override") else List.empty
       param"..$mods val $n: $t = $d"
@@ -267,12 +267,10 @@ trait Generator {
     instances: List[CaseClass]
   )
 
-  protected def paramToVal(param: Term.Param): Stat = {
-    val Term.Param(_, name, decltpe, default) = param
-    default.fold[Stat](
-      q"val ${Term.Name(name.value)}: ${decltpe.get}"
-    )(d => q"val ${Pat.Var(Term.Name(name.value))}: ${decltpe.get} = $d")
-  }
+  protected def paramToVal(param: Term.Param): Stat =
+    param.default.fold[Stat](
+      q"val ${Term.Name(param.name.value)}: ${param.decltpe.get}"
+    )(d => q"val ${Pat.Var(Term.Name(param.name.value))}: ${param.decltpe.get} = $d")
 
   protected def addSumTrait(
     name:      String,
