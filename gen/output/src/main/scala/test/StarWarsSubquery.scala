@@ -6,7 +6,6 @@
 package test
 
 import clue.GraphQLSubquery
-import test.StarWars
 
 
 object StarWarsSubquery extends GraphQLSubquery[StarWars]("Character") {

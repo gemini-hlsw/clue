@@ -3,6 +3,7 @@
 
 package clue.js
 
+import cats.Applicative
 import cats.effect.Ref
 import cats.effect._
 import cats.effect.implicits._
@@ -35,7 +36,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
       isOpen     <- Ref[F].of(false)
       isErrored  <- Ref[F].of(false)
       connection <-
-        Async[F].async_[PersistentConnection[F, CloseParams]] { cb =>
+        Async[F].async[PersistentConnection[F, CloseParams]] { cb =>
           val ws = new WebSocket(uri, Protocol)
 
           ws.onopen = { (_: Event) =>
@@ -84,6 +85,10 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
               } yield ()
             dispatcher.unsafeRunAndForget(close)
           }
+
+          Applicative[F].pure(
+            Sync[F].delay(ws.close(1000, "Web Socket initialization canceled by client")).some
+          )
         }
     } yield connection
 }
