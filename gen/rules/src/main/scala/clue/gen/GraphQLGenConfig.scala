@@ -9,6 +9,8 @@ import cats.effect.Ref
 import cats.effect.kernel.Resource
 import cats.syntax.all._
 import edu.gemini.grackle.Schema
+import metaconfig.ConfDecoder
+import metaconfig.generic.Surface
 
 import java.io.File
 import java.io.FileInputStream
@@ -89,7 +91,8 @@ final case class GraphQLGenConfig(
 }
 
 object GraphQLGenConfig {
-  def default          = GraphQLGenConfig()
-  implicit val surface = metaconfig.generic.deriveSurface[GraphQLGenConfig]
-  implicit val decoder = metaconfig.generic.deriveDecoder(default)
+  def default: GraphQLGenConfig                       = GraphQLGenConfig()
+  implicit val surface: Surface[GraphQLGenConfig]     =
+    metaconfig.generic.deriveSurface[GraphQLGenConfig]
+  implicit val decoder: ConfDecoder[GraphQLGenConfig] = metaconfig.generic.deriveDecoder(default)
 }

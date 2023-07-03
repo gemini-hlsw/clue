@@ -23,8 +23,8 @@ sealed trait ErrorPolicyProcessor[D, R] {
 
 object ErrorPolicy {
   protected sealed trait Distinct[D] extends ErrorPolicyProcessor[D, D] {
-    protected def processData[F[_]: Applicative, D](data: D): F[D] = Applicative[F].pure(data)
-    protected def processErrors[F[_]: ApplicativeThrow, D](
+    protected def processData[F[_]: Applicative](data: D): F[D] = Applicative[F].pure(data)
+    protected def processErrors[F[_]: ApplicativeThrow](
       errors: GraphQLErrors,
       data:   Option[D] = none
     ): F[D] =

@@ -11,7 +11,6 @@ package test
 
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
-import test.StarWars
 // gql: import japgolly.scalajs.react.Dummy._
 
 object Wrapper /* gql: extends Something */ {
