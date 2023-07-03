@@ -10,7 +10,6 @@ package test
 
 import clue.GraphQLSubquery
 import clue.annotation.GraphQL
-import test.StarWars
 
 @GraphQL
 abstract class StarWarsSubquery extends GraphQLSubquery[StarWars]("Character") {

@@ -461,7 +461,7 @@ trait Generator {
         parentBody.foldLeft((List.empty[Stat], false)) { case ((newStats, modified), stat) =>
           stat match {
             // q"..$mods object $objName extends $template}"
-            case Defn.Object(mods, objName, Template(early, inits, self, body))
+            case Defn.Object(mods, objName, Template.After_4_4_0(early, inits, self, body, _))
                 if objName.value == moduleName =>
               (
                 newStats :+ q"..$mods object $objName extends {..$early} with ..$inits { $self => ..${bodyMod(body)} }", // ${Template(early, inits, self, bodyMod(body))}",

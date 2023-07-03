@@ -60,12 +60,12 @@ class GraphQLGen(config: GraphQLGenConfig)
                 _
               ) =>
             IO.pure(Patch.replaceTree(obj, ""))
-          case obj @ Defn.Trait(
+          case obj @ Defn.Trait.After_4_6_0(
                 mods @ GraphQLSchemaAnnotation(_),
                 templateName,
                 Nil,
                 _,
-                Template(early, inits, self, stats)
+                Template.After_4_4_0(early, inits, self, stats, _)
               ) =>
             val objName = templateName.value
             config.getSchema(objName).map { schema =>
@@ -87,15 +87,20 @@ class GraphQLGen(config: GraphQLGenConfig)
                 )
               ) + Patch.removeGlobalImport(GraphQLSchemaAnnotation.symbol)
             }
-          case obj @ Defn.Trait(
+          case obj @ Defn.Trait.After_4_6_0(
                 mods @ GraphQLAnnotation(_),
                 templateName,
                 Nil,
                 _,
-                Template(early, inits, self, stats)
+                Template.After_4_4_0(early, inits, self, stats, _)
               ) if inits.exists {
-                case Init(Type.Apply(Type.Name("GraphQLOperation"), _), _, _) => true
-                case _                                                        => false
+                case Init.After_4_6_0(
+                      Type.Apply.After_4_6_0(Type.Name("GraphQLOperation"), _),
+                      _,
+                      _
+                    ) =>
+                  true
+                case _ => false
               } =>
             val objName = templateName.value
 
@@ -155,15 +160,20 @@ class GraphQLGen(config: GraphQLGenConfig)
                     }
                 }
             }
-          case obj @ Defn.Class(
+          case obj @ Defn.Class.After_4_6_0(
                 mods @ GraphQLAnnotation(_),
                 templateName,
                 Nil,
                 _,
-                Template(early, inits, self, stats)
+                Template.After_4_4_0(early, inits, self, stats, _)
               ) if inits.exists {
-                case Init(Type.Apply(Type.Name("GraphQLSubquery"), _), _, _) => true
-                case _                                                       => false
+                case Init.After_4_6_0(
+                      Type.Apply.After_4_6_0(Type.Name("GraphQLSubquery"), _),
+                      _,
+                      _
+                    ) =>
+                  true
+                case _ => false
               } =>
             val objName = templateName.value
 

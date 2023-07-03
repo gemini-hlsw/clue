@@ -16,8 +16,8 @@ trait QueryGen extends Generator {
   // TODO This could be more sophisticated.
   protected def extractSchemaType(list: List[Init]): Option[Type.Name] =
     list.collect {
-      case Init(
-            Type.Apply(Type.Name("GraphQLOperation"), List(tpe @ Type.Name(_))),
+      case Init.After_4_6_0(
+            Type.Apply.After_4_6_0(Type.Name("GraphQLOperation"), List(tpe @ Type.Name(_))),
             _,
             Nil
           ) =>
@@ -26,8 +26,8 @@ trait QueryGen extends Generator {
 
   protected def extractSchemaAndRootTypes(list: List[Init]): Option[(Type.Name, String)] =
     list.collect {
-      case Init(
-            Type.Apply(Type.Name("GraphQLSubquery"), List(tpe @ Type.Name(_))),
+      case Init.After_4_6_0(
+            Type.Apply.After_4_6_0(Type.Name("GraphQLSubquery"), List(tpe @ Type.Name(_))),
             _,
             List(List(Lit.String(rootType)))
           ) =>
@@ -428,10 +428,10 @@ trait QueryGen extends Generator {
       parentBody.exists {
         // We are not checking in pattern assignments
         // case q"$_ val $tname: $_ = $_" => tname == tpe
-        case Defn.Val(_, List(Pat.Var(Term.Name(name))), _, _) => name == termName
+        case Defn.Val(_, List(Pat.Var(Term.Name(name))), _, _)             => name == termName
         // case q"$_ var $tname: $_ = $_" => tname == tpe
-        case Defn.Var(_, List(Pat.Var(Term.Name(name))), _, _) => name == termName
-        case _                                                 => false
+        case Defn.Var.After_4_7_2(_, List(Pat.Var(Term.Name(name))), _, _) => name == termName
+        case _                                                             => false
       }
 
   private def addValDef(
@@ -455,7 +455,8 @@ trait QueryGen extends Generator {
       parentBody
         .collectFirst {
           // case q"$_ object $tname extends { ..$_ } with ..$_ { $_ => ..$dataBody }"
-          case Defn.Object(_, Term.Name(name), Template(_, _, _, dataBody)) if name == moduleName =>
+          case Defn.Object(_, Term.Name(name), Template.After_4_4_0(_, _, _, dataBody, _))
+              if name == moduleName =>
             dataBody
         }
         .filter(isTermDefined(moduleValName))
@@ -486,19 +487,28 @@ trait QueryGen extends Generator {
       parentBody
         .collectFirst {
           // case q"$_ class Variables $_(...$paramss) extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
-          case Defn.Class(_, Type.Name(name), _, Ctor.Primary(_, _, paramss), _)
-              if name == "Variables" =>
+          case Defn.Class.After_4_6_0(
+                _,
+                Type.Name(name),
+                _,
+                Ctor.Primary.After_4_6_0(_, _, paramss),
+                _
+              ) if name == "Variables" =>
             // Strip "val" from mods.
-            paramss.map(_.map {
-              case Term.Param(_, name, decltpe, default) => param"$name: $decltpe = $default"
-              case other                                 => throw new Exception(s"Unexpected param structure [$other]")
-            })
+            paramss
+              .map(_.map {
+                case Term.Param(_, name, decltpe, default) => param"$name: $decltpe = $default"
+                case other                                 => throw new Exception(s"Unexpected param structure [$other]")
+              })
+              .toList
         }
         .map { paramss =>
-          val variablesNames = paramss.map(_.map {
-            case Term.Param(_, Name(name), _, _) => Term.Name(name)
-            case other                           => throw new Exception(s"Unexpected param structure [$other]")
-          })
+          val variablesNames = paramss
+            .map(_.map {
+              case Term.Param(_, Name(name), _, _) => Term.Name(name)
+              case other                           => throw new Exception(s"Unexpected param structure [$other]")
+            })
+            .toList
           // param"implicit errorPolicy: clue.ErrorPolicy"
           val epiParam       = List(
             Term.Param(
