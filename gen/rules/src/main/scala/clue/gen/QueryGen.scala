@@ -16,8 +16,8 @@ trait QueryGen extends Generator {
   // TODO This could be more sophisticated.
   protected def extractSchemaType(list: List[Init]): Option[Type.Name] =
     list.collect {
-      case Init(
-            Type.Apply(Type.Name("GraphQLOperation"), List(tpe @ Type.Name(_))),
+      case Init.Initial(
+            Type.Apply.Initial(Type.Name("GraphQLOperation"), List(tpe @ Type.Name(_))),
             _,
             Nil
           ) =>
@@ -26,8 +26,8 @@ trait QueryGen extends Generator {
 
   protected def extractSchemaAndRootTypes(list: List[Init]): Option[(Type.Name, String)] =
     list.collect {
-      case Init(
-            Type.Apply(Type.Name("GraphQLSubquery"), List(tpe @ Type.Name(_))),
+      case Init.Initial(
+            Type.Apply.Initial(Type.Name("GraphQLSubquery"), List(tpe @ Type.Name(_))),
             _,
             List(List(Lit.String(rootType)))
           ) =>
@@ -428,10 +428,10 @@ trait QueryGen extends Generator {
       parentBody.exists {
         // We are not checking in pattern assignments
         // case q"$_ val $tname: $_ = $_" => tname == tpe
-        case Defn.Val(_, List(Pat.Var(Term.Name(name))), _, _) => name == termName
+        case Defn.Val(_, List(Pat.Var(Term.Name(name))), _, _)         => name == termName
         // case q"$_ var $tname: $_ = $_" => tname == tpe
-        case Defn.Var(_, List(Pat.Var(Term.Name(name))), _, _) => name == termName
-        case _                                                 => false
+        case Defn.Var.Initial(_, List(Pat.Var(Term.Name(name))), _, _) => name == termName
+        case _                                                         => false
       }
 
   private def addValDef(
@@ -455,7 +455,8 @@ trait QueryGen extends Generator {
       parentBody
         .collectFirst {
           // case q"$_ object $tname extends { ..$_ } with ..$_ { $_ => ..$dataBody }"
-          case Defn.Object(_, Term.Name(name), Template(_, _, _, dataBody)) if name == moduleName =>
+          case Defn.Object(_, Term.Name(name), Template.Initial(_, _, _, dataBody))
+              if name == moduleName =>
             dataBody
         }
         .filter(isTermDefined(moduleValName))
@@ -486,20 +487,37 @@ trait QueryGen extends Generator {
       parentBody
         .collectFirst {
           // case q"$_ class Variables $_(...$paramss) extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
-          case Defn.Class(_, Type.Name(name), _, Ctor.Primary(_, _, paramss), _)
-              if name == "Variables" =>
+          case Defn.Class.Initial(
+                _,
+                Type.Name(name),
+                _,
+                Ctor.Primary.Initial(_, _, paramss),
+                _
+              ) if name == "Variables" =>
             // Strip "val" from mods.
-            paramss.map(_.map {
-              case Term.Param(_, name, decltpe, default) => param"$name: $decltpe = $default"
-              case other                                 => throw new Exception(s"Unexpected param structure [$other]")
-            })
+            paramss
+              .map(_.map {
+                case Term.Param(_, name, decltpe, default) => param"$name: $decltpe = $default"
+                case other                                 => throw new Exception(s"Unexpected param structure [$other]")
+              })
+              .toList
         }
         .map { paramss =>
-          val variablesNames = paramss.map(_.map {
-            case Term.Param(_, Name(name), _, _) => Term.Name(name)
-            case other                           => throw new Exception(s"Unexpected param structure [$other]")
-          })
-          val epiParam       = List(param"implicit errorPolicy: clue.ErrorPolicy")
+          val variablesNames = paramss
+            .map(_.map {
+              case Term.Param(_, Name(name), _, _) => Term.Name(name)
+              case other                           => throw new Exception(s"Unexpected param structure [$other]")
+            })
+            .toList
+          // param"implicit errorPolicy: clue.ErrorPolicy"
+          val epiParam       = List(
+            Term.Param(
+              mods = List(Mod.Implicit()),
+              name = Name("errorPolicy"),
+              decltpe = t"clue.ErrorPolicy".some,
+              default = none
+            )
+          )
           val applied        =
             q"""def apply[F[_]]: clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] =
                   new clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] {
@@ -529,8 +547,20 @@ trait QueryGen extends Generator {
                   """
                 )
               case _: UntypedSubscription =>
-                val epiParam    = param"implicit errorPolicy: clue.ErrorPolicy"
-                val clientParam = param"implicit client: clue.StreamingClient[F, $schemaType]"
+                // param"implicit errorPolicy: clue.ErrorPolicy"
+                val epiParam    = Term.Param(
+                  mods = List(Mod.Implicit()),
+                  name = Name("errorPolicy"),
+                  decltpe = t"clue.ErrorPolicy".some,
+                  default = none
+                )
+                // param"implicit client: clue.StreamingClient[F, $schemaType]"
+                val clientParam = Term.Param(
+                  mods = List(Mod.Implicit()),
+                  name = Name("client"),
+                  decltpe = t"clue.StreamingClient[F, $schemaType]".some,
+                  default = none
+                )
                 List(
                   q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this).withInput(Variables(...$variablesNames))"
                 )

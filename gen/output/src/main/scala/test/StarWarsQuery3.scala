@@ -6,7 +6,6 @@
 package test
 
 import clue.GraphQLOperation
-import test.StarWars
 
 
 object StarWarsQuery3 extends GraphQLOperation[StarWars] {

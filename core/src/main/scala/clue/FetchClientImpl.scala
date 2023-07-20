@@ -5,7 +5,6 @@ package clue
 
 import cats.MonadThrow
 import cats.syntax.all._
-import clue.ErrorPolicyProcessor
 import clue.model.GraphQLCombinedResponse
 import clue.model.GraphQLRequest
 import clue.model.json._

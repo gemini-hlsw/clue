@@ -5,12 +5,17 @@ lazy val scala3Version      = "3.3.0"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-ThisBuild / tlBaseVersion              := "0.31"
+ThisBuild / tlBaseVersion              := "0.32"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
 ThisBuild / scalaVersion               := scala2Version
 ThisBuild / crossScalaVersions         := allVersions
+ThisBuild / scalacOptions ++= {
+  if (tlIsScala3.value) Nil
+  else
+    List("-language:implicitConversions", "-Xlint:-byname-implicit")
+}
 Global / onChangedBuildSource          := ReloadOnSourceChanges
 
 lazy val root = tlCrossRootProject
@@ -56,8 +61,7 @@ lazy val core =
           Settings.Libraries.Fs2.value ++
           Settings.Libraries.Log4Cats.value ++
           Settings.Libraries.DisciplineMUnit.value ++
-          Settings.Libraries.MUnit.value,
-      scalacOptions ++= { if (tlIsScala3.value) Nil else List("-language:implicitConversions") }
+          Settings.Libraries.MUnit.value
     )
     .dependsOn(model)
 
@@ -161,10 +165,11 @@ lazy val sbtPlugin = project
   .enablePlugins(SbtPlugin, BuildInfoPlugin)
   .settings(
     moduleName         := "sbt-clue",
-    crossScalaVersions := List("2.12.17"),
-    addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % "0.10.4"),
+    crossScalaVersions := List("2.12.18"),
+    scalacOptions      := Nil,
+    addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % "0.11.0"),
     addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
-    addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.1"),
+    addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
     buildInfoPackage   := "clue.sbt",
     buildInfoKeys      := Seq[BuildInfoKey](version,
                                        organization,
