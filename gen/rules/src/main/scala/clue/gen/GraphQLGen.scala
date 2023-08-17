@@ -119,14 +119,14 @@ class GraphQLGen(config: GraphQLGenConfig)
                     config.getSchema(schemaType.value).flatMap { schema =>
                       // Parse the operation.
                       val queryResult = QueryParser.parseText(document.render)
-                      if (queryResult.isLeft)
+                      if (!queryResult.hasValue)
                         abort(
-                          s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                          s"Could not parse document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
                         )
                       else {
-                        IO.whenA(queryResult.isBoth)(
+                        IO.whenA(queryResult.hasProblems)(
                           log(
-                            s"Warning parsing document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                            s"Warning parsing document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
                           )
                         ) >> IO {
                           val operation = queryResult.toOption.get
@@ -192,14 +192,14 @@ class GraphQLGen(config: GraphQLGenConfig)
                     config.getSchema(schemaType.value).flatMap { schema =>
                       // Parse the operation.
                       val queryResult = QueryParser.parseText(s"query ${subquery.render}")
-                      if (queryResult.isLeft)
+                      if (!queryResult.hasValue)
                         abort(
-                          s"Could not parse document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                          s"Could not parse document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
                         )
                       else {
-                        IO.whenA(queryResult.isBoth)(
+                        IO.whenA(queryResult.hasProblems)(
                           log(
-                            s"Warning parsing document: ${queryResult.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                            s"Warning parsing document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
                           )
                         ) >> IO {
                           val operation = queryResult.toOption.get
