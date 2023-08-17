@@ -11,11 +11,6 @@ ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
 ThisBuild / scalaVersion               := scala2Version
 ThisBuild / crossScalaVersions         := allVersions
-ThisBuild / scalacOptions ++= {
-  if (tlIsScala3.value) Nil
-  else
-    List("-language:implicitConversions", "-Xlint:-byname-implicit")
-}
 Global / onChangedBuildSource          := ReloadOnSourceChanges
 
 lazy val root = tlCrossRootProject
