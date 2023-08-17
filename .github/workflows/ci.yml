@@ -53,7 +53,7 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@11' && steps.setup-java-temurin-11.outputs.cache-hit == 'false'
-        run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' reload +update
+        run: sbt +update
 
       - name: Setup Java (temurin@17)
         id: setup-java-temurin-17
@@ -66,7 +66,7 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@17' && steps.setup-java-temurin-17.outputs.cache-hit == 'false'
-        run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' reload +update
+        run: sbt +update
 
       - name: Check that workflows are up to date
         run: sbt githubWorkflowCheck
@@ -98,7 +98,7 @@ jobs:
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' coverageReport coverageAggregate
 
       - name: Upload code coverage data
-        run: 'bash <(curl -s https://codecov.io/bash)'
+        uses: codecov/codecov-action@v3
 
   publish:
     name: Publish Artifacts
@@ -126,7 +126,7 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@11' && steps.setup-java-temurin-11.outputs.cache-hit == 'false'
-        run: sbt reload +update
+        run: sbt +update
 
       - name: Setup Java (temurin@17)
         id: setup-java-temurin-17
@@ -139,7 +139,7 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@17' && steps.setup-java-temurin-17.outputs.cache-hit == 'false'
-        run: sbt reload +update
+        run: sbt +update
 
       - name: Import signing key
         if: env.PGP_SECRET != '' && env.PGP_PASSPHRASE == ''
@@ -165,19 +165,16 @@ jobs:
           SONATYPE_CREDENTIAL_HOST: ${{ secrets.SONATYPE_CREDENTIAL_HOST }}
         run: sbt tlCiRelease
 
-  dependency-submission:
-    name: Submit Dependencies
-    if: github.event_name != 'pull_request'
+  validate-steward:
+    name: Validate Steward Config
     strategy:
       matrix:
         os: [ubuntu-latest]
         java: [temurin@11]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout current branch (full)
+      - name: Checkout current branch (fast)
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
       - name: Setup Java (temurin@11)
         id: setup-java-temurin-11
@@ -186,40 +183,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 11
-          cache: sbt
-
-      - name: sbt update
-        if: matrix.java == 'temurin@11' && steps.setup-java-temurin-11.outputs.cache-hit == 'false'
-        run: sbt '++ ${{ matrix.scala }}' reload +update
-
-      - name: Setup Java (temurin@17)
-        id: setup-java-temurin-17
-        if: matrix.java == 'temurin@17'
-        uses: actions/setup-java@v3
-        with:
-          distribution: temurin
-          java-version: 17
-          cache: sbt
-
-      - name: sbt update
-        if: matrix.java == 'temurin@17' && steps.setup-java-temurin-17.outputs.cache-hit == 'false'
-        run: sbt '++ ${{ matrix.scala }}' reload +update
-
-      - name: Submit Dependencies
-        uses: scalacenter/sbt-dependency-submission@v2
-        with:
-          modules-ignore: genTests genInput root rootJS genOutput rootJVM rootNative http4sJDKDemo
-          configs-ignore: test scala-tool scala-doc-tool
-
-  validate-steward:
-    name: Validate Steward Config
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout current branch (fast)
-        uses: actions/checkout@v3
 
       - uses: coursier/setup-action@v1
         with:
