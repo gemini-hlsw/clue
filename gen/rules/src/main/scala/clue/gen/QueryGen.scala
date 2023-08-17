@@ -127,8 +127,8 @@ trait QueryGen extends Generator {
         loop(elem, false).map(e => if (nonNull) ListType(e) else NullableType(ListType(e)))
       case Ast.Type.Named(name)          =>
         schema.definition(name.value) match {
-          case None      => QueryInterpreter.mkErrorResult(s"Undefine typed '${name.value}'")
-          case Some(tpe) => (if (nonNull) tpe else NullableType(tpe)).rightIor
+          case None      => Result.internalError(s"Undefine typed '${name.value}'")
+          case Some(tpe) => Result.success(if (nonNull) tpe else NullableType(tpe))
         }
     }
 
@@ -147,22 +147,22 @@ trait QueryGen extends Generator {
   ): CaseClass = {
     val inputs = compileVarDefs(schema, vars)
 
-    if (inputs.isLeft)
+    if (!inputs.hasValue)
       abort(
         s"Error resolving operation input variables types [${vars
-            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
+            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.toProblems.toList.mkString("; ")}]]"
       )
         .unsafeRunSync()
-    if (inputs.isBoth)
+    if (inputs.hasProblems)
       log(
         s"Warning resolving operation input variables types [${vars
-            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.left.get.toList.mkString("; ")}]]"
+            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.toProblems.toList.mkString("; ")}]]"
       )
         .unsafeRunSync()
 
     CaseClass(
       "Variables",
-      inputs.right.get.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true))
+      inputs.toOption.get.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true))
     )
   }
 

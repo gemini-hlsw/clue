@@ -59,17 +59,17 @@ final case class GraphQLGenConfig(
         .flatMap { schemaString =>
           val schema = Schema(schemaString)
 
-          if (schema.isLeft)
+          if (!schema.hasValue)
             abort(
-              s"Could not parse schema at [$fileName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+              s"Could not parse schema at [$fileName]: ${schema.toProblems.map(_.toString).toList.mkString("\n")}"
             )
           else
-            IO.whenA(schema.isBoth)(
+            IO.whenA(schema.hasProblems)(
               log(
-                s"Warning when parsing schema [$fileName]: ${schema.left.get.toChain.map(_.toString).toList.mkString("\n")}"
+                s"Warning when parsing schema [$fileName]: ${schema.toProblems.map(_.toString).toList.mkString("\n")}"
               )
             ) >>
-              IO.pure(schema.right.get)
+              IO.pure(schema.toOption.get)
         }
     )
   }
