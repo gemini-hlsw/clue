@@ -604,6 +604,7 @@ class ApolloClient[F[_], P, S](
       queue  <- Queue.unbounded[F, DataQueueType[D]]
       id     <- UUIDGen.randomString[F]
       emitter = QueueEmitter(queue, request)
+      _      <- Logger[F].debug(s"Building queue with id [$id] for query [${request.query}]}]")
     } yield (id, emitter)
 
   // TODO Handle interruptions in subscription and query.
@@ -631,7 +632,7 @@ class ApolloClient[F[_], P, S](
       case Initialized(_, _, _, _)               =>
         val request = GraphQLRequest(subscription, operationName, variables)
 
-        buildQueue[D](request).map { case (id, emitter) =>
+        buildQueue[D](request).flatMap { case (id, emitter) =>
           def acquire: F[Unit] =
             s"Acquiring queue for subscription [$id]".debugF >>
               stateModify {
@@ -683,13 +684,11 @@ class ApolloClient[F[_], P, S](
           }
 
           val stream =
-            (Stream.eval(acquire) >>
-              Stream.eval(sendStart) >>
-              Stream
-                .fromQueueUnterminated(emitter.queue)
-                .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".debugF)
-                .unNoneTerminate
-                .evalMap(errorPolicy.process(_)))
+            Stream
+              .fromQueueUnterminated(emitter.queue)
+              .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".debugF)
+              .unNoneTerminate
+              .evalMap(errorPolicy.process(_)) // )
               .onFinalizeCase(c =>
                 s"Stream for subscription [$id] finalized with ExitCase [$c]".debugF >>
                   (c match { // If canceled, we don't want to clean up. Other fibers may be evaluating the stream. Clients can explicitly call `stop()`.
@@ -698,7 +697,7 @@ class ApolloClient[F[_], P, S](
                   })
               )
 
-          createSubscription(stream, id)
+          (acquire >> sendStart).as(createSubscription(stream, id))
         }
       case Initializing(_, _, _, _, latch)       =>
         latch.get.rethrow >> startSubscription(subscription, operationName, variables, errorPolicy)
