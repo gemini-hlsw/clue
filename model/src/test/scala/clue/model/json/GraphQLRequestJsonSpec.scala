@@ -3,6 +3,7 @@
 
 package clue.model.json
 
+import clue.ListLimitingDisciplineSuite
 import clue.model.GraphQLRequest
 import clue.model.arb._
 import io.circe.JsonObject

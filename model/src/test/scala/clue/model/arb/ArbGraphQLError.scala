@@ -5,6 +5,7 @@ package clue.model
 package arb
 
 import cats.data.NonEmptyList
+import clue.model.GraphQLErrors
 import io.circe.testing.instances._
 import org.scalacheck.Arbitrary._
 import org.scalacheck._
@@ -43,6 +44,11 @@ trait ArbGraphQLError {
         extensions
       )
     }
+
+  implicit val arbGraphQLErrors: Arbitrary[GraphQLErrors] =
+    Arbitrary(
+      arbitrary[List[GraphQLError]].withFilter(_.nonEmpty).map(NonEmptyList.fromListUnsafe)
+    )
 
 }
 

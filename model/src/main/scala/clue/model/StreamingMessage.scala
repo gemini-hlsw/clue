@@ -143,10 +143,10 @@ object StreamingMessage {
      * @param payload
      *   GraphQL result
      */
-    final case class Data(id: String, payload: GraphQLDataResponse[Json])
+    final case class Data(id: String, payload: GraphQLResponse[Json])
         extends FromServer
         with Identifier
-        with Payload[GraphQLDataResponse[Json]]
+        with Payload[GraphQLResponse[Json]]
 
     object Data {
       implicit val EqData: Eq[Data] =
