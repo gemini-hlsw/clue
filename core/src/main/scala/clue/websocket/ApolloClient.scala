@@ -587,6 +587,7 @@ class ApolloClient[F[_], P, S](
 
     def emitData(dataJson: Json, errors: Option[GraphQLErrors]): F[Unit] =
       for {
+        _    <- s"Emitting data:\n${dataJson}/nerrors: $errors".traceF
         data <- F.delay(dataJson.as[D]).rethrow
         _    <- queue.offer(Ior.fromOptions(errors, data.some))
       } yield ()
