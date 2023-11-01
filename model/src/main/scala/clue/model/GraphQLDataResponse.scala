@@ -9,7 +9,7 @@ import cats.syntax.option._
 /**
  * A GraphQL response with data.
  *
- * For a general response that may or may not contain data, use `GraphQLCombinedResponse`.
+ * For a general response that may or may not contain data, use `GraphQLResponse`.
  *
  * See https://spec.graphql.org/October2021/#sec-Response-Format
  *

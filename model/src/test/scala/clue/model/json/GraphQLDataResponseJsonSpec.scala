@@ -3,8 +3,9 @@
 
 package clue.model.json
 
+import clue.ListLimitingDisciplineSuite
 import clue.model.GraphQLDataResponse
-import clue.model.arb._
+import clue.model.arb.ArbGraphQLDataResponse
 import io.circe.Json
 import io.circe.testing.CodecTests
 import io.circe.testing.instances._

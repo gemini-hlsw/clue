@@ -114,7 +114,8 @@ object Demo extends IOApp.Simple {
           subscription   <- client.subscribe(Subscription).allocated
           (stream, close) = subscription
           fiber          <- stream.evalTap(_ => IO.println("UPDATE!")).compile.drain.start
-          _              <- mutator(client, (result.right.get \\ "id").map(_.as[String].toOption.get)).start
+          _              <-
+            mutator(client, (result.result.right.get \\ "id").map(_.as[String].toOption.get)).start
           _              <- IO.sleep(10.seconds)
           _              <- close
           _              <- fiber.join

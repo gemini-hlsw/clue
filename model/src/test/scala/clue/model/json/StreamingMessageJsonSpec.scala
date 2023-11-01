@@ -3,6 +3,7 @@
 
 package clue.model.json
 
+import clue.ListLimitingDisciplineSuite
 import clue.model.StreamingMessage.FromClient
 import clue.model.StreamingMessage.FromServer
 import clue.model.arb._

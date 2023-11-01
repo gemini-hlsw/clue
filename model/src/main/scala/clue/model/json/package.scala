@@ -180,7 +180,7 @@ package object json {
       for {
         _ <- checkType(c, "data")
         i <- c.get[String]("id")
-        p <- c.get[GraphQLDataResponse[Json]]("payload")
+        p <- c.get[GraphQLResponse[Json]]("payload")
       } yield Data(i, p)
     )
 
@@ -295,18 +295,30 @@ package object json {
       } yield GraphQLError(message, path, locations, extensions)
     )
 
-  implicit def DecoderGraphQLCombinedResponse[D: Decoder]: Decoder[GraphQLCombinedResponse[D]] =
+  implicit def EncoderGraphQLResponse[D: Encoder]: Encoder[GraphQLResponse[D]] =
+    Encoder.instance(a =>
+      Json
+        .obj(
+          "data"       -> a.data.asJson,
+          "errors"     -> a.errors.asJson,
+          "extensions" -> a.extensions.asJson
+        )
+        .dropNullValues
+    )
+
+  implicit def DecoderGraphQLResponse[D: Decoder]: Decoder[GraphQLResponse[D]] =
     Decoder.instance(c =>
       for {
-        data   <- c.get[Option[D]]("data")
-        errors <- c.get[Option[GraphQLErrors]]("errors")
-        result <-
+        data       <- c.get[Option[D]]("data")
+        errors     <- c.get[Option[GraphQLErrors]]("errors")
+        extensions <- c.get[Option[GraphQLExtensions]]("extensions")
+        result     <-
           Ior
             .fromOptions(errors, data)
-            .fold[Decoder.Result[GraphQLCombinedResponse[D]]](
+            .fold[Decoder.Result[Ior[GraphQLErrors, D]]](
               DecodingFailure("Response doesn't contain 'data' or 'errors' block", c.history).asLeft
             )(_.asRight)
-      } yield result
+      } yield GraphQLResponse(result, extensions)
     )
 
   private def checkType(c: HCursor, expected: String): Decoder.Result[Unit] =

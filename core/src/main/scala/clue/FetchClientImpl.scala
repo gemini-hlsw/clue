@@ -5,8 +5,8 @@ package clue
 
 import cats.MonadThrow
 import cats.syntax.all._
-import clue.model.GraphQLCombinedResponse
 import clue.model.GraphQLRequest
+import clue.model.GraphQLResponse
 import clue.model.json._
 import io.circe._
 import io.circe.parser._
@@ -29,7 +29,7 @@ class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(implicit
   ): F[R] =
     backend
       .request(GraphQLRequest(document, operationName, variables), modParams(requestParams))
-      .map(decode[GraphQLCombinedResponse[D]])
+      .map(decode[GraphQLResponse[D]])
       .rethrow
       .flatMap(errorPolicy.process(_))
       .onError(_.warnF("Error executing query:"))

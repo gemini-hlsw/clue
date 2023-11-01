@@ -4,9 +4,9 @@
 package clue.model.arb
 
 import cats.data.NonEmptyList
-import clue.model.GraphQLDataResponse
 import clue.model.GraphQLError
 import clue.model.GraphQLExtensions
+import clue.model.GraphQLResponse
 import clue.model.StreamingMessage.FromServer
 import clue.model.StreamingMessage.FromServer._
 import io.circe.Json
@@ -17,6 +17,7 @@ import org.scalacheck.Gen
 
 trait ArbFromServer {
   import ArbJson._
+  import ArbGraphQLResponse._
 
   val arbErrorJson: Arbitrary[Json] =
     Arbitrary {
@@ -75,20 +76,11 @@ trait ArbFromServer {
       arbitrary[Json](arbJsonString).map(ConnectionError(_))
     }
 
-  implicit val arbDataWrapper: Arbitrary[GraphQLDataResponse[Json]] =
-    Arbitrary {
-      for {
-        data       <- arbitrary[Json](arbJsonString)
-        errors     <- arbitrary[List[GraphQLError]]
-        extensions <- arbitrary[Option[GraphQLExtensions]]
-      } yield GraphQLDataResponse(data, NonEmptyList.fromList(errors), extensions)
-    }
-
   implicit val arbData: Arbitrary[Data] =
     Arbitrary {
       for {
         i <- arbitrary[String]
-        p <- arbitrary[GraphQLDataResponse[Json]]
+        p <- arbitrary[GraphQLResponse[Json]](arbCombinedResponse(arbJsonString))
       } yield Data(i, p)
     }
 
