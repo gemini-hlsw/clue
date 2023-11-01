@@ -3,12 +3,12 @@
 
 package clue.model
 
+import cats.Applicative
 import cats.Eq
+import cats.Eval
+import cats.Traverse
 import cats.data.Ior
 import cats.syntax.all.*
-import cats.Applicative
-import cats.Traverse
-import cats.Eval
 
 /**
  * A GraphQL response.
