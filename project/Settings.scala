@@ -18,6 +18,7 @@ object Settings {
     val log4Cats                 = "2.6.0"
     val monocle                  = "3.2.0"
     val munit                    = "0.7.29"
+    val munitCatsEffect          = "2.0.0-M4"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom               = "2.8.0"
     val scalaJSMacrotaskExecutor = "1.1.1"
@@ -109,7 +110,8 @@ object Settings {
 
     val Log4Cats = Def.setting(
       Seq(
-        "org.typelevel" %%% "log4cats-core" % log4Cats
+        "org.typelevel" %%% "log4cats-core"    % log4Cats,
+        "org.typelevel" %%% "log4cats-testing" % log4Cats % "test"
       )
     )
 
@@ -123,6 +125,12 @@ object Settings {
     val MUnit = Def.setting(
       Seq[ModuleID](
         "org.scalameta" %%% "munit" % munit % "test"
+      )
+    )
+
+    val MUnitCatsEffect = Def.setting(
+      Seq[ModuleID](
+        "org.typelevel" %%% "munit-cats-effect" % munitCatsEffect % "test"
       )
     )
 
