@@ -11,13 +11,13 @@ import clue.model.GraphQLDataResponse
 import clue.model.GraphQLErrors
 import clue.model.GraphQLResponse
 
-sealed trait ErrorPolicy {
+trait ErrorPolicy {
   type ReturnType[D]
 
   def processor[D]: ErrorPolicyProcessor[D, ReturnType[D]]
 }
 
-sealed trait ErrorPolicyProcessor[D, R] {
+trait ErrorPolicyProcessor[D, R] {
   def process[F[_]: ApplicativeThrow](response: GraphQLResponse[D]): F[R]
 }
 
