@@ -10,6 +10,7 @@ import cats.syntax.all._
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLErrors
 import clue.model.GraphQLResponse
+import org.typelevel.log4cats.Logger
 
 sealed trait ErrorPolicy {
   type ReturnType[D]
@@ -18,7 +19,7 @@ sealed trait ErrorPolicy {
 }
 
 sealed trait ErrorPolicyProcessor[D, R] {
-  def process[F[_]: ApplicativeThrow](response: GraphQLResponse[D]): F[R]
+  def process[F[_]: ApplicativeThrow](response: GraphQLResponse[D])(implicit log: Logger[F]): F[R]
 }
 
 object ErrorPolicy {
@@ -31,15 +32,24 @@ object ErrorPolicy {
       ApplicativeThrow[F].raiseError(ResponseException(errors, data))
   }
 
+  /**
+   * If the response contains data, return it. If the response contains errors, raise an exception.
+   * If the response contains both data and errors, log the errors and return the data.
+   */
   object IgnoreOnData extends ErrorPolicy {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
-      def process[F[_]: ApplicativeThrow](response: GraphQLResponse[D]): F[D] =
+      def process[F[_]: ApplicativeThrow](
+        response: GraphQLResponse[D]
+      )(implicit log: Logger[F]): F[D] =
         response.result match {
-          case Ior.Left(errors)  => processErrors(errors)
-          case Ior.Right(data)   => processData(data)
-          case Ior.Both(_, data) => processData(data)
+          case Ior.Left(errors)       => processErrors(errors)
+          case Ior.Right(data)        => processData(data)
+          case Ior.Both(errors, data) =>
+            log.warn(ResponseException(errors, data.some))(
+              "Received both data and errors"
+            ) *> processData(data)
         }
     }
   }
@@ -48,7 +58,9 @@ object ErrorPolicy {
     type ReturnType[D] = D
 
     def processor[D]: ErrorPolicyProcessor[D, D] = new Distinct[D] {
-      def process[F[_]: ApplicativeThrow](response: GraphQLResponse[D]): F[ReturnType[D]] =
+      def process[F[_]: ApplicativeThrow](
+        response: GraphQLResponse[D]
+      )(implicit log: Logger[F]): F[ReturnType[D]] =
         response.result match {
           case Ior.Left(errors)       => processErrors(errors)
           case Ior.Right(data)        => processData(data)
@@ -65,7 +77,7 @@ object ErrorPolicy {
       new ErrorPolicyProcessor[D, GraphQLResponse[D]] {
         def process[F[_]: ApplicativeThrow](
           response: GraphQLResponse[D]
-        ): F[ReturnType[D]] =
+        )(implicit log: Logger[F]): F[ReturnType[D]] =
           Applicative[F].pure(response)
       }
   }
@@ -78,7 +90,7 @@ object ErrorPolicy {
 
         def process[F[_]: ApplicativeThrow](
           response: GraphQLResponse[D]
-        ): F[ReturnType[D]] =
+        )(implicit log: Logger[F]): F[ReturnType[D]] =
           response.result match {
             case Ior.Left(errors)       => ApplicativeThrow[F].raiseError(ResponseException(errors, none))
             case Ior.Right(data)        => Applicative[F].pure(GraphQLDataResponse(data, none, none))
