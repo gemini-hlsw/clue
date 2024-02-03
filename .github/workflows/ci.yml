@@ -98,7 +98,7 @@ jobs:
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' coverageReport coverageAggregate
 
       - name: Upload code coverage data
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
 
   publish:
     name: Publish Artifacts
