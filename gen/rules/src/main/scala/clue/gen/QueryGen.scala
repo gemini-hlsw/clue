@@ -124,10 +124,12 @@ trait QueryGen extends Generator {
       case Ast.Type.NonNull(Left(named)) => loop(named, nonNull = true)
       case Ast.Type.NonNull(Right(list)) => loop(list, nonNull = true)
       case Ast.Type.List(elem)           =>
-        loop(elem, nonNull = false).map(e => if (nonNull) ListType(e) else NullableType(ListType(e)))
+        loop(elem, nonNull = false).map(e =>
+          if (nonNull) ListType(e) else NullableType(ListType(e))
+        )
       case Ast.Type.Named(name)          =>
         schema.definition(name.value) match {
-          case None      => Result.internalError(s"Undefine typed '${name.value}'")
+          case None     => Result.internalError(s"Undefine typed '${name.value}'")
           case Some(tp) => Result.success(if (nonNull) tp else NullableType(tp))
         }
     }
