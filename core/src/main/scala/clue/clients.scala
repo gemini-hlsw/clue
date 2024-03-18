@@ -4,9 +4,9 @@
 package clue
 
 import cats.effect.Resource
-import cats.syntax.all._
-import io.circe._
-import io.circe.syntax._
+import cats.syntax.all.*
+import io.circe.*
+import io.circe.syntax.*
 
 /**
  * A client that allows one-shot queries and mutations.

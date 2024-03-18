@@ -8,7 +8,7 @@ import clue.model.GraphQLDataResponse
 import clue.model.arb.ArbGraphQLDataResponse
 import io.circe.Json
 import io.circe.testing.CodecTests
-import io.circe.testing.instances._
+import io.circe.testing.instances.*
 
 final class GraphQLDataResponseJsonSpec extends ListLimitingDisciplineSuite {
   import ArbGraphQLDataResponse._

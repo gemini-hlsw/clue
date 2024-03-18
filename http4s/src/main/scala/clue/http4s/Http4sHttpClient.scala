@@ -7,7 +7,7 @@ import cats.Applicative
 import cats.MonadThrow
 import clue.FetchClientImpl
 import org.http4s.Headers
-import org.http4s.Method._
+import org.http4s.Method.*
 import org.http4s.Request
 import org.http4s.Uri
 import org.typelevel.log4cats.Logger

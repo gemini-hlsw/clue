@@ -19,11 +19,11 @@ object StarWars {
       case object Jedi extends Episode()
       implicit val eqEpisode: cats.Eq[Episode] = cats.Eq.fromUniversalEquals
       implicit val showEpisode: cats.Show[Episode] = cats.Show.fromToString
-      implicit val jsonEncoderEpisode: io.circe.Encoder[Episode] = io.circe.Encoder.encodeString.contramap[Episode]({
+      implicit val jsonEncoderEpisode: io.circe.Encoder[Episode] = io.circe.Encoder.encodeString.contramap[Episode] {
         case Newhope => "NEWHOPE"
         case Empire => "EMPIRE"
         case Jedi => "JEDI"
-      })
+      }
       implicit val jsonDecoderEpisode: io.circe.Decoder[Episode] = io.circe.Decoder.decodeString.emap(_ match {
         case "NEWHOPE" =>
           Right(Newhope)

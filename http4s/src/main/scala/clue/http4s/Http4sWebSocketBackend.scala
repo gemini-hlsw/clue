@@ -3,18 +3,18 @@
 
 package clue.http4s
 
+import cats.effect.*
 import cats.effect.Resource.ExitCase
-import cats.effect._
-import cats.effect.implicits._
-import cats.syntax.all._
-import clue._
+import cats.effect.implicits.*
+import cats.syntax.all.*
+import clue.*
 import clue.model.StreamingMessage
-import clue.model.json._
-import clue.websocket._
-import io.circe.syntax._
+import clue.model.json.*
+import clue.websocket.*
+import io.circe.syntax.*
 import org.http4s.Headers
 import org.http4s.Uri
-import org.http4s.client.websocket._
+import org.http4s.client.websocket.*
 
 /**
  * Streaming backend for http4s WebSocket client.

@@ -6,7 +6,7 @@ package clue
 import cats.Applicative
 import cats.ApplicativeThrow
 import cats.data.Ior
-import cats.syntax.all._
+import cats.syntax.all.*
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLErrors
 import clue.model.GraphQLResponse

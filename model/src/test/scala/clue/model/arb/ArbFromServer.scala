@@ -8,11 +8,11 @@ import clue.model.GraphQLError
 import clue.model.GraphQLExtensions
 import clue.model.GraphQLResponse
 import clue.model.StreamingMessage.FromServer
-import clue.model.StreamingMessage.FromServer._
+import clue.model.StreamingMessage.FromServer.*
 import io.circe.Json
-import io.circe.testing.instances._
+import io.circe.testing.instances.*
 import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary._
+import org.scalacheck.Arbitrary.*
 import org.scalacheck.Gen
 
 trait ArbFromServer {

@@ -5,12 +5,12 @@ package clue.model.arb
 
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage.FromClient
-import clue.model.StreamingMessage.FromClient._
+import clue.model.StreamingMessage.FromClient.*
 import io.circe.Json
 import io.circe.JsonObject
-import io.circe.testing.instances._
+import io.circe.testing.instances.*
 import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary._
+import org.scalacheck.Arbitrary.*
 import org.scalacheck.Gen
 
 trait ArbFromClient {

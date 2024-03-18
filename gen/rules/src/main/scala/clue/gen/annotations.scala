@@ -3,9 +3,9 @@
 
 package clue.gen
 
-import scalafix.v1._
+import scalafix.v1.*
 
-import scala.meta._
+import scala.meta.*
 
 // Adapted from simulacrum-scalafix
 class AnnotationPattern(fqcn: String) {

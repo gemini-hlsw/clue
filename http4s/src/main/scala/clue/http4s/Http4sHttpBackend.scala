@@ -3,14 +3,14 @@
 
 package clue.http4s
 
-import cats.effect._
-import clue._
+import cats.effect.*
+import clue.*
 import clue.model.GraphQLRequest
-import clue.model.json._
+import clue.model.json.*
 import io.circe.Encoder
-import io.circe.syntax._
+import io.circe.syntax.*
 import org.http4s.Request
-import org.http4s.circe._
+import org.http4s.circe.*
 import org.http4s.client.Client
 import org.http4s.client.dsl.Http4sClientDsl
 

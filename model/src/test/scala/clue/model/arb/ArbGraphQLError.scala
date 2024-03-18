@@ -6,9 +6,9 @@ package arb
 
 import cats.data.NonEmptyList
 import clue.model.GraphQLErrors
-import io.circe.testing.instances._
-import org.scalacheck.Arbitrary._
-import org.scalacheck._
+import io.circe.testing.instances.*
+import org.scalacheck.*
+import org.scalacheck.Arbitrary.*
 
 trait ArbGraphQLError {
 

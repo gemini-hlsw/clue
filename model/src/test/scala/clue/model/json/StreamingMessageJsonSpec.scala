@@ -6,9 +6,9 @@ package clue.model.json
 import clue.ListLimitingDisciplineSuite
 import clue.model.StreamingMessage.FromClient
 import clue.model.StreamingMessage.FromServer
-import clue.model.arb._
+import clue.model.arb.*
 import io.circe.testing.CodecTests
-import io.circe.testing.instances._
+import io.circe.testing.instances.*
 
 final class StreamingMessageJsonSpec extends ListLimitingDisciplineSuite {
 

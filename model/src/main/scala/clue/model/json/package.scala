@@ -5,9 +5,9 @@ package clue.model
 
 import cats.data.Ior
 import cats.data.NonEmptyList
-import cats.syntax.all._
-import io.circe._
-import io.circe.syntax._
+import cats.syntax.all.*
+import io.circe.*
+import io.circe.syntax.*
 
 /**
  * JSON codecs for `clue.model`.

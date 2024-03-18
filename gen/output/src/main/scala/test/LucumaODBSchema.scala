@@ -31,10 +31,10 @@ object LucumaODB {
       case object Disabled extends Breakpoint()
       implicit val eqBreakpoint: cats.Eq[Breakpoint] = cats.Eq.fromUniversalEquals
       implicit val showBreakpoint: cats.Show[Breakpoint] = cats.Show.fromToString
-      implicit val jsonEncoderBreakpoint: io.circe.Encoder[Breakpoint] = io.circe.Encoder.encodeString.contramap[Breakpoint]({
+      implicit val jsonEncoderBreakpoint: io.circe.Encoder[Breakpoint] = io.circe.Encoder.encodeString.contramap[Breakpoint] {
         case Enabled => "ENABLED"
         case Disabled => "DISABLED"
-      })
+      }
       implicit val jsonDecoderBreakpoint: io.circe.Decoder[Breakpoint] = io.circe.Decoder.decodeString.emap(_ match {
         case "ENABLED" =>
           Right(Enabled)
@@ -51,11 +51,11 @@ object LucumaODB {
       case object Gaia extends CatalogName()
       implicit val eqCatalogName: cats.Eq[CatalogName] = cats.Eq.fromUniversalEquals
       implicit val showCatalogName: cats.Show[CatalogName] = cats.Show.fromToString
-      implicit val jsonEncoderCatalogName: io.circe.Encoder[CatalogName] = io.circe.Encoder.encodeString.contramap[CatalogName]({
+      implicit val jsonEncoderCatalogName: io.circe.Encoder[CatalogName] = io.circe.Encoder.encodeString.contramap[CatalogName] {
         case Simbad => "SIMBAD"
         case Horizon => "HORIZON"
         case Gaia => "GAIA"
-      })
+      }
       implicit val jsonDecoderCatalogName: io.circe.Decoder[CatalogName] = io.circe.Decoder.decodeString.emap(_ match {
         case "SIMBAD" =>
           Right(Simbad)
@@ -78,7 +78,7 @@ object LucumaODB {
       case object ThreePointZero extends CloudExtinction()
       implicit val eqCloudExtinction: cats.Eq[CloudExtinction] = cats.Eq.fromUniversalEquals
       implicit val showCloudExtinction: cats.Show[CloudExtinction] = cats.Show.fromToString
-      implicit val jsonEncoderCloudExtinction: io.circe.Encoder[CloudExtinction] = io.circe.Encoder.encodeString.contramap[CloudExtinction]({
+      implicit val jsonEncoderCloudExtinction: io.circe.Encoder[CloudExtinction] = io.circe.Encoder.encodeString.contramap[CloudExtinction] {
         case PointOne => "POINT_ONE"
         case PointThree => "POINT_THREE"
         case PointFive => "POINT_FIVE"
@@ -86,7 +86,7 @@ object LucumaODB {
         case OnePointFive => "ONE_POINT_FIVE"
         case TwoPointZero => "TWO_POINT_ZERO"
         case ThreePointZero => "THREE_POINT_ZERO"
-      })
+      }
       implicit val jsonDecoderCloudExtinction: io.circe.Decoder[CloudExtinction] = io.circe.Decoder.decodeString.emap(_ match {
         case "POINT_ONE" =>
           Right(PointOne)
@@ -112,10 +112,10 @@ object LucumaODB {
       case object Degrees extends DeclinationUnits()
       implicit val eqDeclinationUnits: cats.Eq[DeclinationUnits] = cats.Eq.fromUniversalEquals
       implicit val showDeclinationUnits: cats.Show[DeclinationUnits] = cats.Show.fromToString
-      implicit val jsonEncoderDeclinationUnits: io.circe.Encoder[DeclinationUnits] = io.circe.Encoder.encodeString.contramap[DeclinationUnits]({
+      implicit val jsonEncoderDeclinationUnits: io.circe.Encoder[DeclinationUnits] = io.circe.Encoder.encodeString.contramap[DeclinationUnits] {
         case Microarcseconds => "MICROARCSECONDS"
         case Degrees => "DEGREES"
-      })
+      }
       implicit val jsonDecoderDeclinationUnits: io.circe.Decoder[DeclinationUnits] = io.circe.Decoder.decodeString.emap(_ match {
         case "MICROARCSECONDS" =>
           Right(Microarcseconds)
@@ -131,10 +131,10 @@ object LucumaODB {
       case object Updated extends EditType()
       implicit val eqEditType: cats.Eq[EditType] = cats.Eq.fromUniversalEquals
       implicit val showEditType: cats.Show[EditType] = cats.Show.fromToString
-      implicit val jsonEncoderEditType: io.circe.Encoder[EditType] = io.circe.Encoder.encodeString.contramap[EditType]({
+      implicit val jsonEncoderEditType: io.circe.Encoder[EditType] = io.circe.Encoder.encodeString.contramap[EditType] {
         case Created => "CREATED"
         case Updated => "UPDATED"
-      })
+      }
       implicit val jsonDecoderEditType: io.circe.Decoder[EditType] = io.circe.Decoder.decodeString.emap(_ match {
         case "CREATED" =>
           Right(Created)
@@ -153,13 +153,13 @@ object LucumaODB {
       case object UserSupplied extends EphemerisKeyType()
       implicit val eqEphemerisKeyType: cats.Eq[EphemerisKeyType] = cats.Eq.fromUniversalEquals
       implicit val showEphemerisKeyType: cats.Show[EphemerisKeyType] = cats.Show.fromToString
-      implicit val jsonEncoderEphemerisKeyType: io.circe.Encoder[EphemerisKeyType] = io.circe.Encoder.encodeString.contramap[EphemerisKeyType]({
+      implicit val jsonEncoderEphemerisKeyType: io.circe.Encoder[EphemerisKeyType] = io.circe.Encoder.encodeString.contramap[EphemerisKeyType] {
         case Comet => "COMET"
         case AsteroidNew => "ASTEROID_NEW"
         case AsteroidOld => "ASTEROID_OLD"
         case MajorBody => "MAJOR_BODY"
         case UserSupplied => "USER_SUPPLIED"
-      })
+      }
       implicit val jsonDecoderEphemerisKeyType: io.circe.Decoder[EphemerisKeyType] = io.circe.Decoder.decodeString.emap(_ match {
         case "COMET" =>
           Right(Comet)
@@ -181,10 +181,10 @@ object LucumaODB {
       case object Deleted extends Existence()
       implicit val eqExistence: cats.Eq[Existence] = cats.Eq.fromUniversalEquals
       implicit val showExistence: cats.Show[Existence] = cats.Show.fromToString
-      implicit val jsonEncoderExistence: io.circe.Encoder[Existence] = io.circe.Encoder.encodeString.contramap[Existence]({
+      implicit val jsonEncoderExistence: io.circe.Encoder[Existence] = io.circe.Encoder.encodeString.contramap[Existence] {
         case Present => "PRESENT"
         case Deleted => "DELETED"
-      })
+      }
       implicit val jsonDecoderExistence: io.circe.Decoder[Existence] = io.circe.Decoder.decodeString.emap(_ match {
         case "PRESENT" =>
           Right(Present)
@@ -202,12 +202,12 @@ object LucumaODB {
       case object XeArc extends GcalArc()
       implicit val eqGcalArc: cats.Eq[GcalArc] = cats.Eq.fromUniversalEquals
       implicit val showGcalArc: cats.Show[GcalArc] = cats.Show.fromToString
-      implicit val jsonEncoderGcalArc: io.circe.Encoder[GcalArc] = io.circe.Encoder.encodeString.contramap[GcalArc]({
+      implicit val jsonEncoderGcalArc: io.circe.Encoder[GcalArc] = io.circe.Encoder.encodeString.contramap[GcalArc] {
         case ArArc => "AR_ARC"
         case ThArArc => "TH_AR_ARC"
         case CuArArc => "CU_AR_ARC"
         case XeArc => "XE_ARC"
-      })
+      }
       implicit val jsonDecoderGcalArc: io.circe.Decoder[GcalArc] = io.circe.Decoder.decodeString.emap(_ match {
         case "AR_ARC" =>
           Right(ArArc)
@@ -228,11 +228,11 @@ object LucumaODB {
       case object QuartzHalogen extends GcalContinuum()
       implicit val eqGcalContinuum: cats.Eq[GcalContinuum] = cats.Eq.fromUniversalEquals
       implicit val showGcalContinuum: cats.Show[GcalContinuum] = cats.Show.fromToString
-      implicit val jsonEncoderGcalContinuum: io.circe.Encoder[GcalContinuum] = io.circe.Encoder.encodeString.contramap[GcalContinuum]({
+      implicit val jsonEncoderGcalContinuum: io.circe.Encoder[GcalContinuum] = io.circe.Encoder.encodeString.contramap[GcalContinuum] {
         case IrGreyBodyLow => "IR_GREY_BODY_LOW"
         case IrGreyBodyHigh => "IR_GREY_BODY_HIGH"
         case QuartzHalogen => "QUARTZ_HALOGEN"
-      })
+      }
       implicit val jsonDecoderGcalContinuum: io.circe.Decoder[GcalContinuum] = io.circe.Decoder.decodeString.emap(_ match {
         case "IR_GREY_BODY_LOW" =>
           Right(IrGreyBodyLow)
@@ -250,10 +250,10 @@ object LucumaODB {
       case object Visible extends GcalDiffuser()
       implicit val eqGcalDiffuser: cats.Eq[GcalDiffuser] = cats.Eq.fromUniversalEquals
       implicit val showGcalDiffuser: cats.Show[GcalDiffuser] = cats.Show.fromToString
-      implicit val jsonEncoderGcalDiffuser: io.circe.Encoder[GcalDiffuser] = io.circe.Encoder.encodeString.contramap[GcalDiffuser]({
+      implicit val jsonEncoderGcalDiffuser: io.circe.Encoder[GcalDiffuser] = io.circe.Encoder.encodeString.contramap[GcalDiffuser] {
         case Ir => "IR"
         case Visible => "VISIBLE"
-      })
+      }
       implicit val jsonDecoderGcalDiffuser: io.circe.Decoder[GcalDiffuser] = io.circe.Decoder.decodeString.emap(_ match {
         case "IR" =>
           Right(Ir)
@@ -278,7 +278,7 @@ object LucumaODB {
       case object Nd50 extends GcalFilter()
       implicit val eqGcalFilter: cats.Eq[GcalFilter] = cats.Eq.fromUniversalEquals
       implicit val showGcalFilter: cats.Show[GcalFilter] = cats.Show.fromToString
-      implicit val jsonEncoderGcalFilter: io.circe.Encoder[GcalFilter] = io.circe.Encoder.encodeString.contramap[GcalFilter]({
+      implicit val jsonEncoderGcalFilter: io.circe.Encoder[GcalFilter] = io.circe.Encoder.encodeString.contramap[GcalFilter] {
         case None => "NONE"
         case Gmos => "GMOS"
         case Hros => "HROS"
@@ -290,7 +290,7 @@ object LucumaODB {
         case Nd40 => "ND40"
         case Nd45 => "ND45"
         case Nd50 => "ND50"
-      })
+      }
       implicit val jsonDecoderGcalFilter: io.circe.Decoder[GcalFilter] = io.circe.Decoder.decodeString.emap(_ match {
         case "NONE" =>
           Right(None)
@@ -324,10 +324,10 @@ object LucumaODB {
       case object Closed extends GcalShutter()
       implicit val eqGcalShutter: cats.Eq[GcalShutter] = cats.Eq.fromUniversalEquals
       implicit val showGcalShutter: cats.Show[GcalShutter] = cats.Show.fromToString
-      implicit val jsonEncoderGcalShutter: io.circe.Encoder[GcalShutter] = io.circe.Encoder.encodeString.contramap[GcalShutter]({
+      implicit val jsonEncoderGcalShutter: io.circe.Encoder[GcalShutter] = io.circe.Encoder.encodeString.contramap[GcalShutter] {
         case Open => "OPEN"
         case Closed => "CLOSED"
-      })
+      }
       implicit val jsonDecoderGcalShutter: io.circe.Decoder[GcalShutter] = io.circe.Decoder.decodeString.emap(_ match {
         case "OPEN" =>
           Right(Open)
@@ -344,11 +344,11 @@ object LucumaODB {
       case object Twelve extends GmosAmpCount()
       implicit val eqGmosAmpCount: cats.Eq[GmosAmpCount] = cats.Eq.fromUniversalEquals
       implicit val showGmosAmpCount: cats.Show[GmosAmpCount] = cats.Show.fromToString
-      implicit val jsonEncoderGmosAmpCount: io.circe.Encoder[GmosAmpCount] = io.circe.Encoder.encodeString.contramap[GmosAmpCount]({
+      implicit val jsonEncoderGmosAmpCount: io.circe.Encoder[GmosAmpCount] = io.circe.Encoder.encodeString.contramap[GmosAmpCount] {
         case Three => "THREE"
         case Six => "SIX"
         case Twelve => "TWELVE"
-      })
+      }
       implicit val jsonDecoderGmosAmpCount: io.circe.Decoder[GmosAmpCount] = io.circe.Decoder.decodeString.emap(_ match {
         case "THREE" =>
           Right(Three)
@@ -366,10 +366,10 @@ object LucumaODB {
       case object Fast extends GmosAmpReadMode()
       implicit val eqGmosAmpReadMode: cats.Eq[GmosAmpReadMode] = cats.Eq.fromUniversalEquals
       implicit val showGmosAmpReadMode: cats.Show[GmosAmpReadMode] = cats.Show.fromToString
-      implicit val jsonEncoderGmosAmpReadMode: io.circe.Encoder[GmosAmpReadMode] = io.circe.Encoder.encodeString.contramap[GmosAmpReadMode]({
+      implicit val jsonEncoderGmosAmpReadMode: io.circe.Encoder[GmosAmpReadMode] = io.circe.Encoder.encodeString.contramap[GmosAmpReadMode] {
         case Slow => "SLOW"
         case Fast => "FAST"
-      })
+      }
       implicit val jsonDecoderGmosAmpReadMode: io.circe.Decoder[GmosAmpReadMode] = io.circe.Decoder.decodeString.emap(_ match {
         case "SLOW" =>
           Right(Slow)
@@ -390,7 +390,7 @@ object LucumaODB {
       case object CustomWidth500 extends GmosCustomSlitWidth()
       implicit val eqGmosCustomSlitWidth: cats.Eq[GmosCustomSlitWidth] = cats.Eq.fromUniversalEquals
       implicit val showGmosCustomSlitWidth: cats.Show[GmosCustomSlitWidth] = cats.Show.fromToString
-      implicit val jsonEncoderGmosCustomSlitWidth: io.circe.Encoder[GmosCustomSlitWidth] = io.circe.Encoder.encodeString.contramap[GmosCustomSlitWidth]({
+      implicit val jsonEncoderGmosCustomSlitWidth: io.circe.Encoder[GmosCustomSlitWidth] = io.circe.Encoder.encodeString.contramap[GmosCustomSlitWidth] {
         case CustomWidth025 => "CUSTOM_WIDTH_0_25"
         case CustomWidth050 => "CUSTOM_WIDTH_0_50"
         case CustomWidth075 => "CUSTOM_WIDTH_0_75"
@@ -398,7 +398,7 @@ object LucumaODB {
         case CustomWidth150 => "CUSTOM_WIDTH_1_50"
         case CustomWidth200 => "CUSTOM_WIDTH_2_00"
         case CustomWidth500 => "CUSTOM_WIDTH_5_00"
-      })
+      }
       implicit val jsonDecoderGmosCustomSlitWidth: io.circe.Decoder[GmosCustomSlitWidth] = io.circe.Decoder.decodeString.emap(_ match {
         case "CUSTOM_WIDTH_0_25" =>
           Right(CustomWidth025)
@@ -424,10 +424,10 @@ object LucumaODB {
       case object Hamamatsu extends GmosDetector()
       implicit val eqGmosDetector: cats.Eq[GmosDetector] = cats.Eq.fromUniversalEquals
       implicit val showGmosDetector: cats.Show[GmosDetector] = cats.Show.fromToString
-      implicit val jsonEncoderGmosDetector: io.circe.Encoder[GmosDetector] = io.circe.Encoder.encodeString.contramap[GmosDetector]({
+      implicit val jsonEncoderGmosDetector: io.circe.Encoder[GmosDetector] = io.circe.Encoder.encodeString.contramap[GmosDetector] {
         case E2V => "E2_V"
         case Hamamatsu => "HAMAMATSU"
-      })
+      }
       implicit val jsonDecoderGmosDetector: io.circe.Decoder[GmosDetector] = io.circe.Decoder.decodeString.emap(_ match {
         case "E2_V" =>
           Right(E2V)
@@ -444,11 +444,11 @@ object LucumaODB {
       case object Two extends GmosDisperserOrder()
       implicit val eqGmosDisperserOrder: cats.Eq[GmosDisperserOrder] = cats.Eq.fromUniversalEquals
       implicit val showGmosDisperserOrder: cats.Show[GmosDisperserOrder] = cats.Show.fromToString
-      implicit val jsonEncoderGmosDisperserOrder: io.circe.Encoder[GmosDisperserOrder] = io.circe.Encoder.encodeString.contramap[GmosDisperserOrder]({
+      implicit val jsonEncoderGmosDisperserOrder: io.circe.Encoder[GmosDisperserOrder] = io.circe.Encoder.encodeString.contramap[GmosDisperserOrder] {
         case Zero => "ZERO"
         case One => "ONE"
         case Two => "TWO"
-      })
+      }
       implicit val jsonDecoderGmosDisperserOrder: io.circe.Decoder[GmosDisperserOrder] = io.circe.Decoder.decodeString.emap(_ match {
         case "ZERO" =>
           Right(Zero)
@@ -477,7 +477,7 @@ object LucumaODB {
       case object Six extends GmosDtax()
       implicit val eqGmosDtax: cats.Eq[GmosDtax] = cats.Eq.fromUniversalEquals
       implicit val showGmosDtax: cats.Show[GmosDtax] = cats.Show.fromToString
-      implicit val jsonEncoderGmosDtax: io.circe.Encoder[GmosDtax] = io.circe.Encoder.encodeString.contramap[GmosDtax]({
+      implicit val jsonEncoderGmosDtax: io.circe.Encoder[GmosDtax] = io.circe.Encoder.encodeString.contramap[GmosDtax] {
         case MinusSix => "MINUS_SIX"
         case MinusFive => "MINUS_FIVE"
         case MinusFour => "MINUS_FOUR"
@@ -491,7 +491,7 @@ object LucumaODB {
         case Four => "FOUR"
         case Five => "FIVE"
         case Six => "SIX"
-      })
+      }
       implicit val jsonDecoderGmosDtax: io.circe.Decoder[GmosDtax] = io.circe.Decoder.decodeString.emap(_ match {
         case "MINUS_SIX" =>
           Right(MinusSix)
@@ -529,10 +529,10 @@ object LucumaODB {
       case object Off extends GmosEOffsetting()
       implicit val eqGmosEOffsetting: cats.Eq[GmosEOffsetting] = cats.Eq.fromUniversalEquals
       implicit val showGmosEOffsetting: cats.Show[GmosEOffsetting] = cats.Show.fromToString
-      implicit val jsonEncoderGmosEOffsetting: io.circe.Encoder[GmosEOffsetting] = io.circe.Encoder.encodeString.contramap[GmosEOffsetting]({
+      implicit val jsonEncoderGmosEOffsetting: io.circe.Encoder[GmosEOffsetting] = io.circe.Encoder.encodeString.contramap[GmosEOffsetting] {
         case On => "ON"
         case Off => "OFF"
-      })
+      }
       implicit val jsonDecoderGmosEOffsetting: io.circe.Decoder[GmosEOffsetting] = io.circe.Decoder.decodeString.emap(_ match {
         case "ON" =>
           Right(On)
@@ -554,7 +554,7 @@ object LucumaODB {
       case object R150G5308 extends GmosNorthDisperser()
       implicit val eqGmosNorthDisperser: cats.Eq[GmosNorthDisperser] = cats.Eq.fromUniversalEquals
       implicit val showGmosNorthDisperser: cats.Show[GmosNorthDisperser] = cats.Show.fromToString
-      implicit val jsonEncoderGmosNorthDisperser: io.circe.Encoder[GmosNorthDisperser] = io.circe.Encoder.encodeString.contramap[GmosNorthDisperser]({
+      implicit val jsonEncoderGmosNorthDisperser: io.circe.Encoder[GmosNorthDisperser] = io.circe.Encoder.encodeString.contramap[GmosNorthDisperser] {
         case B1200G5301 => "B1200_G5301"
         case R831G5302 => "R831_G5302"
         case B600G5303 => "B600_G5303"
@@ -563,7 +563,7 @@ object LucumaODB {
         case R400G5305 => "R400_G5305"
         case R150G5306 => "R150_G5306"
         case R150G5308 => "R150_G5308"
-      })
+      }
       implicit val jsonDecoderGmosNorthDisperser: io.circe.Decoder[GmosNorthDisperser] = io.circe.Decoder.decodeString.emap(_ match {
         case "B1200_G5301" =>
           Right(B1200G5301)
@@ -615,7 +615,7 @@ object LucumaODB {
       case object UPrime extends GmosNorthFilter()
       implicit val eqGmosNorthFilter: cats.Eq[GmosNorthFilter] = cats.Eq.fromUniversalEquals
       implicit val showGmosNorthFilter: cats.Show[GmosNorthFilter] = cats.Show.fromToString
-      implicit val jsonEncoderGmosNorthFilter: io.circe.Encoder[GmosNorthFilter] = io.circe.Encoder.encodeString.contramap[GmosNorthFilter]({
+      implicit val jsonEncoderGmosNorthFilter: io.circe.Encoder[GmosNorthFilter] = io.circe.Encoder.encodeString.contramap[GmosNorthFilter] {
         case GPrime => "G_PRIME"
         case RPrime => "R_PRIME"
         case IPrime => "I_PRIME"
@@ -642,7 +642,7 @@ object LucumaODB {
         case IPrimeCaT => "I_PRIME_CA_T"
         case ZPrimeCaT => "Z_PRIME_CA_T"
         case UPrime => "U_PRIME"
-      })
+      }
       implicit val jsonDecoderGmosNorthFilter: io.circe.Decoder[GmosNorthFilter] = io.circe.Decoder.decodeString.emap(_ match {
         case "G_PRIME" =>
           Right(GPrime)
@@ -720,7 +720,7 @@ object LucumaODB {
       case object Ifu3 extends GmosNorthFpu()
       implicit val eqGmosNorthFpu: cats.Eq[GmosNorthFpu] = cats.Eq.fromUniversalEquals
       implicit val showGmosNorthFpu: cats.Show[GmosNorthFpu] = cats.Show.fromToString
-      implicit val jsonEncoderGmosNorthFpu: io.circe.Encoder[GmosNorthFpu] = io.circe.Encoder.encodeString.contramap[GmosNorthFpu]({
+      implicit val jsonEncoderGmosNorthFpu: io.circe.Encoder[GmosNorthFpu] = io.circe.Encoder.encodeString.contramap[GmosNorthFpu] {
         case Ns0 => "NS0"
         case Ns1 => "NS1"
         case Ns2 => "NS2"
@@ -737,7 +737,7 @@ object LucumaODB {
         case Ifu1 => "IFU1"
         case Ifu2 => "IFU2"
         case Ifu3 => "IFU3"
-      })
+      }
       implicit val jsonDecoderGmosNorthFpu: io.circe.Decoder[GmosNorthFpu] = io.circe.Decoder.decodeString.emap(_ match {
         case "NS0" =>
           Right(Ns0)
@@ -783,12 +783,12 @@ object LucumaODB {
       case object FollowZ extends GmosNorthStageMode()
       implicit val eqGmosNorthStageMode: cats.Eq[GmosNorthStageMode] = cats.Eq.fromUniversalEquals
       implicit val showGmosNorthStageMode: cats.Show[GmosNorthStageMode] = cats.Show.fromToString
-      implicit val jsonEncoderGmosNorthStageMode: io.circe.Encoder[GmosNorthStageMode] = io.circe.Encoder.encodeString.contramap[GmosNorthStageMode]({
+      implicit val jsonEncoderGmosNorthStageMode: io.circe.Encoder[GmosNorthStageMode] = io.circe.Encoder.encodeString.contramap[GmosNorthStageMode] {
         case NoFollow => "NO_FOLLOW"
         case FollowXyz => "FOLLOW_XYZ"
         case FollowXy => "FOLLOW_XY"
         case FollowZ => "FOLLOW_Z"
-      })
+      }
       implicit val jsonDecoderGmosNorthStageMode: io.circe.Decoder[GmosNorthStageMode] = io.circe.Decoder.decodeString.emap(_ match {
         case "NO_FOLLOW" =>
           Right(NoFollow)
@@ -813,7 +813,7 @@ object LucumaODB {
       case object Custom extends GmosRoi()
       implicit val eqGmosRoi: cats.Eq[GmosRoi] = cats.Eq.fromUniversalEquals
       implicit val showGmosRoi: cats.Show[GmosRoi] = cats.Show.fromToString
-      implicit val jsonEncoderGmosRoi: io.circe.Encoder[GmosRoi] = io.circe.Encoder.encodeString.contramap[GmosRoi]({
+      implicit val jsonEncoderGmosRoi: io.circe.Encoder[GmosRoi] = io.circe.Encoder.encodeString.contramap[GmosRoi] {
         case FullFrame => "FULL_FRAME"
         case Ccd2 => "CCD2"
         case CentralSpectrum => "CENTRAL_SPECTRUM"
@@ -821,7 +821,7 @@ object LucumaODB {
         case TopSpectrum => "TOP_SPECTRUM"
         case BottomSpectrum => "BOTTOM_SPECTRUM"
         case Custom => "CUSTOM"
-      })
+      }
       implicit val jsonDecoderGmosRoi: io.circe.Decoder[GmosRoi] = io.circe.Decoder.decodeString.emap(_ match {
         case "FULL_FRAME" =>
           Right(FullFrame)
@@ -851,14 +851,14 @@ object LucumaODB {
       case object R150G5326 extends GmosSouthDisperser()
       implicit val eqGmosSouthDisperser: cats.Eq[GmosSouthDisperser] = cats.Eq.fromUniversalEquals
       implicit val showGmosSouthDisperser: cats.Show[GmosSouthDisperser] = cats.Show.fromToString
-      implicit val jsonEncoderGmosSouthDisperser: io.circe.Encoder[GmosSouthDisperser] = io.circe.Encoder.encodeString.contramap[GmosSouthDisperser]({
+      implicit val jsonEncoderGmosSouthDisperser: io.circe.Encoder[GmosSouthDisperser] = io.circe.Encoder.encodeString.contramap[GmosSouthDisperser] {
         case B1200G5321 => "B1200_G5321"
         case R831G5322 => "R831_G5322"
         case B600G5323 => "B600_G5323"
         case R600G5324 => "R600_G5324"
         case R400G5325 => "R400_G5325"
         case R150G5326 => "R150_G5326"
-      })
+      }
       implicit val jsonDecoderGmosSouthDisperser: io.circe.Decoder[GmosSouthDisperser] = io.circe.Decoder.decodeString.emap(_ match {
         case "B1200_G5321" =>
           Right(B1200G5321)
@@ -908,7 +908,7 @@ object LucumaODB {
       case object Lya395 extends GmosSouthFilter()
       implicit val eqGmosSouthFilter: cats.Eq[GmosSouthFilter] = cats.Eq.fromUniversalEquals
       implicit val showGmosSouthFilter: cats.Show[GmosSouthFilter] = cats.Show.fromToString
-      implicit val jsonEncoderGmosSouthFilter: io.circe.Encoder[GmosSouthFilter] = io.circe.Encoder.encodeString.contramap[GmosSouthFilter]({
+      implicit val jsonEncoderGmosSouthFilter: io.circe.Encoder[GmosSouthFilter] = io.circe.Encoder.encodeString.contramap[GmosSouthFilter] {
         case UPrime => "U_PRIME"
         case GPrime => "G_PRIME"
         case RPrime => "R_PRIME"
@@ -937,7 +937,7 @@ object LucumaODB {
         case HeIi => "HE_II"
         case HeIic => "HE_IIC"
         case Lya395 => "LYA395"
-      })
+      }
       implicit val jsonDecoderGmosSouthFilter: io.circe.Decoder[GmosSouthFilter] = io.circe.Decoder.decodeString.emap(_ match {
         case "U_PRIME" =>
           Right(UPrime)
@@ -1007,12 +1007,12 @@ object LucumaODB {
       case object FollowZ extends GmosSouthStageMode()
       implicit val eqGmosSouthStageMode: cats.Eq[GmosSouthStageMode] = cats.Eq.fromUniversalEquals
       implicit val showGmosSouthStageMode: cats.Show[GmosSouthStageMode] = cats.Show.fromToString
-      implicit val jsonEncoderGmosSouthStageMode: io.circe.Encoder[GmosSouthStageMode] = io.circe.Encoder.encodeString.contramap[GmosSouthStageMode]({
+      implicit val jsonEncoderGmosSouthStageMode: io.circe.Encoder[GmosSouthStageMode] = io.circe.Encoder.encodeString.contramap[GmosSouthStageMode] {
         case NoFollow => "NO_FOLLOW"
         case FollowXyz => "FOLLOW_XYZ"
         case FollowXy => "FOLLOW_XY"
         case FollowZ => "FOLLOW_Z"
-      })
+      }
       implicit val jsonDecoderGmosSouthStageMode: io.circe.Decoder[GmosSouthStageMode] = io.circe.Decoder.decodeString.emap(_ match {
         case "NO_FOLLOW" =>
           Right(NoFollow)
@@ -1033,11 +1033,11 @@ object LucumaODB {
       case object Four extends GmosXBinning()
       implicit val eqGmosXBinning: cats.Eq[GmosXBinning] = cats.Eq.fromUniversalEquals
       implicit val showGmosXBinning: cats.Show[GmosXBinning] = cats.Show.fromToString
-      implicit val jsonEncoderGmosXBinning: io.circe.Encoder[GmosXBinning] = io.circe.Encoder.encodeString.contramap[GmosXBinning]({
+      implicit val jsonEncoderGmosXBinning: io.circe.Encoder[GmosXBinning] = io.circe.Encoder.encodeString.contramap[GmosXBinning] {
         case One => "ONE"
         case Two => "TWO"
         case Four => "FOUR"
-      })
+      }
       implicit val jsonDecoderGmosXBinning: io.circe.Decoder[GmosXBinning] = io.circe.Decoder.decodeString.emap(_ match {
         case "ONE" =>
           Right(One)
@@ -1056,11 +1056,11 @@ object LucumaODB {
       case object Four extends GmosYBinning()
       implicit val eqGmosYBinning: cats.Eq[GmosYBinning] = cats.Eq.fromUniversalEquals
       implicit val showGmosYBinning: cats.Show[GmosYBinning] = cats.Show.fromToString
-      implicit val jsonEncoderGmosYBinning: io.circe.Encoder[GmosYBinning] = io.circe.Encoder.encodeString.contramap[GmosYBinning]({
+      implicit val jsonEncoderGmosYBinning: io.circe.Encoder[GmosYBinning] = io.circe.Encoder.encodeString.contramap[GmosYBinning] {
         case One => "ONE"
         case Two => "TWO"
         case Four => "FOUR"
-      })
+      }
       implicit val jsonDecoderGmosYBinning: io.circe.Decoder[GmosYBinning] = io.circe.Decoder.decodeString.emap(_ match {
         case "ONE" =>
           Right(One)
@@ -1085,7 +1085,7 @@ object LucumaODB {
       case object TwoPointZero extends ImageQuality()
       implicit val eqImageQuality: cats.Eq[ImageQuality] = cats.Eq.fromUniversalEquals
       implicit val showImageQuality: cats.Show[ImageQuality] = cats.Show.fromToString
-      implicit val jsonEncoderImageQuality: io.circe.Encoder[ImageQuality] = io.circe.Encoder.encodeString.contramap[ImageQuality]({
+      implicit val jsonEncoderImageQuality: io.circe.Encoder[ImageQuality] = io.circe.Encoder.encodeString.contramap[ImageQuality] {
         case PointOne => "POINT_ONE"
         case PointTwo => "POINT_TWO"
         case PointThree => "POINT_THREE"
@@ -1095,7 +1095,7 @@ object LucumaODB {
         case OnePointZero => "ONE_POINT_ZERO"
         case OnePointFive => "ONE_POINT_FIVE"
         case TwoPointZero => "TWO_POINT_ZERO"
-      })
+      }
       implicit val jsonDecoderImageQuality: io.circe.Decoder[ImageQuality] = io.circe.Decoder.decodeString.emap(_ match {
         case "POINT_ONE" =>
           Right(PointOne)
@@ -1139,7 +1139,7 @@ object LucumaODB {
       case object Ghost extends InstrumentType()
       implicit val eqInstrumentType: cats.Eq[InstrumentType] = cats.Eq.fromUniversalEquals
       implicit val showInstrumentType: cats.Show[InstrumentType] = cats.Show.fromToString
-      implicit val jsonEncoderInstrumentType: io.circe.Encoder[InstrumentType] = io.circe.Encoder.encodeString.contramap[InstrumentType]({
+      implicit val jsonEncoderInstrumentType: io.circe.Encoder[InstrumentType] = io.circe.Encoder.encodeString.contramap[InstrumentType] {
         case Phoenix => "PHOENIX"
         case Michelle => "MICHELLE"
         case Gnirs => "GNIRS"
@@ -1156,7 +1156,7 @@ object LucumaODB {
         case Visitor => "VISITOR"
         case Flamingos2 => "FLAMINGOS2"
         case Ghost => "GHOST"
-      })
+      }
       implicit val jsonDecoderInstrumentType: io.circe.Decoder[InstrumentType] = io.circe.Decoder.decodeString.emap(_ match {
         case "PHOENIX" =>
           Right(Phoenix)
@@ -1218,7 +1218,7 @@ object LucumaODB {
       case object Ap extends MagnitudeBand()
       implicit val eqMagnitudeBand: cats.Eq[MagnitudeBand] = cats.Eq.fromUniversalEquals
       implicit val showMagnitudeBand: cats.Show[MagnitudeBand] = cats.Show.fromToString
-      implicit val jsonEncoderMagnitudeBand: io.circe.Encoder[MagnitudeBand] = io.circe.Encoder.encodeString.contramap[MagnitudeBand]({
+      implicit val jsonEncoderMagnitudeBand: io.circe.Encoder[MagnitudeBand] = io.circe.Encoder.encodeString.contramap[MagnitudeBand] {
         case SloanU => "SLOAN_U"
         case SloanG => "SLOAN_G"
         case SloanR => "SLOAN_R"
@@ -1239,7 +1239,7 @@ object LucumaODB {
         case N => "N"
         case Q => "Q"
         case Ap => "AP"
-      })
+      }
       implicit val jsonDecoderMagnitudeBand: io.circe.Decoder[MagnitudeBand] = io.circe.Decoder.decodeString.emap(_ match {
         case "SLOAN_U" =>
           Right(SloanU)
@@ -1292,11 +1292,11 @@ object LucumaODB {
       case object Jy extends MagnitudeSystem()
       implicit val eqMagnitudeSystem: cats.Eq[MagnitudeSystem] = cats.Eq.fromUniversalEquals
       implicit val showMagnitudeSystem: cats.Show[MagnitudeSystem] = cats.Show.fromToString
-      implicit val jsonEncoderMagnitudeSystem: io.circe.Encoder[MagnitudeSystem] = io.circe.Encoder.encodeString.contramap[MagnitudeSystem]({
+      implicit val jsonEncoderMagnitudeSystem: io.circe.Encoder[MagnitudeSystem] = io.circe.Encoder.encodeString.contramap[MagnitudeSystem] {
         case Vega => "VEGA"
         case Ab => "AB"
         case Jy => "JY"
-      })
+      }
       implicit val jsonDecoderMagnitudeSystem: io.circe.Decoder[MagnitudeSystem] = io.circe.Decoder.decodeString.emap(_ match {
         case "VEGA" =>
           Right(Vega)
@@ -1314,10 +1314,10 @@ object LucumaODB {
       case object IsNotMosPreImaging extends MosPreImaging()
       implicit val eqMosPreImaging: cats.Eq[MosPreImaging] = cats.Eq.fromUniversalEquals
       implicit val showMosPreImaging: cats.Show[MosPreImaging] = cats.Show.fromToString
-      implicit val jsonEncoderMosPreImaging: io.circe.Encoder[MosPreImaging] = io.circe.Encoder.encodeString.contramap[MosPreImaging]({
+      implicit val jsonEncoderMosPreImaging: io.circe.Encoder[MosPreImaging] = io.circe.Encoder.encodeString.contramap[MosPreImaging] {
         case IsMosPreImaging => "IS_MOS_PRE_IMAGING"
         case IsNotMosPreImaging => "IS_NOT_MOS_PRE_IMAGING"
-      })
+      }
       implicit val jsonDecoderMosPreImaging: io.circe.Decoder[MosPreImaging] = io.circe.Decoder.decodeString.emap(_ match {
         case "IS_MOS_PRE_IMAGING" =>
           Right(IsMosPreImaging)
@@ -1339,7 +1339,7 @@ object LucumaODB {
       case object Observed extends ObsStatus()
       implicit val eqObsStatus: cats.Eq[ObsStatus] = cats.Eq.fromUniversalEquals
       implicit val showObsStatus: cats.Show[ObsStatus] = cats.Show.fromToString
-      implicit val jsonEncoderObsStatus: io.circe.Encoder[ObsStatus] = io.circe.Encoder.encodeString.contramap[ObsStatus]({
+      implicit val jsonEncoderObsStatus: io.circe.Encoder[ObsStatus] = io.circe.Encoder.encodeString.contramap[ObsStatus] {
         case New => "NEW"
         case Included => "INCLUDED"
         case Proposed => "PROPOSED"
@@ -1348,7 +1348,7 @@ object LucumaODB {
         case Ready => "READY"
         case Ongoing => "ONGOING"
         case Observed => "OBSERVED"
-      })
+      }
       implicit val jsonDecoderObsStatus: io.circe.Decoder[ObsStatus] = io.circe.Decoder.decodeString.emap(_ match {
         case "NEW" =>
           Right(New)
@@ -1376,10 +1376,10 @@ object LucumaODB {
       case object Milliarcseconds extends ParallaxUnits()
       implicit val eqParallaxUnits: cats.Eq[ParallaxUnits] = cats.Eq.fromUniversalEquals
       implicit val showParallaxUnits: cats.Show[ParallaxUnits] = cats.Show.fromToString
-      implicit val jsonEncoderParallaxUnits: io.circe.Encoder[ParallaxUnits] = io.circe.Encoder.encodeString.contramap[ParallaxUnits]({
+      implicit val jsonEncoderParallaxUnits: io.circe.Encoder[ParallaxUnits] = io.circe.Encoder.encodeString.contramap[ParallaxUnits] {
         case Microarcseconds => "MICROARCSECONDS"
         case Milliarcseconds => "MILLIARCSECONDS"
-      })
+      }
       implicit val jsonDecoderParallaxUnits: io.circe.Decoder[ParallaxUnits] = io.circe.Decoder.decodeString.emap(_ match {
         case "MICROARCSECONDS" =>
           Right(Microarcseconds)
@@ -1395,10 +1395,10 @@ object LucumaODB {
       case object MilliarcsecondsPerYear extends ProperMotionComponentUnits()
       implicit val eqProperMotionComponentUnits: cats.Eq[ProperMotionComponentUnits] = cats.Eq.fromUniversalEquals
       implicit val showProperMotionComponentUnits: cats.Show[ProperMotionComponentUnits] = cats.Show.fromToString
-      implicit val jsonEncoderProperMotionComponentUnits: io.circe.Encoder[ProperMotionComponentUnits] = io.circe.Encoder.encodeString.contramap[ProperMotionComponentUnits]({
+      implicit val jsonEncoderProperMotionComponentUnits: io.circe.Encoder[ProperMotionComponentUnits] = io.circe.Encoder.encodeString.contramap[ProperMotionComponentUnits] {
         case MicroarcsecondsPerYear => "MICROARCSECONDS_PER_YEAR"
         case MilliarcsecondsPerYear => "MILLIARCSECONDS_PER_YEAR"
-      })
+      }
       implicit val jsonDecoderProperMotionComponentUnits: io.circe.Decoder[ProperMotionComponentUnits] = io.circe.Decoder.decodeString.emap(_ match {
         case "MICROARCSECONDS_PER_YEAR" =>
           Right(MicroarcsecondsPerYear)
@@ -1415,11 +1415,11 @@ object LucumaODB {
       case object KilometersPerSecond extends RadialVelocityUnits()
       implicit val eqRadialVelocityUnits: cats.Eq[RadialVelocityUnits] = cats.Eq.fromUniversalEquals
       implicit val showRadialVelocityUnits: cats.Show[RadialVelocityUnits] = cats.Show.fromToString
-      implicit val jsonEncoderRadialVelocityUnits: io.circe.Encoder[RadialVelocityUnits] = io.circe.Encoder.encodeString.contramap[RadialVelocityUnits]({
+      implicit val jsonEncoderRadialVelocityUnits: io.circe.Encoder[RadialVelocityUnits] = io.circe.Encoder.encodeString.contramap[RadialVelocityUnits] {
         case CentimetersPerSecond => "CENTIMETERS_PER_SECOND"
         case MetersPerSecond => "METERS_PER_SECOND"
         case KilometersPerSecond => "KILOMETERS_PER_SECOND"
-      })
+      }
       implicit val jsonDecoderRadialVelocityUnits: io.circe.Decoder[RadialVelocityUnits] = io.circe.Decoder.decodeString.emap(_ match {
         case "CENTIMETERS_PER_SECOND" =>
           Right(CentimetersPerSecond)
@@ -1438,11 +1438,11 @@ object LucumaODB {
       case object Hours extends RightAscensionUnits()
       implicit val eqRightAscensionUnits: cats.Eq[RightAscensionUnits] = cats.Eq.fromUniversalEquals
       implicit val showRightAscensionUnits: cats.Show[RightAscensionUnits] = cats.Show.fromToString
-      implicit val jsonEncoderRightAscensionUnits: io.circe.Encoder[RightAscensionUnits] = io.circe.Encoder.encodeString.contramap[RightAscensionUnits]({
+      implicit val jsonEncoderRightAscensionUnits: io.circe.Encoder[RightAscensionUnits] = io.circe.Encoder.encodeString.contramap[RightAscensionUnits] {
         case Microarcseconds => "MICROARCSECONDS"
         case Degrees => "DEGREES"
         case Hours => "HOURS"
-      })
+      }
       implicit val jsonDecoderRightAscensionUnits: io.circe.Decoder[RightAscensionUnits] = io.circe.Decoder.decodeString.emap(_ match {
         case "MICROARCSECONDS" =>
           Right(Microarcseconds)
@@ -1462,12 +1462,12 @@ object LucumaODB {
       case object Bright extends SkyBackground()
       implicit val eqSkyBackground: cats.Eq[SkyBackground] = cats.Eq.fromUniversalEquals
       implicit val showSkyBackground: cats.Show[SkyBackground] = cats.Show.fromToString
-      implicit val jsonEncoderSkyBackground: io.circe.Encoder[SkyBackground] = io.circe.Encoder.encodeString.contramap[SkyBackground]({
+      implicit val jsonEncoderSkyBackground: io.circe.Encoder[SkyBackground] = io.circe.Encoder.encodeString.contramap[SkyBackground] {
         case Darkest => "DARKEST"
         case Dark => "DARK"
         case Gray => "GRAY"
         case Bright => "BRIGHT"
-      })
+      }
       implicit val jsonDecoderSkyBackground: io.circe.Decoder[SkyBackground] = io.circe.Decoder.decodeString.emap(_ match {
         case "DARKEST" =>
           Right(Darkest)
@@ -1490,13 +1490,13 @@ object LucumaODB {
       case object SmartGcal extends StepType()
       implicit val eqStepType: cats.Eq[StepType] = cats.Eq.fromUniversalEquals
       implicit val showStepType: cats.Show[StepType] = cats.Show.fromToString
-      implicit val jsonEncoderStepType: io.circe.Encoder[StepType] = io.circe.Encoder.encodeString.contramap[StepType]({
+      implicit val jsonEncoderStepType: io.circe.Encoder[StepType] = io.circe.Encoder.encodeString.contramap[StepType] {
         case Bias => "BIAS"
         case Dark => "DARK"
         case Gcal => "GCAL"
         case Science => "SCIENCE"
         case SmartGcal => "SMART_GCAL"
-      })
+      }
       implicit val jsonDecoderStepType: io.circe.Decoder[StepType] = io.circe.Decoder.decodeString.emap(_ match {
         case "BIAS" =>
           Right(Bias)
@@ -1520,12 +1520,12 @@ object LucumaODB {
       case object Wet extends WaterVapor()
       implicit val eqWaterVapor: cats.Eq[WaterVapor] = cats.Eq.fromUniversalEquals
       implicit val showWaterVapor: cats.Show[WaterVapor] = cats.Show.fromToString
-      implicit val jsonEncoderWaterVapor: io.circe.Encoder[WaterVapor] = io.circe.Encoder.encodeString.contramap[WaterVapor]({
+      implicit val jsonEncoderWaterVapor: io.circe.Encoder[WaterVapor] = io.circe.Encoder.encodeString.contramap[WaterVapor] {
         case VeryDry => "VERY_DRY"
         case Dry => "DRY"
         case Median => "MEDIAN"
         case Wet => "WET"
-      })
+      }
       implicit val jsonDecoderWaterVapor: io.circe.Decoder[WaterVapor] = io.circe.Decoder.decodeString.emap(_ match {
         case "VERY_DRY" =>
           Right(VeryDry)

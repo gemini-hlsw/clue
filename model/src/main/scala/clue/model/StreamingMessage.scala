@@ -4,7 +4,7 @@
 package clue.model
 
 import cats.Eq
-import cats.syntax.all._
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.JsonObject
 

@@ -4,13 +4,13 @@
 package clue.gen
 
 // import scalafix.v1._
-import cats.syntax.all._
+import cats.syntax.all.*
 import edu.gemini.grackle
 import edu.gemini.grackle.ScalarType
-import edu.gemini.grackle.{Type => GType}
+import edu.gemini.grackle.Type as GType
 
 import java.util.regex.Pattern
-import scala.meta._
+import scala.meta.*
 
 trait Generator {
   protected val TypeSelect = "__typename"
@@ -183,6 +183,7 @@ trait Generator {
           (parentBody, false)
         case Define(newParentBody, early, inits) =>
           val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
+
           (newParentBody :+
              //  q"case class ${Type.Name(name)}(..$pars) extends ..$earlyDefs with ..$allParents",
              q"case class ${Type.Name(name)}(..$pars) extends {..$early} with ..$allInits",
@@ -282,6 +283,7 @@ trait Generator {
         (parentBody, false)
       case Define(newParentBody, early, inits) =>
         val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
+
         (newParentBody :+
            q"sealed trait ${Type.Name(name)} extends { ..$early } with ..$allInits { ..${pars.map(paramToVal)} }",
          true

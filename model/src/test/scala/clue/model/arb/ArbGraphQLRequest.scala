@@ -4,8 +4,8 @@
 package clue.model.arb
 
 import clue.model.GraphQLRequest
-import org.scalacheck.Arbitrary._
-import org.scalacheck._
+import org.scalacheck.*
+import org.scalacheck.Arbitrary.*
 
 trait ArbGraphQLRequest {
 

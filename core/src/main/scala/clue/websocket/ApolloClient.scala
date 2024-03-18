@@ -3,23 +3,23 @@
 
 package clue.websocket
 
+import cats.effect.*
 import cats.effect.Ref
 import cats.effect.Temporal
-import cats.effect._
-import cats.effect.implicits._
+import cats.effect.implicits.*
 import cats.effect.std.Queue
 import cats.effect.std.UUIDGen
-import cats.syntax.all._
-import clue._
+import cats.syntax.all.*
+import clue.*
 import clue.model.GraphQLErrors
 import clue.model.GraphQLRequest
 import clue.model.GraphQLResponse
 import clue.model.StreamingMessage
-import clue.model.json._
+import clue.model.json.*
 import fs2.Stream
 import fs2.concurrent.SignallingRef
-import io.circe._
-import io.circe.parser._
+import io.circe.*
+import io.circe.parser.*
 import org.typelevel.log4cats.Logger
 
 import java.util.UUID

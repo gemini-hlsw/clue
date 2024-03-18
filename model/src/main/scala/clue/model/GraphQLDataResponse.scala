@@ -4,7 +4,7 @@
 package clue.model
 
 import cats.Eq
-import cats.syntax.option._
+import cats.syntax.option.*
 
 /**
  * A GraphQL response with data.

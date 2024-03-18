@@ -3,7 +3,7 @@
 
 package clue.gen
 
-import cats._
+import cats.*
 
 /**
  * Holds the aggregated `CaseClass`es, their `ClassParam`s and possible `Sum` info as we recurse the

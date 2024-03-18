@@ -3,7 +3,7 @@
 
 package clue.websocket
 
-import cats.syntax.all._
+import cats.syntax.all.*
 
 case class CloseParams(code: Option[Int] = none, reason: Option[String] = none)
 object CloseParams {

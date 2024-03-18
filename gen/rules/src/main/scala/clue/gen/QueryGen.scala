@@ -5,11 +5,11 @@ package clue.gen
 
 import cats.data.State
 import cats.effect.unsafe.implicits.global
-import cats.syntax.all._
-import edu.gemini.grackle.UntypedOperation._
-import edu.gemini.grackle.{Term => _, Type => GType, _}
+import cats.syntax.all.*
+import edu.gemini.grackle.UntypedOperation.*
+import edu.gemini.grackle.{Term as _, Type as GType, *}
 
-import scala.meta._
+import scala.meta.*
 
 trait QueryGen extends Generator {
 
@@ -121,18 +121,20 @@ trait QueryGen extends Generator {
 
   protected[this] def compileType(schema: Schema, tpe: Ast.Type): Result[GType] = {
     def loop(tpe: Ast.Type, nonNull: Boolean): Result[GType] = tpe match {
-      case Ast.Type.NonNull(Left(named)) => loop(named, true)
-      case Ast.Type.NonNull(Right(list)) => loop(list, true)
+      case Ast.Type.NonNull(Left(named)) => loop(named, nonNull = true)
+      case Ast.Type.NonNull(Right(list)) => loop(list, nonNull = true)
       case Ast.Type.List(elem)           =>
-        loop(elem, false).map(e => if (nonNull) ListType(e) else NullableType(ListType(e)))
+        loop(elem, nonNull = false).map(e =>
+          if (nonNull) ListType(e) else NullableType(ListType(e))
+        )
       case Ast.Type.Named(name)          =>
         schema.definition(name.value) match {
-          case None      => Result.internalError(s"Undefine typed '${name.value}'")
-          case Some(tpe) => Result.success(if (nonNull) tpe else NullableType(tpe))
+          case None     => Result.internalError(s"Undefine typed '${name.value}'")
+          case Some(tp) => Result.success(if (nonNull) tp else NullableType(tp))
         }
     }
 
-    loop(tpe, false)
+    loop(tpe, nonNull = false)
   }
   //
   // END COPIED FROM GRACKLE.

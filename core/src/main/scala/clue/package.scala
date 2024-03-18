@@ -5,7 +5,7 @@ import cats.Eq
 import cats.MonadError
 import cats.effect.Concurrent
 import cats.effect.Deferred
-import cats.syntax.all._
+import cats.syntax.all.*
 import org.typelevel.log4cats.Logger
 
 package object clue {
