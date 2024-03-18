@@ -183,6 +183,7 @@ trait Generator {
           (parentBody, false)
         case Define(newParentBody, early, inits) =>
           val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
+
           (newParentBody :+
              //  q"case class ${Type.Name(name)}(..$pars) extends ..$earlyDefs with ..$allParents",
              q"case class ${Type.Name(name)}(..$pars) extends {..$early} with ..$allInits",
@@ -282,6 +283,7 @@ trait Generator {
         (parentBody, false)
       case Define(newParentBody, early, inits) =>
         val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
+
         (newParentBody :+
            q"sealed trait ${Type.Name(name)} extends { ..$early } with ..$allInits { ..${pars.map(paramToVal)} }",
          true
