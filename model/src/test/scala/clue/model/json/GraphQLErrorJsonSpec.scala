@@ -6,9 +6,9 @@ package clue.model.json
 import clue.ListLimitingDisciplineSuite
 import clue.model.GraphQLError
 import clue.model.GraphQLErrors
-import clue.model.arb._
+import clue.model.arb.*
 import io.circe.testing.CodecTests
-import io.circe.testing.instances._
+import io.circe.testing.instances.*
 
 final class GraphQLErrorJsonSpec extends ListLimitingDisciplineSuite {
   import ArbGraphQLError._

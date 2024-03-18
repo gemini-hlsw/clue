@@ -3,7 +3,7 @@
 
 package clue
 
-import cats.syntax.all._
+import cats.syntax.all.*
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage
 import io.circe.Encoder

@@ -4,19 +4,19 @@
 package clue.js
 
 import cats.Applicative
-import cats.effect._
-import cats.syntax.all._
-import clue._
+import cats.effect.*
+import cats.syntax.all.*
+import clue.*
 import clue.model.GraphQLRequest
-import clue.model.json._
+import clue.model.json.*
 import io.circe.Encoder
-import io.circe.syntax._
+import io.circe.syntax.*
 import org.scalajs.dom.AbortController
 import org.scalajs.dom.Fetch
 import org.scalajs.dom.Headers
 import org.scalajs.dom.HttpMethod
 import org.scalajs.dom.RequestInit
-import org.scalajs.macrotaskexecutor.MacrotaskExecutor.Implicits._
+import org.scalajs.macrotaskexecutor.MacrotaskExecutor.Implicits.*
 
 import scala.scalajs.js.URIUtils
 import scala.util.Failure

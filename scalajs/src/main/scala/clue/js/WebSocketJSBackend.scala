@@ -4,16 +4,16 @@
 package clue.js
 
 import cats.Applicative
+import cats.effect.*
 import cats.effect.Ref
-import cats.effect._
-import cats.effect.implicits._
+import cats.effect.implicits.*
 import cats.effect.std.Dispatcher
-import cats.syntax.all._
-import clue._
+import cats.syntax.all.*
+import clue.*
 import clue.model.StreamingMessage
-import clue.model.json._
-import clue.websocket._
-import io.circe.syntax._
+import clue.model.json.*
+import clue.websocket.*
+import io.circe.syntax.*
 import org.scalajs.dom.CloseEvent
 import org.scalajs.dom.Event
 import org.scalajs.dom.MessageEvent

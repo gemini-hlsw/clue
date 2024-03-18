@@ -9,7 +9,7 @@ import cats.effect.IO
 import cats.effect.IOApp
 import cats.effect.Resource
 import cats.effect.Sync
-import cats.syntax.all._
+import cats.syntax.all.*
 import clue.ErrorPolicy
 import clue.FetchClient
 import clue.GraphQLOperation
@@ -19,13 +19,13 @@ import clue.websocket.WebSocketClient
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
-import io.circe.generic.semiauto._
-import org.http4s.implicits._
+import io.circe.generic.semiauto.*
+import org.http4s.implicits.*
 import org.http4s.jdkhttpclient.JdkWSClient
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
 
 object Demo extends IOApp.Simple {

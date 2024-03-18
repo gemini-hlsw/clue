@@ -5,10 +5,10 @@ package clue.model.json
 
 import clue.ListLimitingDisciplineSuite
 import clue.model.GraphQLRequest
-import clue.model.arb._
+import clue.model.arb.*
 import io.circe.JsonObject
 import io.circe.testing.CodecTests
-import io.circe.testing.instances._
+import io.circe.testing.instances.*
 
 final class GraphQLRequestJsonSpec extends ListLimitingDisciplineSuite {
   import ArbGraphQLRequest._

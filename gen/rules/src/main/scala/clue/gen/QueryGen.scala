@@ -5,11 +5,11 @@ package clue.gen
 
 import cats.data.State
 import cats.effect.unsafe.implicits.global
-import cats.syntax.all._
-import edu.gemini.grackle.UntypedOperation._
-import edu.gemini.grackle.{Term => _, Type => GType, _}
+import cats.syntax.all.*
+import edu.gemini.grackle.UntypedOperation.*
+import edu.gemini.grackle.{Term as _, Type as GType, *}
 
-import scala.meta._
+import scala.meta.*
 
 trait QueryGen extends Generator {
 

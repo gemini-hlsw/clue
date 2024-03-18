@@ -12,10 +12,10 @@ import cats.Monad
 import cats.Show
 import cats.Traverse
 import cats.data.Ior
-import cats.syntax.all._
-import clue.data.syntax._
-import io.circe._
-import io.circe.syntax._
+import cats.syntax.all.*
+import clue.data.syntax.*
+import io.circe.*
+import io.circe.syntax.*
 
 import scala.annotation.tailrec
 

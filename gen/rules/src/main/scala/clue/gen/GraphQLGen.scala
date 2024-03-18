@@ -5,12 +5,12 @@ package clue.gen
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import cats.syntax.all._
+import cats.syntax.all.*
 import edu.gemini.grackle.QueryParser
 import metaconfig.Configured
-import scalafix.v1._
+import scalafix.v1.*
 
-import scala.meta._
+import scala.meta.*
 
 class GraphQLGen(config: GraphQLGenConfig)
     extends SemanticRule("GraphQLGen")

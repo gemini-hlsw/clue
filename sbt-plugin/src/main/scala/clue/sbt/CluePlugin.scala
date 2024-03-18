@@ -3,14 +3,14 @@
 
 package clue.sbt
 
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt._
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
+import sbt.*
 import sbtcrossproject.CrossPlugin
 import scalafix.sbt.ScalafixPlugin
 
-import Keys._
-import CrossPlugin.autoImport._
-import ScalafixPlugin.autoImport._
+import Keys.*
+import CrossPlugin.autoImport.*
+import ScalafixPlugin.autoImport.*
 
 object CluePlugin extends AutoPlugin {
 

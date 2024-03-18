@@ -4,7 +4,7 @@
 package clue.js
 
 import cats.effect.Async
-import clue.websocket._
+import clue.websocket.*
 import org.typelevel.log4cats.Logger
 
 object WebSocketJSClient {

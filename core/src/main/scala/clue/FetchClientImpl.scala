@@ -4,12 +4,12 @@
 package clue
 
 import cats.MonadThrow
-import cats.syntax.all._
+import cats.syntax.all.*
 import clue.model.GraphQLRequest
 import clue.model.GraphQLResponse
-import clue.model.json._
-import io.circe._
-import io.circe.parser._
+import clue.model.json.*
+import io.circe.*
+import io.circe.parser.*
 import org.typelevel.log4cats.Logger
 
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http

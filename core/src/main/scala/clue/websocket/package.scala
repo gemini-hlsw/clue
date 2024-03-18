@@ -3,7 +3,7 @@
 
 package clue
 
-import cats.syntax.all._
+import cats.syntax.all.*
 
 import scala.concurrent.duration.FiniteDuration
 

@@ -5,9 +5,9 @@ package clue.model
 
 import cats.Eq
 import cats.data.NonEmptyList
-import cats.syntax.either._
-import cats.syntax.eq._
-import cats.syntax.option._
+import cats.syntax.either.*
+import cats.syntax.eq.*
+import cats.syntax.option.*
 import clue.model.GraphQLError.Location
 import clue.model.GraphQLError.PathElement
 

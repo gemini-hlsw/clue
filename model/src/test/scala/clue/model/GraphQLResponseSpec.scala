@@ -5,7 +5,7 @@ package clue.model
 
 import cats.laws.discipline.TraverseTests
 import clue.ListLimitingDisciplineSuite
-import clue.model.arb._
+import clue.model.arb.*
 
 final class GraphQLResponseSpec extends ListLimitingDisciplineSuite {
   import ArbGraphQLResponse._

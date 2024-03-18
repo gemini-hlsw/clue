@@ -4,13 +4,13 @@
 package clue.gen
 
 // import scalafix.v1._
-import cats.syntax.all._
+import cats.syntax.all.*
 import edu.gemini.grackle
 import edu.gemini.grackle.ScalarType
-import edu.gemini.grackle.{Type => GType}
+import edu.gemini.grackle.Type as GType
 
 import java.util.regex.Pattern
-import scala.meta._
+import scala.meta.*
 
 trait Generator {
   protected val TypeSelect = "__typename"
