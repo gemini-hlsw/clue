@@ -32,7 +32,7 @@ trait SchemaGen extends Generator {
             q"def ignoreUnusedImportEnums(): Unit = ()" +: parentBody
           ) ++
             schema.types
-              .collect { case EnumType(name, _, values) => Enum(name, values.map(_.name)) }
+              .collect { case EnumType(name, _, values, _) => Enum(name, values.map(_.name)) }
               .map(
                 _.addToParentBody(
                   config.catsEq,
