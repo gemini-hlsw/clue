@@ -253,7 +253,7 @@ trait QueryGen extends Generator {
               val subquery: Term.Ref = subqueries(i) match {
                 case Term.Block((q: Term.Ref) :: Nil) => q
                 case q: Term.Ref                      => q
-                case other                          =>
+                case other                            =>
                   throw new Exception(s"Unexpected subquery AST. Should be Term.Ref, was: [$other]")
               }
               ClassParam.fromGrackleType(
