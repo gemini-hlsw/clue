@@ -250,12 +250,17 @@ trait QueryGen extends Generator {
             ) { nextType =>
               val i = fieldName.substring("subquery".length).toInt
 
+              val subquery: Term.Ref = subqueries(i) match {
+                case Term.Block((q: Term.Ref) :: Nil) => q
+                case q: Term.Ref                      => q
+                case other                            =>
+                  throw new Exception(s"Unexpected subquery AST. Should be Term.Ref, was: [$other]")
+              }
               ClassParam.fromGrackleType(
                 name,
                 nextType.dealias,
                 isInput = false,
-                typeOverride =
-                  Some(Type.Select(subqueries(i).asInstanceOf[Term.Ref], Type.Name("Data")))
+                typeOverride = Some(Type.Select(subquery, Type.Name("Data")))
               )
             }
 
