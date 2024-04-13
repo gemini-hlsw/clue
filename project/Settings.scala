@@ -18,7 +18,7 @@ object Settings {
     val log4Cats                 = "2.6.0"
     val monocle                  = "3.2.0"
     val munit                    = "0.7.29"
-    val munitCatsEffect          = "2.0.0-M4"
+    val munitCatsEffect          = "2.0.0-M5"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJSDom               = "2.8.0"
     val scalaJSMacrotaskExecutor = "1.1.1"
