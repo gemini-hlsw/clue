@@ -5,7 +5,7 @@ import sbt.librarymanagement._
 object Settings {
 
   object LibraryVersions {
-    val cats                     = "2.10.0"
+    val cats                     = "2.12.0"
     val catsEffect               = "3.5.4"
     val circe                    = "0.14.5"
     val disciplineMUnit          = "1.0.9"
