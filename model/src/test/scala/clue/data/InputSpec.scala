@@ -14,12 +14,11 @@ import io.circe.*
 import io.circe.generic.semiauto.*
 import io.circe.testing.CodecTests
 import io.circe.testing.instances.*
+import monocle.law.discipline.PrismTests
 import munit.DisciplineSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Prop.forAll
-import monocle.law.discipline.OptionalTests
-import monocle.law.discipline.PrismTests
 
 import arb.ArbInput.*
 
@@ -114,23 +113,5 @@ class InputSpec extends DisciplineSuite {
 
   checkAll("SomeInput", CodecTests[SomeInput].codec)
 
-  import arb.ArbInput.*
-  import optics.*
-
-  case class Wrapper(int: Input[Int])
-  // implici
-
-  val lens     = monocle.Lens[Wrapper, Input[Int]](_.int)(i => w => w.copy(int = i))
-  val optional = lens.assign
-  val prism    = assign[Int]
-
-  // checkAll("Lens.assign", OptionalTests(prism))
-  checkAll("assign", PrismTests(prism))
-
-  // property("Lens.assign") {
-  //   case class Wrapper(int: Input[Int])
-  //   val lens  = monocle.Lens[Wrapper, Int](_.int)(i => w => w.copy(int = i))
-  //   val prism = lens.assign
-
-  // }
+  checkAll("assign", PrismTests(optics.assign[Int]))
 }

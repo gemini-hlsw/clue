@@ -8,9 +8,11 @@ import monocle.Prism
 
 trait InputOptics {
   final def pAssign[A, B]: PPrism[Input[A], Input[B], A, B] =
-    PPrism[Input[A], Input[B], A, B](x =>
-      x.toOption.map(Right(_)).getOrElse(Left(x.asInstanceOf[Input[B]]))
-    )(Assign.apply)
+    PPrism[Input[A], Input[B], A, B] {
+      case Assign(a) => Right(a)
+      case Ignore    => Left(Ignore)
+      case Unassign  => Left(Unassign)
+    }(Assign.apply)
 
   final def assign[A]: Prism[Input[A], A] =
     pAssign[A, A]
