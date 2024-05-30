@@ -3,7 +3,6 @@
 
 package clue.data
 
-import clue.data.optics
 import monocle.PLens
 import monocle.POptional
 import monocle.PPrism
