@@ -41,6 +41,7 @@ lazy val model =
           Settings.Libraries.CatsTestkit.value ++
           Settings.Libraries.Circe.value ++
           Settings.Libraries.DisciplineMUnit.value ++
+          Settings.Libraries.Monocle.value ++
           Settings.Libraries.MUnit.value
     )
 
