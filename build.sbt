@@ -42,6 +42,8 @@ lazy val model =
           Settings.Libraries.Circe.value ++
           Settings.Libraries.DisciplineMUnit.value ++
           Settings.Libraries.Monocle.value ++
+          // Settings.Libraries.Discipline.value ++
+          Settings.Libraries.MonocleLaw.value ++
           Settings.Libraries.MUnit.value
     )
 
