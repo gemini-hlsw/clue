@@ -122,6 +122,12 @@ object Settings {
       )
     )
 
+    val MonocleLaw = Def.setting(
+      Seq(
+        "dev.optics" %%% "monocle-law" % monocle
+      )
+    )
+
     val MUnit = Def.setting(
       Seq[ModuleID](
         "org.scalameta" %%% "munit" % munit % "test"
