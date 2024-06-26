@@ -15,4 +15,4 @@ case class InvalidSubscriptionIdException(id: String)
     extends GraphQLException(s"Invalid subscription id: $id")
 
 case class ResponseException[D](errors: GraphQLErrors, data: Option[D])
-    extends GraphQLException(errors.toString)
+    extends GraphQLException(errors.map(_.message).toList.mkString(", "))
