@@ -22,7 +22,6 @@ object CluePlugin extends AutoPlugin {
   import autoImport._
 
   override def buildSettings: Seq[Setting[_]] = Seq(
-    scalafixScalaBinaryVersion                     := "2.13",
     scalafixDependencies += BuildInfo.organization %% BuildInfo.rulesModule % BuildInfo.version,
     Compile / clueSourceGenerators                 := Seq.empty,
     clueClean                                      := {}
