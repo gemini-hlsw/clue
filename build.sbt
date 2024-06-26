@@ -1,7 +1,7 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
 lazy val scala2Version      = V.scala213
-lazy val scala3Version      = "3.3.3"
+lazy val scala3Version      = "3.4.2"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
@@ -35,16 +35,16 @@ lazy val model =
     .crossType(CrossType.Pure)
     .in(file("model"))
     .settings(
-      moduleName := "clue-model",
+      moduleName                         := "clue-model",
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
           Settings.Libraries.Circe.value ++
           Settings.Libraries.DisciplineMUnit.value ++
           Settings.Libraries.Monocle.value ++
-          // Settings.Libraries.Discipline.value ++
           Settings.Libraries.MonocleLaw.value ++
-          Settings.Libraries.MUnit.value
+          Settings.Libraries.MUnit.value,
+      Test / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.Flat // Needed for circe's codec tests
     )
 
 lazy val core =
