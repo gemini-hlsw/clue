@@ -25,7 +25,7 @@ object Http4sHttpClient {
     Applicative[F].pure(
       new FetchClientImpl[F, Request[F], S](
         Request(POST, uri, headers = headers)
-      )(F, internalLogger, backend)
+      )(using F, internalLogger, backend)
     )
   }
 }

@@ -3,9 +3,9 @@
 
 package clue.gen
 
-import edu.gemini.grackle.EnumType
-import edu.gemini.grackle.InputObjectType
-import edu.gemini.grackle.Schema
+import grackle.EnumType
+import grackle.InputObjectType
+import grackle.Schema
 
 import scala.meta.*
 
@@ -32,7 +32,7 @@ trait SchemaGen extends Generator {
             q"def ignoreUnusedImportEnums(): Unit = ()" +: parentBody
           ) ++
             schema.types
-              .collect { case EnumType(name, _, values) => Enum(name, values.map(_.name)) }
+              .collect { case EnumType(name, _, values, _) => Enum(name, values.map(_.name)) }
               .map(
                 _.addToParentBody(
                   config.catsEq,
@@ -62,7 +62,7 @@ trait SchemaGen extends Generator {
           ) ++ parentBody
         ) ++
           schema.types
-            .collect { case InputObjectType(name, _, fields) =>
+            .collect { case InputObjectType(name, _, fields, _) =>
               CaseClass(
                 name.capitalize,
                 fields.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true))

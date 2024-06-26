@@ -22,7 +22,7 @@ object FetchJSClient {
     Applicative[F].pure(
       new FetchClientImpl[F, FetchJSRequest, S](
         FetchJSRequest(uri, headers)
-      )(F, internalLogger, backend)
+      )(using F, internalLogger, backend)
     )
   }
 }

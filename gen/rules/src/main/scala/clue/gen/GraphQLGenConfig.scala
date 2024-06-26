@@ -8,7 +8,7 @@ import cats.effect.IO
 import cats.effect.Ref
 import cats.effect.kernel.Resource
 import cats.syntax.all.*
-import edu.gemini.grackle.Schema
+import grackle.Schema
 import metaconfig.ConfDecoder
 import metaconfig.generic.Surface
 

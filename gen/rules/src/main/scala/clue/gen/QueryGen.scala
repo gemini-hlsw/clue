@@ -6,8 +6,8 @@ package clue.gen
 import cats.data.State
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all.*
-import edu.gemini.grackle.UntypedOperation.*
-import edu.gemini.grackle.{Term as _, Type as GType, *}
+import grackle.UntypedOperation.*
+import grackle.{Term as _, Type as GType, *}
 
 import scala.meta.*
 
@@ -110,13 +110,13 @@ trait QueryGen extends Generator {
   //
   // START COPIED FROM GRACKLE.
   //
-  import Query.{Skip => _, _}
+  import Query._
   protected[this] def compileVarDefs(
     schema:         Schema,
     untypedVarDefs: UntypedVarDefs
   ): Result[VarDefs] =
-    untypedVarDefs.traverse { case UntypedVarDef(name, untypedTpe, default) =>
-      compileType(schema, untypedTpe).map(tpe => InputValue(name, None, tpe, default))
+    untypedVarDefs.traverse { case UntypedVarDef(name, untypedTpe, default, directives) =>
+      compileType(schema, untypedTpe).map(tpe => InputValue(name, None, tpe, default, directives))
     }
 
   protected[this] def compileType(schema: Schema, tpe: Ast.Type): Result[GType] = {
@@ -235,11 +235,11 @@ trait QueryGen extends Generator {
 
     def go(
       currentAlgebra: Query,
-      currentType:    Option[GType],
-      nameOverride:   Option[String] = none
+      currentType:    Option[GType]
     ): ClassAccumulator =
       currentAlgebra match {
-        case Select(name, _, Select(fieldName, _, _)) if fieldName.startsWith("subquery") =>
+        case UntypedSelect(name, alias, _, _, UntypedSelect(fieldName, _, _, _, _))
+            if fieldName.startsWith("subquery") =>
           val param = MetaTypes
             .get(name)
             .orElse(currentType.flatMap(_.field(name)))
@@ -260,13 +260,14 @@ trait QueryGen extends Generator {
                 name,
                 nextType.dealias,
                 isInput = false,
+                alias = alias,
                 typeOverride = Some(Type.Select(subquery, Type.Name("Data")))
               )
             }
 
           ClassAccumulator(parAccum = List(param))
-        case Select(name, _, child)                                                       =>
-          val paramName = nameOverride.getOrElse(name)
+        case UntypedSelect(name, alias, _, _, child)   =>
+          val paramName = alias.getOrElse(name)
 
           MetaTypes
             .get(name)
@@ -289,28 +290,32 @@ trait QueryGen extends Generator {
               ClassAccumulator(
                 classes = newClass.toList,
                 parAccum = List(
-                  ClassParam.fromGrackleType(paramName,
-                                             nextType.dealias,
-                                             isInput = false,
-                                             paramTypeNameOverride
+                  ClassParam.fromGrackleType(
+                    paramName,
+                    nextType.dealias,
+                    isInput = false,
+                    paramTypeNameOverride
                   )
                 )
               )
             }
-
-        case UntypedNarrow(typeName, child) =>
+        case UntypedInlineFragment(typeName, _, child) =>
           // Single element in inline fragment
-          go(child, getType(typeName).some)
-        case Rename(name, child)            =>
-          go(child, currentType, name.some)
-        case Group(selections)              =>
-          // A Group in an inline fragment "... on X" will be represented as Group(List(UntypedNarrow(X, ...), UntypedNarrow(X, ...))).
-          // We fix that to UntypedNarrow(X, Group(List(..., ...)))
+          go(child, typeName.map(getType).orElse(currentType))
+        case Group(selections)                         =>
+          // A Group in an inline fragment "... on X" will be represented as Group(List(UntypedInlineFragment(X, ...), UntypedInlineFragment(X, ...))).
+          // We fix that to UntypedInlineFragment(X, Group(List(..., ...)))
           val fixedSelections = selections.map(_ match {
-            // We flatly assume that if the first element of a group is UntypedNarrow(X, ...), then all elements are.
-            case Group(list @ UntypedNarrow(typeName, _) +: _) =>
-              UntypedNarrow(typeName, Group(list.collect { case UntypedNarrow(_, child) => child }))
-            case other                                         => other
+            // We flatly assume that if the first element of a group is UntypedInlineFragment(X, ...), then all elements are.
+            case Group(list @ UntypedInlineFragment(typeName, _, _) +: _) =>
+              UntypedInlineFragment(
+                typeName,
+                List.empty,
+                Group(list.collect { case UntypedInlineFragment(_, _, child) =>
+                  child
+                })
+              )
+            case other                                                    => other
           })
 
           // (Also, check what Grackle is returning when there's an interface)
@@ -318,9 +323,9 @@ trait QueryGen extends Generator {
             fixedSelections.zipWithIndex // We want to preserve order of appeareance
               .groupBy {
                 _._1 match {
-                  case UntypedNarrow(typeName, _) =>
-                    typeName.some // Selection in inline fragment, group by discriminator.some
-                  case _                          =>
+                  case UntypedInlineFragment(typeName, _, _) =>
+                    typeName // Selection in inline fragment, group by discriminator
+                  case _                                     =>
                     none // Selection in base group, group by none
                 }
               }
@@ -329,7 +334,7 @@ trait QueryGen extends Generator {
               .map { // Resolve groups
                 case (Some(typeName), subQueries) =>
                   (typeName.some, // Unwrap inline fragment selections
-                   subQueries.collect { case (UntypedNarrow(_, child), idx) =>
+                   subQueries.collect { case (UntypedInlineFragment(_, _, child), idx) =>
                      (go(child, getType(typeName).some), idx)
                    }
                   )
@@ -372,11 +377,11 @@ trait QueryGen extends Generator {
                 Sum(baseParams, baseAccumulator.classes, subTypes).some
               )
           }
-
-        case Empty => ClassAccumulator()
-        case _     =>
-          log(s"Unhandled Algebra: [$algebra]").unsafeRunSync()
-          ClassAccumulator()
+        case Empty                                     => ClassAccumulator()
+        case _                                         =>
+          throw new Exception(
+            s"Unhandled Algebra: [$currentAlgebra] - Current Type: [$currentType]"
+          )
       }
 
     val algebraTypes = go(algebra, rootType.flatMap(_.underlyingObject))
