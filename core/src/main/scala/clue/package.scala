@@ -9,7 +9,7 @@ import cats.syntax.all.*
 import org.typelevel.log4cats.Logger
 
 package object clue {
-  type FetchClient[F[_], S] = FetchClientWithPars[F, _, S]
+  type FetchClient[F[_], S] = FetchClientWithPars[F, ?, S]
 
   protected[clue] type Latch[F[_]] = Deferred[F, Either[Throwable, Unit]]
 

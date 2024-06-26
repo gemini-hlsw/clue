@@ -80,7 +80,8 @@ object Demo extends IOApp.Simple {
       client <- Resource.eval(JdkWSClient.simple)
       backend = Http4sWebSocketBackend(client)
       uri     = uri"wss://lucuma-odb-development.herokuapp.com/ws"
-      sc     <- Resource.eval(Http4sWebSocketClient.of[F, DemoDB](uri)(Async[F], Logger[F], backend))
+      sc     <-
+        Resource.eval(Http4sWebSocketClient.of[F, DemoDB](uri)(using Async[F], Logger[F], backend))
       _      <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
     } yield sc
 

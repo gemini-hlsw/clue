@@ -80,7 +80,7 @@ trait ArbFromServer {
     Arbitrary {
       for {
         i <- arbitrary[String]
-        p <- arbitrary[GraphQLResponse[Json]](arbCombinedResponse(arbJsonString))
+        p <- arbitrary[GraphQLResponse[Json]](using arbCombinedResponse(using arbJsonString))
       } yield Data(i, p)
     }
 
