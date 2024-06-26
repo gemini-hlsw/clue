@@ -14,6 +14,7 @@ import io.circe.*
 import io.circe.generic.semiauto.*
 import io.circe.testing.CodecTests
 import io.circe.testing.instances.*
+import monocle.law.discipline.PrismTests
 import munit.DisciplineSuite
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
@@ -111,4 +112,6 @@ class InputSpec extends DisciplineSuite {
   }
 
   checkAll("SomeInput", CodecTests[SomeInput].codec)
+
+  checkAll("assign", PrismTests(optics.assign[Int]))
 }
