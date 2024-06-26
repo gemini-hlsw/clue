@@ -5,9 +5,8 @@ package clue.gen
 
 // import scalafix.v1._
 import cats.syntax.all.*
-import edu.gemini.grackle
-import edu.gemini.grackle.ScalarType
-import edu.gemini.grackle.Type as GType
+import grackle.ScalarType
+import grackle.Type as GType
 
 import java.util.regex.Pattern
 import scala.meta.*
@@ -20,7 +19,7 @@ trait Generator {
 
   protected val MetaTypes: Map[String, GType] =
     // "__schema" | "__type"
-    Map(TypeSelect -> ScalarType("String", "Type Discriminator".some))
+    Map(TypeSelect -> ScalarType("String", "Type Discriminator".some, List.empty))
 
   protected sealed trait DefineType
   protected object DefineType {
@@ -116,7 +115,7 @@ trait Generator {
       name:         String,
       tpe:          grackle.Type,
       isInput:      Boolean,
-      nameOverride: Option[String] = None,
+      alias:        Option[String] = None,
       typeOverride: Option[Type] = None
     ): ClassParam = {
       def resolveType(tpe: grackle.Type): Type =
@@ -130,7 +129,7 @@ trait Generator {
           case nt: grackle.NamedType     =>
             DefaultMappings.getOrElse(
               nt.name,
-              typeOverride.getOrElse(Type.Name(snakeToCamel(nameOverride.getOrElse(nt.name))))
+              typeOverride.getOrElse(Type.Name(snakeToCamel(alias.getOrElse(nt.name))))
             )
         }
 
@@ -312,37 +311,40 @@ trait Generator {
         val nextPath              = nextNestPath(nestPath)
         val nextTypes             = nextNestedTypes(sum.nested, nestPath, nestedTypes)
         val (newBody, wasMissing) =
-          addSumTrait(camelName,
-                      sum.params.map(_.toTree(nextPath, nextTypes, asVals = true)),
-                      extending
+          addSumTrait(
+            camelName,
+            sum.params.map(_.toTree(nextPath, nextTypes, asVals = true)),
+            extending
           )(
             parentBody
           )
 
         val addDefinitions =
           sum.nested.map(
-            _.addToParentBody(catsEq,
-                              catsShow,
-                              monocleLenses,
-                              scalaJSReactReuse,
-                              circeEncoder,
-                              circeDecoder,
-                              forceModule,
-                              nextPath,
-                              nextTypes
+            _.addToParentBody(
+              catsEq,
+              catsShow,
+              monocleLenses,
+              scalaJSReactReuse,
+              circeEncoder,
+              circeDecoder,
+              forceModule,
+              nextPath,
+              nextTypes
             )
           ) ++
             sum.instances.map(
-              _.addToParentBody(catsEq,
-                                catsShow,
-                                monocleLenses,
-                                scalaJSReactReuse,
-                                circeEncoder,
-                                circeDecoder,
-                                forceModule,
-                                nextPath,
-                                nextTypes,
-                                camelName.some // Extends
+              _.addToParentBody(
+                catsEq,
+                catsShow,
+                monocleLenses,
+                scalaJSReactReuse,
+                circeEncoder,
+                circeDecoder,
+                forceModule,
+                nextPath,
+                nextTypes,
+                camelName.some // Extends
               )
             )
 

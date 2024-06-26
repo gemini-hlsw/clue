@@ -6,7 +6,9 @@ package clue.gen
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all.*
-import edu.gemini.grackle.QueryParser
+import grackle.Query.UntypedFragment
+import grackle.Result
+import grackle.UntypedOperation
 import metaconfig.Configured
 import scalafix.v1.*
 
@@ -118,7 +120,9 @@ class GraphQLGen(config: GraphQLGenConfig)
                   case Some(document) =>
                     config.getSchema(schemaType.value).flatMap { schema =>
                       // Parse the operation.
-                      val queryResult = QueryParser.parseText(document.render)
+                      val queryResult: Result[(List[UntypedOperation], List[UntypedFragment])] =
+                        GQLParser.parseText(document.render)
+
                       if (!queryResult.hasValue)
                         abort(
                           s"Could not parse document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
@@ -129,7 +133,8 @@ class GraphQLGen(config: GraphQLGenConfig)
                             s"Warning parsing document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
                           )
                         ) >> IO {
-                          val operation = queryResult.toOption.get
+                          // TODO Support multi-operation queries?
+                          val operation: UntypedOperation = queryResult.toOption.get._1.head
 
                           // Modifications to add the missing definitions.
                           val modObjDefs = scala.Function.chain(
@@ -191,7 +196,9 @@ class GraphQLGen(config: GraphQLGenConfig)
                   case Some(subquery) =>
                     config.getSchema(schemaType.value).flatMap { schema =>
                       // Parse the operation.
-                      val queryResult = QueryParser.parseText(s"query ${subquery.render}")
+                      val queryResult: Result[(List[UntypedOperation], List[UntypedFragment])] =
+                        GQLParser.parseText(s"query ${subquery.render}")
+
                       if (!queryResult.hasValue)
                         abort(
                           s"Could not parse document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
@@ -202,7 +209,8 @@ class GraphQLGen(config: GraphQLGenConfig)
                             s"Warning parsing document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
                           )
                         ) >> IO {
-                          val operation = queryResult.toOption.get
+                          // TODO Support multi-operation queries?
+                          val operation: UntypedOperation = queryResult.toOption.get._1.head
 
                           // Modifications to add the missing definitions.
                           val modObjDefs = scala.Function.chain(
