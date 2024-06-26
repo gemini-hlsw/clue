@@ -508,7 +508,6 @@ trait Generator {
 
     val reuseDef = Option.when(scalaJSReactReuse)(
       q"""implicit val ${valName("reuse")}: japgolly.scalajs.react.Reusability[$n] = {
-              import japgolly.scalajs.react.Reusability
               japgolly.scalajs.react.Reusability.derive
             }
           """
