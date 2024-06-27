@@ -246,7 +246,7 @@ class ApolloClient[F[_], P, S](
         .evalMap(result => F.delay(cb(result)))
         .compile
         .drain
-        .as(subscription.stop().some)
+        .as(none)
     )
   )
   // </FetchClient>
