@@ -18,19 +18,22 @@ object Wrapper extends Something {
     import StarWars.Types._
     ignoreUnusedImportTypes()
     override val document: String = """
+          fragment fields on Character {
+            id
+            name
+            ... on Human {
+              homePlanet
+            }
+            friends {
+              name
+            }
+            ... on Droid {
+              primaryFunction
+            }
+          }
           query ($charId: ID!) {
             character(id: $charId) {
-              id
-              name
-              ... on Human {
-                homePlanet
-              }
-              friends {
-                name
-              }
-              ... on Droid {
-                primaryFunction
-              }
+              ...fields
             }
           }
         """
