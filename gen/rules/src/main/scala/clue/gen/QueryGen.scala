@@ -222,9 +222,12 @@ trait QueryGen extends Generator {
     schema:     Schema,
     algebra:    Query,
     subqueries: List[Term],
+    fragments:  List[UntypedFragment],
     rootType:   Option[GType]
   ): CaseClass = {
     import Query._
+
+    val fragmentsMap: Map[String, UntypedFragment] = fragments.map(f => f.name -> f).toMap
 
     def getType(typeName: String): NamedType =
       schema
@@ -302,6 +305,9 @@ trait QueryGen extends Generator {
         case UntypedInlineFragment(typeName, _, child) =>
           // Single element in inline fragment
           go(child, typeName.map(getType).orElse(currentType))
+        case UntypedFragmentSpread(name, _)            =>
+          val fragment: UntypedFragment = fragmentsMap(name)
+          go(fragment.child, getType(fragment.tpnme).some)
         case Group(selections)                         =>
           // A Group in an inline fragment "... on X" will be represented as Group(List(UntypedInlineFragment(X, ...), UntypedInlineFragment(X, ...))).
           // We fix that to UntypedInlineFragment(X, Group(List(..., ...)))
@@ -394,16 +400,18 @@ trait QueryGen extends Generator {
     operation:        UntypedOperation,
     config:           GraphQLGenConfig,
     subqueries:       List[Term],
+    fragments:        List[UntypedFragment],
     rootTypeOverride: Option[NamedType] = None
   ): List[Stat] => List[Stat] =
     parentBody =>
       mustDefineType("Data")(parentBody) match {
         case Skip            =>
-          addModuleDefs("Data",
-                        config.catsEq,
-                        config.catsShow,
-                        config.scalaJSReactReuse,
-                        circeDecoder = true
+          addModuleDefs(
+            "Data",
+            config.catsEq,
+            config.catsShow,
+            config.scalaJSReactReuse,
+            circeDecoder = true
           )(parentBody)
         case Define(_, _, _) => // For now, we don't allow specifying Data class parents.
           // For some reason, schema.schemaType only returns the Query type.
@@ -424,7 +432,13 @@ trait QueryGen extends Generator {
             case _: UntypedSubscription => schemaType.field("subscription").flatMap(_.asNamed)
           }
 
-          resolveData(schema, operation.query, subqueries, rootTypeOverride.orElse(rootType))
+          resolveData(
+            schema,
+            operation.query,
+            subqueries,
+            fragments,
+            rootTypeOverride.orElse(rootType)
+          )
             .addToParentBody(
               config.catsEq,
               config.catsShow,

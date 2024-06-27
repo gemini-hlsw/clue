@@ -133,15 +133,16 @@ class GraphQLGen(config: GraphQLGenConfig)
                             s"Warning parsing document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
                           )
                         ) >> IO {
+                          val (operations, fragments) = queryResult.toOption.get
                           // TODO Support multi-operation queries?
-                          val operation: UntypedOperation = queryResult.toOption.get._1.head
+                          val operation               = operations.head
 
                           // Modifications to add the missing definitions.
                           val modObjDefs = scala.Function.chain(
                             List(
                               addImports(schemaType.value),
                               addVars(schema, operation, config),
-                              addData(schema, operation, config, document.subqueries),
+                              addData(schema, operation, config, document.subqueries, fragments),
                               addVarEncoder,
                               addDataDecoder,
                               addConvenienceMethod(schemaType, operation, objName)
@@ -209,8 +210,9 @@ class GraphQLGen(config: GraphQLGenConfig)
                             s"Warning parsing document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
                           )
                         ) >> IO {
+                          val (operations, fragments) = queryResult.toOption.get
                           // TODO Support multi-operation queries?
-                          val operation: UntypedOperation = queryResult.toOption.get._1.head
+                          val operation               = operations.head
 
                           // Modifications to add the missing definitions.
                           val modObjDefs = scala.Function.chain(
@@ -221,6 +223,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                                 operation,
                                 config,
                                 subquery.subqueries,
+                                fragments,
                                 schema.types.find(_.name == rootTypeName)
                               ),
                               addDataDecoder,
