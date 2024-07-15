@@ -10,6 +10,7 @@ import clue.model.GraphQLResponse
 import clue.model.StreamingMessage.FromServer
 import clue.model.StreamingMessage.FromServer.*
 import io.circe.Json
+import io.circe.JsonObject
 import io.circe.testing.instances.*
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.*
@@ -73,7 +74,7 @@ trait ArbFromServer {
 
   implicit val arbConnectionError: Arbitrary[ConnectionError] =
     Arbitrary {
-      arbitrary[Json](arbJsonString).map(ConnectionError(_))
+      arbitrary[JsonObject](arbitraryJsonObject).map(ConnectionError(_))
     }
 
   implicit val arbData: Arbitrary[Data] =
