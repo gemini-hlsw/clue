@@ -2,24 +2,35 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 import cats.Eq
+import cats.Functor
 import cats.MonadError
 import cats.effect.Concurrent
 import cats.effect.Deferred
+import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import org.typelevel.log4cats.Logger
 
 package object clue {
   type FetchClient[F[_], S] = FetchClientWithPars[F, ?, S]
 
-  protected[clue] type Latch[F[_]] = Deferred[F, Either[Throwable, Unit]]
+  // None = canceled, Some(Right(())) = done, Some(Some(Left(t)) = error
+  protected[clue] type Latch[F[_]] = Deferred[F, Option[Either[Throwable, Unit]]]
+
+  final implicit class LatchOps[F[_]](val latch: Latch[F]) extends AnyVal {
+    def resolve(implicit F: MonadCancelThrow[F]): F[Unit] =
+      latch.get.flatMap(_.fold(F.canceled)(_.fold(F.raiseError, F.pure)))
+
+    def release(implicit F: Functor[F]): F[Unit] =
+      latch.complete(().asRight.some).void
+
+    def error(t: Throwable)(implicit F: Functor[F]): F[Unit] =
+      latch.complete(t.asLeft.some).void
+
+    def cancel(implicit F: Functor[F]): F[Unit] =
+      latch.complete(none).void
+  }
 
   final implicit class StringOps(val str: String) extends AnyVal {
-    def error[A]: Either[Throwable, A] =
-      new Exception(str).asLeft[A]
-
-    def raiseError[F[_], A](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[A] =
-      logger.error(str) >> F.raiseError(new Exception(str))
-
     def errorF[F[_]](implicit logger: Logger[F]): F[Unit] =
       logger.error(str)
 
@@ -34,10 +45,11 @@ package object clue {
   }
 
   final implicit class ThrowableOps(val t: Throwable) extends AnyVal {
-    def raiseF[F[_]](
-      msg: String
-    )(implicit F: MonadError[F, Throwable], logger: Logger[F]): F[Unit] =
-      logger.error(t)(msg) >> F.raiseError(t)
+    def logAndRaiseF[F[_]](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[Unit] =
+      logAndRaiseF_[F, Unit]
+
+    def logAndRaiseF_[F[_], A](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[A] =
+      logger.error(t)("") >> F.raiseError[A](t)
 
     def logF[F[_]](
       msg: String
@@ -55,7 +67,7 @@ package object clue {
 package clue {
   protected[clue] object Latch {
     def apply[F[_]: Concurrent]: F[Latch[F]] =
-      Deferred[F, Either[Throwable, Unit]]
+      Deferred[F, Option[Either[Throwable, Unit]]]
   }
 
   protected[clue] class ConnectionId(val value: Int) extends AnyVal {

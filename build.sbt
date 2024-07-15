@@ -170,10 +170,11 @@ lazy val sbtPlugin = project
     addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
     addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
     buildInfoPackage   := "clue.sbt",
-    buildInfoKeys      := Seq[BuildInfoKey](version,
-                                       organization,
-                                       "rulesModule" -> (genRules / moduleName).value,
-                                       "coreModule"  -> (core.jvm / moduleName).value
+    buildInfoKeys      := Seq[BuildInfoKey](
+      version,
+      organization,
+      "rulesModule" -> (genRules / moduleName).value,
+      "coreModule"  -> (core.jvm / moduleName).value
     ),
     buildInfoOptions += BuildInfoOption.PackagePrivate,
     Test / test        := {

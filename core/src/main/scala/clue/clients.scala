@@ -125,7 +125,8 @@ trait PersistentClient[F[_], CP, CE] {
   def statusStream: fs2.Stream[F, PersistentClientStatus]
 
   def connect(): F[Unit]
-  def initialize(payload: Map[String, Json] = Map.empty): F[Unit]
+  // Initialization may repeat upon reconnection, that's why the payload is effectful since it may change over time (eg: auth tokens).
+  def initialize(payload: F[Map[String, Json]]): F[Unit]
 
   def terminate(): F[Unit]
   def disconnect(closeParameters: CP): F[Unit]
