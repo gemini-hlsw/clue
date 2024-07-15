@@ -136,7 +136,7 @@ package object json {
     Decoder.instance(c =>
       for {
         _ <- checkType(c, "connection_error")
-        p <- c.get[Json]("payload")
+        p <- c.get[JsonObject]("payload")
       } yield ConnectionError(p)
     )
 
@@ -273,16 +273,14 @@ package object json {
       } yield GraphQLError.Location(line, column)
     )
 
-  implicit val EncoderGraphQLError: Encoder[GraphQLError] =
-    Encoder.instance(a =>
-      Json
-        .obj(
-          "message"    -> a.message.asJson,
-          "path"       -> a.path.asJson,
-          "locations"  -> a.locations.asJson,
-          "extensions" -> a.extensions.asJson
-        )
-        .dropNullValues
+  implicit val EncoderGraphQLError: Encoder.AsObject[GraphQLError] =
+    Encoder.AsObject.instance(a =>
+      JsonObject(
+        "message"    -> a.message.asJson,
+        "path"       -> a.path.asJson,
+        "locations"  -> a.locations.asJson,
+        "extensions" -> a.extensions.asJson
+      ).filter { case (_, v) => !v.isNull }
     )
 
   implicit val DecoderGraphQLError: Decoder[GraphQLError] =
