@@ -4,10 +4,14 @@
 package clue
 
 import clue.model.GraphQLErrors
+import io.circe.JsonObject
 
 class GraphQLException(msg: String) extends Exception(msg)
 
 case class ConnectionException() extends GraphQLException("Could not establish connection")
+
+case class RemoteInitializationException(payload: JsonObject)
+    extends GraphQLException(s"The server returned an error on initialization: [$payload]")
 
 case class DisconnectedException() extends GraphQLException("Connection was closed")
 

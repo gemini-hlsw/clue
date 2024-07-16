@@ -271,7 +271,7 @@ class ApolloClient[F[_], P, S](
           case Initializing(stateConnectionId, connection, _, _, latch)
               if connectionId === stateConnectionId =>
             Connected(connectionId, connection) ->
-              latch.complete(s"Initialization rejected by server: [$payload].".error).void
+              latch.complete(RemoteInitializationException(payload).asLeft).void
           case s => s -> s"Unexpected connection_error received from server.".warnF
         }
       case Right(StreamingMessage.FromServer.Data(subscriptionId, response)) =>
