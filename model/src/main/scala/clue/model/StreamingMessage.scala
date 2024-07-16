@@ -122,7 +122,9 @@ object StreamingMessage {
      * @param payload
      *   error information
      */
-    final case class ConnectionError(payload: Json) extends FromServer with Payload[Json]
+    final case class ConnectionError(payload: JsonObject)
+        extends FromServer
+        with Payload[JsonObject]
 
     object ConnectionError {
       implicit val EqConnectionError: Eq[ConnectionError] =
