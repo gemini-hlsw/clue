@@ -13,7 +13,8 @@ import org.typelevel.log4cats.Logger
 package object clue {
   type FetchClient[F[_], S] = FetchClientWithPars[F, ?, S]
 
-  // None = canceled, Some(Right(())) = done, Some(Some(Left(t)) = error
+  // The Latch value is interpreted as:
+  //   None = canceled, Some(Right(())) = done, Some(Left(t)) = error
   protected[clue] type Latch[F[_]] = Deferred[F, Option[Either[Throwable, Unit]]]
 
   final implicit class LatchOps[F[_]](val latch: Latch[F]) extends AnyVal {
