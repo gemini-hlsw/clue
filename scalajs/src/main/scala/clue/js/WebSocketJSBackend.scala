@@ -67,7 +67,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
                 _    <- s"Error on WebSocket for [$uri]".errorF
                 _    <- isErrored.set(true)
                 open <- isOpen.get
-              } yield if (!open) cb(ConnectionException().asLeft)
+              } yield if (!open) cb(ConnectionException("Could not establish connection").asLeft)
             ).uncancelable
             dispatcher.unsafeRunAndForget(error)
           }
@@ -79,7 +79,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
                 errored <- isErrored.get
                 _       <- handler.onClose(
                              connectionId,
-                             if (errored) DisconnectedException().asLeft
+                             if (errored) DisconnectedException.asLeft
                              else CloseParams(e.code, e.reason).asRight
                            )
               } yield ()

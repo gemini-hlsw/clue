@@ -53,20 +53,20 @@ protected object State {
     connectionId:  ConnectionId,
     connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]],
-    initPayload:   Map[String, Json],
+    initPayload:   F[Map[String, Json]],
     latch:         Latch[F]
   ) extends State[F](PersistentClientStatus.Initializing)
   final case class Initialized[F[_]](
     connectionId:  ConnectionId,
     connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]],
-    initPayload:   Map[String, Json]
+    initPayload:   F[Map[String, Json]]
   ) extends State[F](PersistentClientStatus.Initialized)
   // Reestablishing = We are in the process of reconnecting + reinitializing after a low level error/close, but we haven't connected yet.
   final case class Reestablishing[F[_]](
     connectionId:  ConnectionId,
     subscriptions: Map[String, Emitter[F]],
-    initPayload:   Map[String, Json],
+    initPayload:   F[Map[String, Json]],
     connectLatch:  Latch[F],
     initLatch:     Latch[F]
   ) extends State[F](PersistentClientStatus.Connecting)
@@ -114,16 +114,16 @@ class ApolloClient[F[_], P, S](
         case Disconnected(connectionId)                   =>
           Connecting(connectionId, newLatch) -> doConnect(connectionId, newLatch)
         case s @ Connecting(_, latch)                     =>
-          s -> (warn >> latch.get.rethrow)
+          s -> (warn >> latch.resolve)
         case s @ Reestablishing(_, _, _, connectLatch, _) =>
-          s -> (warn >> connectLatch.get.rethrow)
+          s -> (warn >> connectLatch.resolve)
         case state                                        => state -> warn
       }
     }
   }
 
-  override def initialize(payload: Map[String, Json] = Map.empty): F[Unit] = {
-    val error = "initialize() called while disconnected.".raiseError.void
+  override def initialize(payload: F[Map[String, Json]] = F.pure(Map.empty)): F[Unit] = {
+    val error = InvalidInvocationException("initialize() called while disconnected.").logAndRaiseF
     val warn  =
       "initialize() called while already attempting to initialize (or reestablishing).".warnF
 
@@ -133,8 +133,8 @@ class ApolloClient[F[_], P, S](
         case Connected(connectionId, connection)                     =>
           Initializing(connectionId, connection, Map.empty, payload, newLatch) ->
             doInitialize(payload, connection, newLatch)
-        case s @ Initializing(_, _, _, _, latch)                     => s -> (warn >> latch.get.rethrow)
-        case s @ Reestablishing(_, _, _, _, initLatch)               => s -> (warn >> initLatch.get.rethrow)
+        case s @ Initializing(_, _, _, _, latch)                     => s -> (warn >> latch.resolve)
+        case s @ Reestablishing(_, _, _, _, initLatch)               => s -> (warn >> initLatch.resolve)
         case Initialized(connectionId, connection, subscriptions, _) =>
           Initializing(connectionId, connection, subscriptions, payload, newLatch) ->
             (stopSubscriptions(connection, subscriptions) >>
@@ -144,7 +144,7 @@ class ApolloClient[F[_], P, S](
   }
 
   override def terminate(): F[Unit] = {
-    val error = "terminate() called while uninitialized.".raiseError.void
+    val error = InvalidInvocationException("terminate() called while uninitialized.").logAndRaiseF
     val warn  = "terminate() called while initializing.".warnF
 
     stateModify {
@@ -157,9 +157,9 @@ class ApolloClient[F[_], P, S](
             _ <- h.join
           } yield ())
       case s @ Initializing(_, _, _, _, latch)                     =>
-        s -> (warn >> latch.get.rethrow >> terminate())
+        s -> (warn >> latch.resolve >> terminate())
       case s @ Reestablishing(_, _, _, _, initLatch)               =>
-        s -> (warn >> initLatch.get.rethrow >> terminate())
+        s -> (warn >> initLatch.resolve >> terminate())
       case s                                                       =>
         s -> error
     }
@@ -173,30 +173,28 @@ class ApolloClient[F[_], P, S](
   final def disconnect(): F[Unit] = disconnectInternal(none)
 
   private def disconnectInternal(closeParameters: Option[CloseParams]): F[Unit] = {
-    val error            = "disconnect() called while disconnected.".raiseError.void
-    val interruptedError = "disconnect() called while connecting or initializing.".error
+    val error            = InvalidInvocationException("disconnect() called while disconnected.").logAndRaiseF
+    val interruptedError = InvalidInvocationException(
+      "disconnect() called while connecting or initializing."
+    )
 
     // We *could* wait for onClose to be invoked before completing, but is there a point to that?
     stateModify {
       case Connecting(connectionId, latch)                             =>
         // We need a wait for the connection to establish and then disconnect it, without blocking the client.
         Disconnected(connectionId.next) ->
-          latch.complete(interruptedError).void // >> TODO wait in background to complete and close
+          latch.error(interruptedError) // >> TODO wait in background to complete and close
       case Connected(connectionId, connection)                         =>
         Disconnected(connectionId.next) -> connection.closeInternal(closeParameters)
       case Initializing(connectionId, connection, _, _, latch)         =>
         Disconnected(connectionId.next) ->
-          (latch.complete(interruptedError) >> connection.closeInternal(closeParameters))
+          (latch.error(interruptedError) >> connection.closeInternal(closeParameters))
       case Initialized(connectionId, connection, _, _)                 =>
         Disconnected(connectionId.next) -> connection.closeInternal(closeParameters)
       case Reestablishing(connectionId, _, _, connectLatch, initLatch) =>
         Disconnected(connectionId.next) ->
-          (connectLatch.complete(interruptedError).attempt.void >>
-            initLatch
-              .complete(
-                interruptedError
-              )
-              .void) // >> TODO wait in background to complete and close
+          (connectLatch.error(interruptedError) >>
+            initLatch.error(interruptedError)) // >> TODO wait in background to complete and close
       case s                                                           => s -> error
     }.uncancelable
   }
@@ -206,7 +204,7 @@ class ApolloClient[F[_], P, S](
       Latch[F].flatMap { newInitLatch =>
         stateModify {
           case s @ Reestablishing(_, _, _, _, initLatch)                         =>
-            s -> (s"reestablish() called while already reestablishing.".errorF >> initLatch.get.rethrow)
+            s -> (s"reestablish() called while already reestablishing.".errorF >> initLatch.resolve)
           case Initialized(connectionId, connection, subscriptions, initPayload) =>
             Reestablishing(
               connectionId.next,
@@ -217,7 +215,7 @@ class ApolloClient[F[_], P, S](
             ) ->
               ((gracefulTerminate(connection, subscriptions) >> connection.close()).start >>
                 doConnect(connectionId.next, newConnectLatch) >>
-                newInitLatch.get.rethrow)
+                newInitLatch.resolve)
           case s @ _                                                             =>
             s -> s"reestablish() called while disconnected or uninitialized.".errorF
         }
@@ -256,25 +254,27 @@ class ApolloClient[F[_], P, S](
   // <WebSocketHandler>
   override def onMessage(connectionId: ConnectionId, msg: String): F[Unit] =
     decode[StreamingMessage.FromServer](msg) match {
-      case Left(e)                                                           =>
-        e.raiseF(s"Exception decoding message received from server: [$msg]")
-      case Right(StreamingMessage.FromServer.ConnectionAck)                  =>
+      case Left(e)                                                                 =>
+        ServerMessageDecodingException(e).logAndRaiseF
+      case Right(StreamingMessage.FromServer.ConnectionAck)                        =>
         stateModify {
           case Initializing(stateConnectionId, connection, subscriptions, initPayload, latch)
               if connectionId === stateConnectionId =>
             Initialized(connectionId, connection, subscriptions, initPayload) ->
-              (startSubscriptions(connection, subscriptions) >> latch.complete(().asRight).void)
+              (startSubscriptions(connection, subscriptions) >> latch.release)
           case s => s -> s"Unexpected connection_ack received from server.".warnF
         }
-      case Right(StreamingMessage.FromServer.ConnectionError(payload))       =>
+      case Right(StreamingMessage.FromServer.ConnectionError(payload))             =>
         stateModify {
           case Initializing(stateConnectionId, connection, _, _, latch)
               if connectionId === stateConnectionId =>
+            // We don't disconnect here. According to spec:
+            // "It server (sic)  also respond with this message in case of a parsing errors of the message (which does not disconnect the client, just ignore the message)."
             Connected(connectionId, connection) ->
-              latch.complete(RemoteInitializationException(payload).asLeft).void
+              latch.error(RemoteInitializationException(payload)).void
           case s => s -> s"Unexpected connection_error received from server.".warnF
         }
-      case Right(StreamingMessage.FromServer.Data(subscriptionId, response)) =>
+      case Right(msg @ StreamingMessage.FromServer.Data(subscriptionId, response)) =>
         state.get.flatMap {
           case Initialized(stateConnectionId, _, subscriptions, _)
               if connectionId === stateConnectionId =>
@@ -285,10 +285,13 @@ class ApolloClient[F[_], P, S](
                 emitter.emitData(response)
             }
           case s @ _ =>
-            s"UNEXPECTED Data RECEIVED for subscription [$subscriptionId]. State is: [$s]".raiseError.void
+            UnexpectedServerMessageException[StreamingMessage.FromServer.Data, State[F]](
+              msg,
+              s
+            ).logAndRaiseF
         }
       // TODO Contemplate different states.
-      case Right(StreamingMessage.FromServer.Error(subscriptionId, payload)) =>
+      case Right(msg @ StreamingMessage.FromServer.Error(subscriptionId, payload)) =>
         state.get.flatMap {
           case Initialized(stateConnectionId, _, subscriptions, _)
               if connectionId === stateConnectionId =>
@@ -300,9 +303,12 @@ class ApolloClient[F[_], P, S](
                   emitter.emitErrors(payload)
             }
           case s @ _ =>
-            s"UNEXPECTED Error RECEIVED for subscription [$subscriptionId]. State is: [$s]".raiseError.void
+            UnexpectedServerMessageException[StreamingMessage.FromServer.Error, State[F]](
+              msg,
+              s
+            ).logAndRaiseF
         }
-      case Right(StreamingMessage.FromServer.Complete(subscriptionId))       =>
+      case Right(StreamingMessage.FromServer.Complete(subscriptionId))             =>
         state.get.flatMap {
           case Initialized(stateConnectionId, _, subscriptions, _)
               if connectionId === stateConnectionId =>
@@ -319,17 +325,19 @@ class ApolloClient[F[_], P, S](
           case Initialized(stateConnectionId, _, _, _) if connectionId =!= stateConnectionId =>
             F.unit
           case s @ Disconnected(_)                                                           =>
-            s"Complete RECEIVED for subscription [$subscriptionId] on Disconnected state: [$s]".debugF
+            s"Complete RECEIVED for subscription [$subscriptionId] on Disconnected state.".debugF >>
+              s"  \\-- State Is: [$s]".traceF
           case s @ _                                                                         =>
-            s"UNEXPECTED Complete RECEIVED for subscription [$subscriptionId]. State is: [$s]".warnF
+            s"UNEXPECTED Complete RECEIVED for subscription [$subscriptionId].".warnF >>
+              s"  \\-- State Is: [$s]".traceF
         }
-      case Right(StreamingMessage.FromServer.ConnectionKeepAlive)            => F.unit
-      case _                                                                 => s"Unexpected message received from server: [$msg]".warnF
+      case Right(StreamingMessage.FromServer.ConnectionKeepAlive)                  => F.unit
+      case _                                                                       => s"Unexpected message received from server: [$msg]".warnF
     }
 
   // TODO Handle interruptions? Can callbacks be canceled?
   override def onClose(connectionId: ConnectionId, event: CloseEvent): F[Unit] = {
-    val error = DisconnectedException().asLeft
+    val error = DisconnectedException
     val debug = s"onClose() called with mismatching connectionId.".debugF
 
     reconnectionStrategy(0, event.asRight) match {
@@ -338,14 +346,14 @@ class ApolloClient[F[_], P, S](
           case s @ Disconnected(_)                                                           =>
             s -> s"onClose() called while disconnected.".debugF
           case Connecting(stateConnectionId, latch) if connectionId === stateConnectionId    =>
-            Disconnected(connectionId.next) -> latch.complete(error).void
+            Disconnected(connectionId.next) -> latch.error(error)
           case Reestablishing(stateConnectionId, _, _, connectLatch, initLatch)
               if connectionId === stateConnectionId =>
             Disconnected(connectionId.next) ->
-              (connectLatch.complete(error) >> initLatch.complete(error).void)
+              (connectLatch.error(error) >> initLatch.error(error))
           case Initializing(stateConnectionId, _, _, _, latch)
               if connectionId === stateConnectionId =>
-            Disconnected(connectionId.next) -> latch.complete(error).void
+            Disconnected(connectionId.next) -> latch.error(error)
           case Connected(stateConnectionId, _) if connectionId === stateConnectionId         =>
             Disconnected(connectionId.next) -> F.unit
           case Initialized(stateConnectionId, _, _, _) if connectionId === stateConnectionId =>
@@ -357,7 +365,7 @@ class ApolloClient[F[_], P, S](
         Latch[F].flatMap { newConnectLatch =>
           Latch[F].flatMap { newInitLatch =>
             def waitAndConnect(nextConnectionId: ConnectionId, latch: Latch[F]): F[Unit] =
-              s"Connection closed. Attempting to reconnect.".warnF >>
+              s"Connection closed with event [$event]. Attempting to reconnect.".warnF >>
                 s"Waiting [$wait] before reconnect...".debugF >>
                 timer.sleep(wait) >>
                 doConnect(nextConnectionId, latch)
@@ -436,11 +444,11 @@ class ApolloClient[F[_], P, S](
                 reconnectionStrategy(attempt, t.asLeft) match {
                   case None       =>
                     Disconnected(connectionId.next) ->
-                      (latch.complete(t.asLeft) >> F.raiseError(t)).void
+                      (latch.error(t) >> F.raiseError(t)).void
                   case Some(wait) =>
                     Connecting(connectionId.next, latch) -> retry(t, wait, connectionId.next)
                 }
-              case Right(c) => Connected(connectionId, c) -> latch.complete(().asRight).void
+              case Right(c) => Connected(connectionId, c) -> latch.release
             }
           case Reestablishing(connectionId, subscriptions, initPayload, connectLatch, initLatch) =>
             connection match {
@@ -448,9 +456,7 @@ class ApolloClient[F[_], P, S](
                 reconnectionStrategy(attempt, t.asLeft) match {
                   case None       =>
                     Disconnected(connectionId.next) ->
-                      (latch.complete(t.asLeft) >>
-                        initLatch.complete(t.asLeft) >>
-                        F.raiseError(t)).void
+                      (latch.error(t) >> initLatch.error(t) >> F.raiseError(t)).void
                   case Some(wait) =>
                     Reestablishing(
                       connectionId.next,
@@ -462,55 +468,53 @@ class ApolloClient[F[_], P, S](
                 }
               case Right(c) =>
                 Initializing(connectionId, c, subscriptions, initPayload, initLatch) ->
-                  (latch.complete(().asRight) >> doInitialize(initPayload, c, initLatch))
+                  (latch.release >> doInitialize(initPayload, c, initLatch))
             }
           case s                                                                                 =>
-            s -> (latch.complete(connection.void) >>
-              s"Unexpected state [$s] in connect(). Unblocking clients, but state may be inconsistent.".raiseError.void)
+            s -> (
+              s"Unexpected state in connect(). State Is: [$s]".traceF >>
+                (latch.complete(connection.void.some) >>
+                  InvalidInvocationException(
+                    s"Unexpected state in connect(). Unblocking clients, but state may be inconsistent."
+                  ).logAndRaiseF)
+            )
         }
       }
       .guaranteeCase {
         case Outcome.Succeeded(_) | Outcome.Errored(_) => F.unit
-        case Outcome.Canceled()                        => // Attempt recovery.
+        case Outcome.Canceled()                        => // Cleanup.
           stateModify {
-            case s @ Connected(_, _)                              => s -> latch.complete(Either.unit).attempt.void
+            case s @ Connected(_, _)                              => s -> latch.release
             case Connecting(connectionId, _)                      =>
               // TODO Cleanup the web socket. We should call .close() on it once it's connected. But we have to keep track of it.
-              Disconnected(connectionId.next) -> latch
-                .complete("connect() was canceled.".error[Unit])
-                .attempt
-                .void
+              Disconnected(connectionId.next) -> latch.cancel
             case Reestablishing(connectionId, _, _, _, initLatch) =>
               // TODO Cleanup the web socket. We should call .close() on it once it's connected. But we have to keep track of it.
               Disconnected(connectionId.next) ->
-                (latch.complete("connect() was canceled.".error[Unit]).attempt >>
-                  initLatch.complete("connect() was canceled.".error[Unit]).attempt.void)
+                (latch.cancel >> initLatch.cancel)
             case s                                                =>
-              s -> s"Unexpected state [$s] in canceled connect(). Cannot recover.".raiseError.void
+              s -> UnexpectedInternalStateException("cancelling connect()", s).logAndRaiseF
           }
       }
 
   private def doInitialize(
-    payload:    Map[String, Json],
+    payload:    F[Map[String, Json]],
     connection: WebSocketConnection[F],
     latch:      Latch[F]
   ): F[Unit] = (for {
-    _ <- connection.send(StreamingMessage.FromClient.ConnectionInit(payload))
-    _ <- latch.get.rethrow
+    _ <- payload >>= (p => connection.send(StreamingMessage.FromClient.ConnectionInit(p)))
+    _ <- latch.resolve
   } yield ()).guaranteeCase {
     case Outcome.Succeeded(_) | Outcome.Errored(_) => F.unit
-    case Outcome.Canceled()                        => // Attempt recovery.
+    case Outcome.Canceled()                        => // Cleanup.
       stateModify {
         case s @ Initializing(_, _, _, _, _) =>
           s ->
-            (disconnect().start >> latch
-              .complete("initialize() was canceled. Disconnecting...".error[Unit])
-              .attempt
-              .void)
+            (disconnect().start >> latch.cancel)
         case s                               =>
           s ->
             (disconnect().start >>
-              s"Unexpected state [$s] in canceled initialize(). Cannot recover. Disconnecting...".raiseError.void)
+              UnexpectedInternalStateException("cancelling initialize()", s).logAndRaiseF)
       }
   }
 
@@ -553,12 +557,13 @@ class ApolloClient[F[_], P, S](
           for {
             _ <- s"Current subscriptions: [${subscriptions.keySet}]".traceF
             _ <- subscriptions.get(subscriptionId) match {
-                   case None               => F.raiseError(new InvalidSubscriptionIdException(subscriptionId))
+                   case None               =>
+                     F.raiseError(new InvalidSubscriptionOperationException("stop", subscriptionId))
                    case Some(subscription) => subscription.halt
                  }
           } yield ()
         case s @ _                               =>
-          s"UNEXPECTED haltSubscription for subscription [$subscriptionId]. State is: [$s]".raiseError
+          InvalidSubscriptionOperationException("stop", subscriptionId).logAndRaiseF
       }
 
   private def createSubscription[D](
@@ -631,12 +636,12 @@ class ApolloClient[F[_], P, S](
 
         buildQueue[D](request).flatMap { case (id, emitter) =>
           def acquire: F[Unit] =
-            s"Acquiring queue for subscription [$id]".debugF >>
+            s"Acquiring queue for subscription [$id]".traceF >>
               stateModify {
                 case Initialized(cid, c, subscriptions, i)                          =>
                   Initialized(cid, c, subscriptions + (id -> emitter), i) -> F.unit
                 case s @ Initializing(_, _, _, _, latch)                            =>
-                  s -> (latch.get.rethrow >> acquire)
+                  s -> (latch.resolve >> acquire)
                 case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
                   Reestablishing(
                     cid,
@@ -647,16 +652,17 @@ class ApolloClient[F[_], P, S](
                   ) ->
                     F.unit
                 case s @ _                                                          =>
-                  s -> s"UNEXPECTED acquire for subscription [$id]. State is: [$s]".raiseError.void
+                  s ->
+                    InvalidSubscriptionOperationException("acquire queue", id).logAndRaiseF
               }
 
           def release: F[Unit] =
-            s"Releasing queue for subscription[$id]".debugF >>
+            s"Releasing queue for subscription[$id]".traceF >>
               stateModify {
                 case Initialized(cid, c, subscriptions, i)                          =>
                   Initialized(cid, c, subscriptions - id, i) -> F.unit
                 case s @ Initializing(_, _, _, _, latch)                            =>
-                  s -> (latch.get.rethrow >> release)
+                  s -> (latch.resolve >> release)
                 case Reestablishing(cid, subscriptions, i, connectLatch, initLatch) =>
                   Reestablishing(cid, subscriptions - id, i, connectLatch, initLatch) ->
                     F.unit
@@ -665,7 +671,8 @@ class ApolloClient[F[_], P, S](
                   // It may happen if protocol was terminated or client disconnected and we are halting streams.
                   s -> F.unit
                 case s @ _                                                          =>
-                  s -> s"UNEXPECTED release for subscription [$id]. State is: [$s]".raiseError.void
+                  s ->
+                    InvalidSubscriptionOperationException("release queue", id).logAndRaiseF
               }
 
           def sendStart: F[Unit] = state.get.flatMap {
@@ -673,21 +680,21 @@ class ApolloClient[F[_], P, S](
             case Initialized(_, currentConnection, _, _) =>
               currentConnection.send(StreamingMessage.FromClient.Start(id, request))
             case Initializing(_, _, _, _, latch)         =>
-              latch.get.rethrow >> sendStart
+              latch.resolve >> sendStart
             case Reestablishing(_, _, _, _, initLatch)   =>
-              initLatch.get.rethrow >> sendStart
+              initLatch.resolve >> sendStart
             case s @ _                                   =>
-              s"UNEXPECTED sendStart for subscription [$id]. State is: [$s]".raiseError.void
+              InvalidSubscriptionOperationException("send start", id).logAndRaiseF
           }
 
           val stream =
             Stream
               .fromQueueUnterminated(emitter.queue)
-              .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".debugF)
+              .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".traceF)
               .unNoneTerminate
               .evalMap(errorPolicy.process(_))
               .onFinalizeCase(c =>
-                s"Stream for subscription [$id] finalized with ExitCase [$c]".debugF >>
+                s"Stream for subscription [$id] finalized with ExitCase [$c]".traceF >>
                   (c match { // If canceled, we don't want to clean up. Other fibers may be evaluating the stream. Clients can explicitly call `stop()`.
                     case Resource.ExitCase.Canceled => F.unit
                     case _                          => release
@@ -697,12 +704,13 @@ class ApolloClient[F[_], P, S](
           (acquire >> sendStart).as(createSubscription(stream, id))
         }
       case Initializing(_, _, _, _, latch)       =>
-        latch.get.rethrow >> startSubscription(subscription, operationName, variables, errorPolicy)
+        latch.resolve >>
+          startSubscription(subscription, operationName, variables, errorPolicy)
       case Reestablishing(_, _, _, _, initLatch) =>
-        initLatch.get.rethrow >>
+        initLatch.resolve >>
           startSubscription(subscription, operationName, variables, errorPolicy)
       case _                                     =>
-        "NOT INITIALIZED".raiseError
+        ConnectionNotInitializedException.logAndRaiseF_
     }
 
   private def sendStop(subscriptionId: String): F[Unit] =
@@ -711,7 +719,7 @@ class ApolloClient[F[_], P, S](
       case Initialized(_, currentConnection, _, _) =>
         currentConnection.send(StreamingMessage.FromClient.Stop(subscriptionId))
       case s @ _                                   =>
-        s"UNEXPECTED sendStop for subscription [$subscriptionId]. State is: [$s]".raiseError.void
+        InvalidSubscriptionOperationException("send stop", subscriptionId).logAndRaiseF
     }
 
   // </GraphQLStreamingClient Helpers>

@@ -5,7 +5,7 @@ lazy val scala3Version      = "3.4.2"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-ThisBuild / tlBaseVersion              := "0.38"
+ThisBuild / tlBaseVersion              := "0.39"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
@@ -170,10 +170,11 @@ lazy val sbtPlugin = project
     addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
     addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
     buildInfoPackage   := "clue.sbt",
-    buildInfoKeys      := Seq[BuildInfoKey](version,
-                                       organization,
-                                       "rulesModule" -> (genRules / moduleName).value,
-                                       "coreModule"  -> (core.jvm / moduleName).value
+    buildInfoKeys      := Seq[BuildInfoKey](
+      version,
+      organization,
+      "rulesModule" -> (genRules / moduleName).value,
+      "coreModule"  -> (core.jvm / moduleName).value
     ),
     buildInfoOptions += BuildInfoOption.PackagePrivate,
     Test / test        := {
