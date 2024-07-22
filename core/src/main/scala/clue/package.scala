@@ -52,6 +52,9 @@ package object clue {
     def logAndRaiseF_[F[_], A](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[A] =
       logger.error(t)("") >> F.raiseError[A](t)
 
+    def raiseF[F[_]](implicit F: MonadError[F, Throwable]): F[Unit] =
+      F.raiseError(t)
+
     def logF[F[_]](
       msg: String
     )(implicit logger: Logger[F]): F[Unit] =

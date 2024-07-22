@@ -36,7 +36,7 @@ object Demo extends IOApp.Simple {
   object Query extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
     override val document: String = """
       |query {
-      |  observations(WHERE: {programId: {EQ: "p-2"}}) {
+      |  observations(WHERE: {program: {id: {EQ: "p-2"}}}) {
       |    matches {
       |      id
       |      title
@@ -75,14 +75,22 @@ object Demo extends IOApp.Simple {
   def withLogger[F[_]: Sync]: Resource[F, Logger[F]] =
     Resource.make(Slf4jLogger.create[F])(_ => Applicative[F].unit)
 
+  def initPayload[F[_]: Sync]: F[Map[String, Json]] =
+    Sync[F]
+      .delay(sys.env.get("ODB_SERVICE_JWT"))
+      .map(
+        _.map(token => Map("Authorization" -> Json.fromString(s"Bearer $token")))
+          .getOrElse(Map.empty)
+      )
+
   def withStreamingClient[F[_]: Async: Logger]: Resource[F, WebSocketClient[F, DemoDB]] =
     for {
       client <- Resource.eval(JdkWSClient.simple)
       backend = Http4sWebSocketBackend(client)
-      uri     = uri"wss://lucuma-odb-development.herokuapp.com/ws"
+      uri     = uri"wss://lucuma-postgres-odb-dev.herokuapp.com/ws"
       sc     <-
         Resource.eval(Http4sWebSocketClient.of[F, DemoDB](uri)(using Async[F], Logger[F], backend))
-      _      <- Resource.make(sc.connect() >> sc.initialize())(_ => sc.terminate() >> sc.disconnect())
+      _      <- Resource.make(sc.connect(initPayload))(_ => sc.disconnect())
     } yield sc
 
   val allStatus =

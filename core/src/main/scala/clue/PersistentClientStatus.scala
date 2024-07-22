@@ -10,8 +10,6 @@ sealed trait PersistentClientStatus
 object PersistentClientStatus {
   case object Connecting   extends PersistentClientStatus
   case object Connected    extends PersistentClientStatus
-  case object Initializing extends PersistentClientStatus
-  case object Initialized  extends PersistentClientStatus
   case object Disconnected extends PersistentClientStatus
 
   implicit val eqStreamingClientStatus: Eq[PersistentClientStatus]     = Eq.fromUniversalEquals
