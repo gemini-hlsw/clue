@@ -118,21 +118,15 @@ trait StreamingClient[F[_], S] extends FetchClientWithPars[F, Unit, S] {
  * A client that keeps a connection open and initializable protocol with the server.
  */
 trait PersistentClient[F[_], CP, CE] {
-  // protected val backend: PersistentBackend[F, CP, CE]
-  // protected val reconnectionStrategy: ReconnectionStrategy[CE]
-
   def status: F[PersistentClientStatus]
   def statusStream: fs2.Stream[F, PersistentClientStatus]
 
-  def connect(): F[Unit]
   // Initialization may repeat upon reconnection, that's why the payload is effectful since it may change over time (eg: auth tokens).
-  def initialize(payload: F[Map[String, Json]]): F[Unit]
+  def connect(payload: F[Map[String, Json]]): F[Unit]
+  def connect(): F[Unit]
 
-  def terminate(): F[Unit]
   def disconnect(closeParameters: CP): F[Unit]
   def disconnect(): F[Unit]
-
-  def reestablish(): F[Unit]
 }
 
 /**
