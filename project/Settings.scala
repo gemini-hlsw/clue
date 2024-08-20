@@ -16,7 +16,7 @@ object Settings {
     val http4sJDKClient          = "0.9.1"
     val jawn                     = "1.3.2"
     val log4Cats                 = "2.7.0"
-    val monocle                  = "3.2.0"
+    val monocle                  = "3.3.0"
     val munit                    = "1.0.0"
     val munitCatsEffect          = "2.0.0"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion

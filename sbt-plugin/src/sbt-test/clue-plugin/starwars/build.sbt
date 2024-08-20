@@ -5,6 +5,6 @@ lazy val app = project
   .enablePlugins(CluePlugin)
   .settings(
     libraryDependencies ++= Seq(
-      "dev.optics" %% "monocle-macro" % "3.2.0"
+      "dev.optics" %% "monocle-macro" % "3.3.0"
     )
   )
