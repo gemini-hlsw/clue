@@ -7,8 +7,8 @@ import cats.syntax.all.*
 
 case class CloseParams(code: Option[Int] = none, reason: Option[String] = none)
 object CloseParams {
-  def apply(code:   Int): CloseParams    = CloseParams(code = code.some)
-  def apply(reason: String): CloseParams = CloseParams(reason = reason.some)
+  def apply(code:   Int): CloseParams               = CloseParams(code = code.some)
+  def apply(reason: String): CloseParams            = CloseParams(reason = reason.some)
   def apply(code: Int, reason: String): CloseParams =
     CloseParams(code = code.some, reason = reason.some)
 }
