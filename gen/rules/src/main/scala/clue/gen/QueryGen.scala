@@ -331,7 +331,7 @@ trait QueryGen extends Generator {
                 _._1 match {
                   case UntypedInlineFragment(typeName, _, _) =>
                     typeName // Selection in inline fragment, group by discriminator
-                  case _                                     =>
+                  case _ =>
                     none // Selection in base group, group by none
                 }
               }
