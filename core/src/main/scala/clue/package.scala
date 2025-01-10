@@ -2,12 +2,16 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 import cats.Eq
+import cats.Applicative
 import cats.Functor
 import cats.MonadError
+import cats.data.Ior
 import cats.effect.Concurrent
 import cats.effect.Deferred
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
+import clue.model.GraphQLResponse
+import fs2.Pipe
 import org.typelevel.log4cats.Logger
 
 package object clue {
@@ -66,6 +70,17 @@ package object clue {
     def debugF[F[_]](msg: String)(implicit logger: Logger[F]): F[Unit] =
       logger.debug(t)(msg)
   }
+
+  def ignoreSubscriptionErrors[F[_], D](
+    onError: ResponseException[D] => F[Unit]
+  )(implicit F: Applicative[F]): Pipe[F, GraphQLResponse[D], D] =
+    _.evalTap(_.result match {
+      case Ior.Left(a)    => onError(ResponseException(a, none))
+      case Ior.Right(b)   => F.unit
+      case Ior.Both(a, b) => onError(ResponseException(a, b.some))
+    })
+      .map(_.data)
+      .flattenOption
 }
 
 package clue {

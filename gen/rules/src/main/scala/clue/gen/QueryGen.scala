@@ -574,21 +574,28 @@ trait QueryGen extends Generator {
                 )
               case _: UntypedSubscription =>
                 // param"implicit errorPolicy: clue.ErrorPolicy"
-                val epiParam    = Term.Param(
+                val epiParam     = Term.Param(
                   mods = List(Mod.Implicit()),
                   name = Name("errorPolicy"),
                   decltpe = t"clue.ErrorPolicy".some,
                   default = none
                 )
                 // param"implicit client: clue.StreamingClient[F, $schemaType]"
-                val clientParam = Term.Param(
+                val clientParam  = Term.Param(
                   mods = List(Mod.Implicit()),
                   name = Name("client"),
                   decltpe = t"clue.StreamingClient[F, $schemaType]".some,
                   default = none
                 )
+                val onErrorParam = Term.Param(
+                  mods = List.empty,
+                  name = Name("onError"),
+                  decltpe = t"clue.ResponseException[Data] => F[Unit]".some,
+                  default = none
+                )
                 List(
-                  q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this).withInput(Variables(...$variablesNames))"
+                  q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this).withInput(Variables(...$variablesNames))",
+                  q"def subscribe[F[_]: cats.Applicative](...${(List(onErrorParam) :: paramss) :+ List(clientParam)}) = client.subscribe(this)(clue.ErrorPolicy.ReturnAlways).withInput(Variables(...$variablesNames)).map(_.through(clue.ignoreSubscriptionErrors(onError)))"
                 )
             })
         }
