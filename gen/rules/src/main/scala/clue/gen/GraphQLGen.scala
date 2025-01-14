@@ -84,7 +84,8 @@ class GraphQLGen(config: GraphQLGenConfig)
                 indented(obj)(
                   List(
                     q"sealed trait ${Type.Name(objName)}".toString,
-                    q"..$newMods object ${Term.Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
+                    q"..$newMods object ${Term
+                        .Name(objName)} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
                   ).mkString("\n")
                 )
               ) + Patch.removeGlobalImport(GraphQLSchemaAnnotation.symbol)
@@ -157,7 +158,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                             indented(obj)(
                               List(
                                 q"..$newMods object ${Term
-                                    .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
+                                    .Name(objName)} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
                               ).mkString("\n")
                             )
                           ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
@@ -242,7 +243,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                             indented(obj)(
                               List(
                                 q"..$newMods object ${Term
-                                    .Name(objName)} extends {..$early} with ..$inits { $self => ..${modObjDefs(stats)} }".toString
+                                    .Name(objName)} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
                               ).mkString("\n")
                             )
                           ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)

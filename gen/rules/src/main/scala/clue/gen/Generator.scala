@@ -168,6 +168,33 @@ trait Generator {
     ): List[Stat] => List[Stat]
   }
 
+  protected[this] def buildTemplate(
+    early: List[Stat],
+    inits: List[Init],
+    body:  Option[(Option[Self], List[Stat])] = None
+  ): Template =
+    (early, body) match {
+      case (Nil, None)                     =>
+        template"..$inits"
+      case (Nil, Some((None, defs)))       =>
+        template"..$inits { ..$defs }"
+      case (Nil, Some((self, defs)))       =>
+        template"..$inits { $self => ..$defs }"
+      case (someEarly, None)               =>
+        template"{..$someEarly} with ..$inits"
+      case (someEarly, Some((None, defs))) =>
+        template"{..$someEarly} with ..$inits { ..$defs }"
+      case (someEarly, Some((self, defs))) =>
+        template"{..$someEarly} with ..$inits { $self => ..$defs }"
+    }
+
+  protected[this] def buildTemplate(
+    early: List[Stat],
+    inits: List[Init],
+    body:  (Option[Self], List[Stat])
+  ): Template =
+    buildTemplate(early, inits, body.some)
+
   /**
    * Compute a case class definition.
    */
@@ -184,8 +211,7 @@ trait Generator {
           val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
 
           (newParentBody :+
-             //  q"case class ${Type.Name(name)}(..$pars) extends ..$earlyDefs with ..$allParents",
-             q"case class ${Type.Name(name)}(..$pars) extends {..$early} with ..$allInits",
+             q"case class ${Type.Name(name)}(..$pars) ${buildTemplate(early, allInits)}",
            true
           )
       }
@@ -284,7 +310,7 @@ trait Generator {
         val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
 
         (newParentBody :+
-           q"sealed trait ${Type.Name(name)} extends { ..$early } with ..$allInits { ..${pars.map(paramToVal)} }",
+           q"sealed trait ${Type.Name(name)} ${buildTemplate(early, allInits, (none, pars.map(paramToVal)))}",
          true
         )
     }
@@ -425,8 +451,7 @@ trait Generator {
             circeDecoder,
             TypeType.Enum(enumValues),
             _ ++ enumValues.map { enumValue =>
-              // q"case object ${TermName(enumValue.className)} extends ..$early with ..$allInit"
-              q"case object ${Term.Name(enumValue.className)} extends {..$early} with ..$allInits"
+              q"case object ${Term.Name(enumValue.className)} ${buildTemplate(early, allInits)}"
             }
           )(
             newParentBody :+ q"sealed trait ${Type.Name(name)}"
@@ -468,7 +493,7 @@ trait Generator {
             case Defn.Object(mods, objName, Template.Initial(early, inits, self, body))
                 if objName.value == moduleName =>
               (
-                newStats :+ q"..$mods object $objName extends {..$early} with ..$inits { $self => ..${bodyMod(body)} }", // ${Template(early, inits, self, bodyMod(body))}",
+                newStats :+ q"..$mods object $objName ${buildTemplate(early, inits, (self.some, bodyMod(body)))}",
                 true
               )
             case other =>
