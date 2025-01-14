@@ -97,6 +97,6 @@ object LucumaQuery extends GraphQLOperation[LucumaODB] {
   val varEncoder: io.circe.Encoder.AsObject[Variables] = Variables.jsonEncoderVariables
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
   def apply[F[_]]: clue.ClientAppliedF[F, LucumaODB, ClientAppliedFP] = new clue.ClientAppliedF[F, LucumaODB, ClientAppliedFP] { def applyP[P](client: clue.FetchClientWithPars[F, P, LucumaODB]) = new ClientAppliedFP(client) }
-  class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, LucumaODB]) { def query(modParams: P => P = identity)(implicit errorPolicy: clue.ErrorPolicy) = client.request(LucumaQuery).withInput(Variables(), modParams) }
+  class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, LucumaODB]) { def query(modParams: P => P = identity) = client.request(LucumaQuery).withInput(Variables(), modParams) }
 }
 // format: on

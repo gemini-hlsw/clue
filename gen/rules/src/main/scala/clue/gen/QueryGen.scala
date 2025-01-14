@@ -535,15 +535,6 @@ trait QueryGen extends Generator {
               case other                           => throw new Exception(s"Unexpected param structure [$other]")
             })
             .toList
-          // param"implicit errorPolicy: clue.ErrorPolicy"
-          val epiParam       = List(
-            Term.Param(
-              mods = List(Mod.Implicit()),
-              name = Name("errorPolicy"),
-              decltpe = t"clue.ErrorPolicy".some,
-              default = none
-            )
-          )
           val applied        =
             q"""def apply[F[_]]: clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] =
                   new clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] {
@@ -555,7 +546,7 @@ trait QueryGen extends Generator {
                 List(
                   applied,
                   q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
-                      def query(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
+                      def query(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail}) =
                         client.request(${Term
                       .Name(objName)}).withInput(Variables(...$variablesNames), modParams)
                     }
@@ -566,20 +557,13 @@ trait QueryGen extends Generator {
                 List(
                   applied,
                   q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
-                      def execute(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail :+ epiParam}) =
+                      def execute(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail}) =
                         client.request(${Term
                       .Name(objName)}).withInput(Variables(...$variablesNames), modParams)
                     }
                   """
                 )
               case _: UntypedSubscription =>
-                // param"implicit errorPolicy: clue.ErrorPolicy"
-                val epiParam    = Term.Param(
-                  mods = List(Mod.Implicit()),
-                  name = Name("errorPolicy"),
-                  decltpe = t"clue.ErrorPolicy".some,
-                  default = none
-                )
                 // param"implicit client: clue.StreamingClient[F, $schemaType]"
                 val clientParam = Term.Param(
                   mods = List(Mod.Implicit()),
@@ -588,7 +572,7 @@ trait QueryGen extends Generator {
                   default = none
                 )
                 List(
-                  q"def subscribe[F[_]](...${paramss :+ List(clientParam, epiParam)}) = client.subscribe(this).withInput(Variables(...$variablesNames))"
+                  q"def subscribe[F[_]](...${paramss :+ List(clientParam)}) = client.subscribe(this).withInput(Variables(...$variablesNames))"
                 )
             })
         }

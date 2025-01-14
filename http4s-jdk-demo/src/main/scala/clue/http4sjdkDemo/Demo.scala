@@ -10,7 +10,6 @@ import cats.effect.IOApp
 import cats.effect.Resource
 import cats.effect.Sync
 import cats.syntax.all.*
-import clue.ErrorPolicy
 import clue.FetchClient
 import clue.GraphQLOperation
 import clue.http4s.Http4sWebSocketBackend
@@ -30,8 +29,6 @@ import scala.util.Random
 
 object Demo extends IOApp.Simple {
   type DemoDB
-
-  implicit private val DefaultErrorPolicy: ErrorPolicy.ReturnAlways.type = ErrorPolicy.ReturnAlways
 
   object Query extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
     override val document: String = """
@@ -128,7 +125,7 @@ object Demo extends IOApp.Simple {
           _              <- IO.sleep(10.seconds)
           _              <- close
           _              <- fiber.join
-          result         <- client.request(Query)(ErrorPolicy.RaiseAlways)
+          result         <- client.request(Query).apply.raiseGraphQLErrors
           _              <- IO.println(result)
 
         } yield ()

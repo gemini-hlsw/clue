@@ -6,9 +6,13 @@ package clue.model
 import cats.Applicative
 import cats.Eq
 import cats.Eval
+import cats.MonadThrow
 import cats.Traverse
 import cats.data.Ior
+import cats.effect.Resource
 import cats.syntax.all.*
+import clue.ResponseException
+import org.typelevel.log4cats.Logger
 
 /**
  * A GraphQL response.
@@ -44,13 +48,13 @@ final case class GraphQLResponse[D](
 }
 
 object GraphQLResponse {
-  def errors[D](e: GraphQLErrors): GraphQLResponse[D] =
+  final def errors[D](e: GraphQLErrors): GraphQLResponse[D] =
     GraphQLResponse(Ior.left(e))
 
-  implicit def eqGraphQLResponse[D: Eq]: Eq[GraphQLResponse[D]] =
+  final implicit def eqGraphQLResponse[D: Eq]: Eq[GraphQLResponse[D]] =
     Eq.by(x => (x.result, x.extensions))
 
-  implicit val traverseGraphQLResponse: Traverse[GraphQLResponse] =
+  final implicit val traverseGraphQLResponse: Traverse[GraphQLResponse] =
     new Traverse[GraphQLResponse] {
       def traverse[G[_], A, B](fa: GraphQLResponse[A])(f: A => G[B])(implicit
         G: Applicative[G]
@@ -65,4 +69,57 @@ object GraphQLResponse {
       ): cats.Eval[E] =
         fa.foldRight(lb)(f)
     }
+
+  final implicit class GreaphQLResponseOps[F[_], D](
+    val response: F[GraphQLResponse[D]]
+  ) extends AnyVal {
+    def raiseGraphQLErrors(implicit F: MonadThrow[F]): F[D] =
+      response.map(_.result).flatMap {
+        case Ior.Right(b)   => F.pure(b)
+        case Ior.Both(e, b) => F.raiseError(ResponseException(e, b.some))
+        case Ior.Left(e)    => F.raiseError(ResponseException(e, none))
+      }
+
+    def raiseGraphQLErrorsOnNoData(implicit F: MonadThrow[F]): F[D] =
+      response.map(_.result).flatMap {
+        case Ior.Right(b)   => F.pure(b)
+        case Ior.Both(_, b) => F.pure(b)
+        case Ior.Left(e)    => F.raiseError(ResponseException(e, none))
+      }
+  }
+
+  final implicit class GreaphQLResponseResourceStreamOps[F[_], D](
+    val streamResource: Resource[F, fs2.Stream[F, GraphQLResponse[D]]]
+  ) extends AnyVal {
+    def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
+      streamResource.map(
+        _.through(
+          _.map(_.result).collect {
+            case Ior.Right(b)   => b
+            case Ior.Both(_, b) => b
+          }
+        )
+      )
+
+    def handleGraphQLErrors(
+      onError: ResponseException[D] => F[Unit]
+    )(implicit F: Applicative[F]): Resource[F, fs2.Stream[F, D]] =
+      streamResource.map(
+        _.through(
+          _.evalTap(_.result match {
+            case Ior.Left(a)    => onError(ResponseException(a, none))
+            case Ior.Right(b)   => F.unit
+            case Ior.Both(a, b) => onError(ResponseException(a, b.some))
+          })
+            .map(_.data)
+            .flattenOption
+        )
+      )
+
+    def logGraphQLErrors(implicit
+      F:      Applicative[F],
+      logger: Logger[F]
+    ): Resource[F, fs2.Stream[F, D]] =
+      handleGraphQLErrors(e => logger.error(e)(e.getMessage))
+  }
 }
