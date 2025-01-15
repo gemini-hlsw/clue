@@ -18,17 +18,17 @@ object syntax {
     val response: F[GraphQLResponse[D]]
   ) extends AnyVal {
     def raiseGraphQLErrors(implicit F: MonadThrow[F]): F[D] =
-      new GraphQLResponse.GreaphQLResponseOps(response).raiseGraphQLErrors
+      new GraphQLResponse.GraphQLResponseOps(response).raiseGraphQLErrors
 
     def raiseGraphQLErrorsOnNoData(implicit F: MonadThrow[F]): F[D] =
-      new GraphQLResponse.GreaphQLResponseOps(response).raiseGraphQLErrorsOnNoData
+      new GraphQLResponse.GraphQLResponseOps(response).raiseGraphQLErrorsOnNoData
   }
 
   final implicit class GreaphQLResponseResourceStreamOps[F[_], D](
     val streamResource: Resource[F, fs2.Stream[F, GraphQLResponse[D]]]
   ) extends AnyVal {
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
-      new GraphQLResponse.GreaphQLResponseResourceStreamOps(streamResource).ignoreGraphQLErrors
+      new GraphQLResponse.GraphQLResponseResourceStreamOps(streamResource).ignoreGraphQLErrors
 
     def handleGraphQLErrors(
       onError: ResponseException[D] => F[Unit]
@@ -40,6 +40,6 @@ object syntax {
       F:      Applicative[F],
       logger: Logger[F]
     ): Resource[F, fs2.Stream[F, D]] =
-      new GraphQLResponse.GreaphQLResponseResourceStreamOps(streamResource).logGraphQLErrors
+      new GraphQLResponse.GraphQLResponseResourceStreamOps(streamResource).logGraphQLErrors
   }
 }
