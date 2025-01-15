@@ -70,7 +70,7 @@ object GraphQLResponse {
         fa.foldRight(lb)(f)
     }
 
-  final implicit class GreaphQLResponseOps[F[_], D](
+  final implicit class GraphQLResponseOps[F[_], D](
     val response: F[GraphQLResponse[D]]
   ) extends AnyVal {
     def raiseGraphQLErrors(implicit F: MonadThrow[F]): F[D] =
@@ -88,7 +88,7 @@ object GraphQLResponse {
       }
   }
 
-  final implicit class GreaphQLResponseResourceStreamOps[F[_], D](
+  final implicit class GraphQLResponseResourceStreamOps[F[_], D](
     val streamResource: Resource[F, fs2.Stream[F, GraphQLResponse[D]]]
   ) extends AnyVal {
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
@@ -116,10 +116,10 @@ object GraphQLResponse {
         )
       )
 
-    def logGraphQLErrors(implicit
+    def logGraphQLErrors(msg: ResponseException[D] => String)(implicit
       F:      Applicative[F],
       logger: Logger[F]
     ): Resource[F, fs2.Stream[F, D]] =
-      handleGraphQLErrors(e => logger.error(e)(e.getMessage))
+      handleGraphQLErrors(e => logger.error(e)(msg(e)))
   }
 }
