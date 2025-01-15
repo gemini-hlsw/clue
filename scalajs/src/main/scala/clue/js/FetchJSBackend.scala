@@ -28,11 +28,11 @@ object FetchMethod {
   case object POST extends FetchMethod
 }
 
-final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
-    extends FetchBackend[F, FetchJSRequest] {
+final class FetchJsBackend[F[_]: Async](fetchMethod: FetchMethod)
+    extends FetchBackend[F, FetchJsRequest] {
   override def request[V: Encoder](
     request:     GraphQLRequest[V],
-    baseRequest: FetchJSRequest
+    baseRequest: FetchJsRequest
   ): F[String] =
     Async[F].async { cb =>
       val controller = new AbortController()
@@ -80,7 +80,7 @@ final class FetchJSBackend[F[_]: Async](fetchMethod: FetchMethod)
     }
 }
 
-object FetchJSBackend {
-  def apply[F[_]: Async](method: FetchMethod = FetchMethod.POST): FetchJSBackend[F] =
-    new FetchJSBackend[F](method)
+object FetchJsBackend {
+  def apply[F[_]: Async](method: FetchMethod = FetchMethod.POST): FetchJsBackend[F] =
+    new FetchJsBackend[F](method)
 }

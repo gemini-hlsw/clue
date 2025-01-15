@@ -1,13 +1,13 @@
 # clue
 
-Experimental GraphQL client.
+Experimental GraphQL client for Scala and Scala.js.
 
 ## Usage
 
 ### 1) Create a client
 
 Either:
-  * A `TransactionalClient[F[_], S]` (supporting queries and mutations), or
+  * A `FetchClient[F[_], S]` (supporting queries and mutations), or
   * A `StreamingClient[F[_], S]` (supporting queries, mutations and subscriptions).
 
   `S` is a type denoting the schema. It can be any type, even a phantom type. It's only used to type-match clients and operations.
@@ -15,27 +15,45 @@ Either:
 #### Example
 
 ``` scala
-  import clue._
-  import clue.js._
+  import clue.*
   import cats.effect.IO
-  import org.typelevel.log4cats.Logger
 
   sealed trait StarWars
 
-  implicit val backend: Backend[IO] = AjaxJSBackend[IO]
-  val transactionalClient: TransactionalClient[IO, StarWars] = 
-    TransactionalClient.of[IO, Schema]("https://starwars.com/graphql")
+  // Scala JVM and Scala.js with http4s Ember client
+  import org.http4s.ember.client.EmberClientBuilder
 
-  implicit val streamingBackend: StreamingBackend[IO] = WebSocketJSBackend[IO]
+  EmberClientBuilder
+    .default[IO]
+    .build
+    .use: client => 
+      given Backend[IO] = Http4sHttpBackend[IO](client)
+      val fetchClient: FetchClient[IO, StarWars] = 
+        Http4sHttpClient.of[IO, StarWars]("https://starwars.com/graphql")
+    
+  // Scala JVM with JDK WS client behind http4s
+  import import org.http4s.jdkhttpclient.JdkWSClient
+
+  JdkWSClient
+    .simple[IO]
+    .use: client =>
+      given StreamingBackend[IO] = Http4sWebSocketBackend[IO](client)
+      val streamingClient: StreamingClient[IO, StarWars] = 
+        Http4sWebSocketClient.of[IO, StarWars]("wss://starwars.com/graphql")
+
+
+  // Scala.js with default fetch/WS client
+  import clue.js.*
+
+  given Backend[IO] = AjaxJSBackend[IO]
+  val fetchClient: FetchClient[IO, StarWars] = 
+    FetchJsClient.of[IO, StarWars]("https://starwars.com/graphql")
+
+  // Streaming doesn't require Apollo, it just follows the Apollo protocol for GraphQL over WS
+  given StreamingBackend[IO] = WebSocketJsBackend[IO]
   val streamingClient: StreamingClient[IO, StarWars] = 
-    ApolloStreamingClient.of[IO, Schema]("wss://starwars.com/graphql")
+    ApolloStreamingClient.of[IO, StarWars]("wss://starwars.com/graphql")
 ```
-
-NOTES: 
-* `ApolloStreamingClient` implements the "de facto" Apollo protocol for streaming over web sockets.
-* The `TransactionalClient.of` constructor requires an implicit instance of a `Backend[F]`. An `AjaxJSBackend[F]` is provided for Scala.js.
-* The `ApolloStreamingClient.of` constructor requires an implicit instance of a `StreamingBackend[F]`. A `WebSocketJSBackend[F]` is provided for Scala.js.
-
 
 ### 2) Create operations
 
@@ -86,7 +104,7 @@ They must extend `GraphQLOperation[S]`, defining the following members:
 #### Example
 
 ``` scala
-transactionalClient.request(CharacterQuery)(CharacterQuery.Variables("0001"))
+fetchClient.request(CharacterQuery)(CharacterQuery.Variables("0001"))
   .forEach(println).unsafeRunSync()
 
 # Data(Some(Character("0001", Some("Luke"))))

@@ -5,4 +5,4 @@ package clue.js
 
 import org.scalajs.dom.Headers
 
-final case class FetchJSRequest(uri: String, headers: Headers)
+final case class FetchJsRequest(uri: String, headers: Headers)

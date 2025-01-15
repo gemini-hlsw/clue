@@ -6,7 +6,7 @@ package clue
 import clue.websocket.ApolloClient
 
 package object js {
-  type FetchJSClient[F[_], S] = FetchClientWithPars[F, FetchJSRequest, S]
+  type FetchJsClient[F[_], S] = FetchClientWithPars[F, FetchJsRequest, S]
 
-  type WebSocketJSClient[F[_], S] = ApolloClient[F, String, S]
+  type WebSocketJsClient[F[_], S] = ApolloClient[F, String, S]
 }

@@ -73,8 +73,8 @@ lazy val scalaJS = project
     moduleName      := "clue-scalajs",
     coverageEnabled := false,
     libraryDependencies ++=
-      Settings.Libraries.ScalaJSDom.value ++
-        Settings.Libraries.ScalaJSMacrotaskExecutor.value
+      Settings.Libraries.ScalaJsDom.value ++
+        Settings.Libraries.ScalaJsMacrotaskExecutor.value
   )
   .dependsOn(core.js)
 

@@ -5,7 +5,7 @@
 /*
   rules = [GraphQLGen]
   GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
-  GraphQLGen.scalaJSReactReuse = true
+  GraphQLGen.scalaJsReactReuse = true
  */
 package test
 
