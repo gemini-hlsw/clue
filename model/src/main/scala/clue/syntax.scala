@@ -14,7 +14,7 @@ import org.typelevel.log4cats.Logger
 // if it's invoked with a generic F, the compiler won't pick those up
 // and importing this is necessary.
 object syntax {
-  final implicit class GreaphQLResponseOps[F[_], D](
+  final implicit class GraphQLResponseOps[F[_], D](
     val response: F[GraphQLResponse[D]]
   ) extends AnyVal {
     def raiseGraphQLErrors(implicit F: MonadThrow[F]): F[D] =
@@ -24,7 +24,7 @@ object syntax {
       new GraphQLResponse.GraphQLResponseOps(response).raiseGraphQLErrorsOnNoData
   }
 
-  final implicit class GreaphQLResponseResourceStreamOps[F[_], D](
+  final implicit class GraphQLResponseResourceStreamOps[F[_], D](
     val streamResource: Resource[F, fs2.Stream[F, GraphQLResponse[D]]]
   ) extends AnyVal {
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
@@ -33,13 +33,13 @@ object syntax {
     def handleGraphQLErrors(
       onError: ResponseException[D] => F[Unit]
     )(implicit F: Applicative[F]): Resource[F, fs2.Stream[F, D]] =
-      new GraphQLResponse.GreaphQLResponseResourceStreamOps(streamResource)
+      new GraphQLResponse.GraphQLResponseResourceStreamOps(streamResource)
         .handleGraphQLErrors(onError)
 
-    def logGraphQLErrors(implicit
+    def logGraphQLErrors(msg: ResponseException[D] => String)(implicit
       F:      Applicative[F],
       logger: Logger[F]
     ): Resource[F, fs2.Stream[F, D]] =
-      new GraphQLResponse.GraphQLResponseResourceStreamOps(streamResource).logGraphQLErrors
+      new GraphQLResponse.GraphQLResponseResourceStreamOps(streamResource).logGraphQLErrors(msg)
   }
 }
