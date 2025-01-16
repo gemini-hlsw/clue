@@ -15,22 +15,21 @@ import org.typelevel.log4cats.Logger
 // Response format from Spec: https://github.com/APIs-guru/graphql-over-http
 // {
 //   "data": { ... }, // Typed
-//   "errors": [ ... ]
+//   "errors": [ ... ],
+//   "extensions": { ... }
 // }
 class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(implicit
   backend: FetchBackend[F, P]
 ) extends clue.FetchClientWithPars[F, P, S] {
-  override protected def requestInternal[D: Decoder, R](
+  override protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String],
     variables:     Option[JsonObject],
-    modParams:     P => P = identity,
-    errorPolicy:   ErrorPolicyProcessor[D, R]
-  ): F[R] =
+    modParams:     P => P = identity
+  ): F[GraphQLResponse[D]] =
     backend
       .request(GraphQLRequest(document, operationName, variables), modParams(requestParams))
       .map(decode[GraphQLResponse[D]])
       .rethrow
-      .flatMap(errorPolicy.process(_))
       .onError(_.warnF("Error executing query:"))
 }

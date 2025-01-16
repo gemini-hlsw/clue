@@ -5,7 +5,7 @@ lazy val scala3Version      = "3.6.2"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
-ThisBuild / tlBaseVersion              := "0.40"
+ThisBuild / tlBaseVersion              := "0.41"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
@@ -41,6 +41,8 @@ lazy val model =
           Settings.Libraries.CatsTestkit.value ++
           Settings.Libraries.Circe.value ++
           Settings.Libraries.DisciplineMUnit.value ++
+          Settings.Libraries.Fs2.value ++
+          Settings.Libraries.Log4Cats.value ++
           Settings.Libraries.Monocle.value ++
           Settings.Libraries.MonocleLaw.value ++
           Settings.Libraries.MUnit.value,

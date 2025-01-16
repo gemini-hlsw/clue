@@ -112,23 +112,21 @@ class ApolloClient[F[_], P, S](
   }
 
   // <StreamingClient>
-  override protected def subscribeInternal[D: Decoder, R](
+  override protected def subscribeInternal[D: Decoder](
     subscription:  String,
     operationName: Option[String],
-    variables:     Option[JsonObject],
-    errorPolicy:   ErrorPolicyProcessor[D, R]
-  ): Resource[F, fs2.Stream[F, R]] =
-    subscriptionResource(subscription, operationName, variables, errorPolicy)
+    variables:     Option[JsonObject]
+  ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
+    subscriptionResource(subscription, operationName, variables)
 
   // <FetchClient>
-  override protected def requestInternal[D: Decoder, R](
+  override protected def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String],
     variables:     Option[JsonObject],
-    modParams:     Unit => Unit,
-    errorPolicy:   ErrorPolicyProcessor[D, R]
-  ): F[R] = F.async[R](cb =>
-    startSubscription[D, R](document, operationName, variables, errorPolicy).flatMap(subscription =>
+    modParams:     Unit => Unit // This is ignored here.
+  ): F[GraphQLResponse[D]] = F.async(cb =>
+    startSubscription[D](document, operationName, variables).flatMap(subscription =>
       subscription.stream.attempt
         .evalMap(result => F.delay(cb(result)))
         .compile
@@ -460,22 +458,20 @@ class ApolloClient[F[_], P, S](
   private def subscriptionResource[D: Decoder, R](
     subscription:  String,
     operationName: Option[String],
-    variables:     Option[JsonObject],
-    errorPolicy:   ErrorPolicyProcessor[D, R]
-  ): Resource[F, fs2.Stream[F, R]] =
+    variables:     Option[JsonObject]
+  ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     Resource
-      .make(startSubscription[D, R](subscription, operationName, variables, errorPolicy))(
+      .make(startSubscription[D](subscription, operationName, variables))(
         _.stop()
           .handleErrorWith(_.logF("Error stopping subscription"))
       )
       .map(_.stream)
 
-  private def startSubscription[D: Decoder, R](
+  private def startSubscription[D: Decoder](
     subscription:  String,
     operationName: Option[String],
-    variables:     Option[JsonObject],
-    errorPolicy:   ErrorPolicyProcessor[D, R]
-  ): F[GraphQLSubscription[F, R]] =
+    variables:     Option[JsonObject]
+  ): F[GraphQLSubscription[F, GraphQLResponse[D]]] =
     state.get.flatMap {
       case Connected(_, _, _, _)         =>
         val request = GraphQLRequest(subscription, operationName, variables)
@@ -521,7 +517,6 @@ class ApolloClient[F[_], P, S](
               .fromQueueUnterminated(emitter.queue)
               .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".traceF)
               .unNoneTerminate
-              .evalMap(errorPolicy.process(_))
               .onFinalizeCase(c =>
                 s"Stream for subscription [$id] finalized with ExitCase [$c]".traceF >>
                   (c match { // If canceled, we don't want to clean up. Other fibers may be evaluating the stream. Clients can explicitly call `stop()`.
@@ -534,7 +529,7 @@ class ApolloClient[F[_], P, S](
         }
       case Connecting(_, _, _, _, latch) =>
         latch.resolve >>
-          startSubscription(subscription, operationName, variables, errorPolicy)
+          startSubscription(subscription, operationName, variables)
       case _                             =>
         ConnectionNotInitializedException.logAndRaiseF_
     }
