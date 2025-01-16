@@ -37,7 +37,7 @@ object Demo extends IOApp.Simple {
       |    matches {
       |      id
       |      title
-      |      status
+      |      subtitle
       |    }
       |  }
       |}""".stripMargin
@@ -46,19 +46,21 @@ object Demo extends IOApp.Simple {
   object Subscription extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
     override val document: String = """
       |subscription {
-      |  observationEdit(programId:"p-2") {
-      |    id
+      |  observationEdit(input: {programId: "p-2"}) {
+      |    value {
+      |      id
+      |    }
       |  }
       |}""".stripMargin
   }
 
   object Mutation extends GraphQLOperation[DemoDB] {
     type Data = Json
-    case class Variables(observationId: String, status: String)
+    case class Variables(observationId: String, subtitle: String)
 
     override val document: String                        = """
-    |mutation ($observationId: ObservationId!, $status: ObsStatus!){
-    |  updateObservations(input: {WHERE: {id: {EQ: $observationId}}, SET: {status: $status}}) {
+    |mutation ($observationId: ObservationId!, $subtitle: String){
+    |  updateObservations(input: {WHERE: {id: {EQ: $observationId}}, SET: {subtitle: $subtitle}}) {
     |    observations {
     |      id
     |    }
@@ -90,13 +92,13 @@ object Demo extends IOApp.Simple {
       _      <- Resource.make(sc.connect(initPayload))(_ => sc.disconnect())
     } yield sc
 
-  val allStatus =
-    List("NEW", "INCLUDED", "PROPOSED", "APPROVED", "FOR_REVIEW", "READY", "ONGOING", "OBSERVED")
+  val allSubtitles =
+    List("Interesting", "Very Interesting", "Extremely Interesting", "Boring", "Very Boring")
 
   def randomMutate(client: FetchClient[IO, DemoDB], ids: List[String]) =
     for {
       id     <- IO(ids(Random.between(0, ids.length)))
-      status <- IO(allStatus(Random.between(0, allStatus.length)))
+      status <- IO(allSubtitles(Random.between(0, allSubtitles.length)))
       _      <-
         client.request(Mutation).withInput(Mutation.Variables(id, status))
     } yield ()
@@ -125,7 +127,7 @@ object Demo extends IOApp.Simple {
           _              <- IO.sleep(10.seconds)
           _              <- close
           _              <- fiber.join
-          result         <- client.request(Query).apply.raiseGraphQLErrors
+          result         <- client.request(Query).raiseGraphQLErrors
           _              <- IO.println(result)
 
         } yield ()
