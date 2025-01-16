@@ -9,19 +9,19 @@ import clue.FetchClientImpl
 import org.scalajs.dom.Headers
 import org.typelevel.log4cats.Logger
 
-object FetchJSClient {
+object FetchJsClient {
   def of[F[_], S](uri: String, name: String = "", headers: Headers = new Headers())(implicit
     F:       MonadThrow[F],
-    backend: FetchJSBackend[F],
+    backend: FetchJsBackend[F],
     logger:  Logger[F]
-  ): F[FetchJSClient[F, S]] = {
-    val logPrefix = s"clue.FetchJSClient[${if (name.isEmpty) uri else name}]"
+  ): F[FetchJsClient[F, S]] = {
+    val logPrefix = s"clue.FetchJsClient[${if (name.isEmpty) uri else name}]"
 
     val internalLogger = logger.withModifiedString(s => s"$logPrefix $s")
 
     Applicative[F].pure(
-      new FetchClientImpl[F, FetchJSRequest, S](
-        FetchJSRequest(uri, headers)
+      new FetchClientImpl[F, FetchJsRequest, S](
+        FetchJsRequest(uri, headers)
       )(using F, internalLogger, backend)
     )
   }

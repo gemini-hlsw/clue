@@ -21,9 +21,9 @@ import org.scalajs.dom.WebSocket
 import org.typelevel.log4cats.Logger
 
 /**
- * Streaming backend for JS WebSocket.
+ * Streaming backend for Js WebSocket.
  */
-final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
+final class WebSocketJsBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
     extends WebSocketBackend[F, String] {
   private val Protocol = "graphql-ws"
 
@@ -44,7 +44,7 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
               for {
                 _ <- isOpen.set(true)
                 _ <- s"WebSocket open for URI [$uri]".traceF
-              } yield cb(new WebSocketJSConnection(ws).asRight)
+              } yield cb(new WebSocketJsConnection(ws).asRight)
             ).uncancelable
             dispatcher.unsafeRunAndForget(open)
           }
@@ -93,12 +93,12 @@ final class WebSocketJSBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
     } yield connection
 }
 
-object WebSocketJSBackend {
-  def apply[F[_]: Async: Logger](dispatcher: Dispatcher[F]): WebSocketJSBackend[F] =
-    new WebSocketJSBackend[F](dispatcher)
+object WebSocketJsBackend {
+  def apply[F[_]: Async: Logger](dispatcher: Dispatcher[F]): WebSocketJsBackend[F] =
+    new WebSocketJsBackend[F](dispatcher)
 }
 
-final class WebSocketJSConnection[F[_]: Sync: Logger](private val ws: WebSocket)
+final class WebSocketJsConnection[F[_]: Sync: Logger](private val ws: WebSocket)
     extends WebSocketConnection[F] {
   override def send(msg: StreamingMessage.FromClient): F[Unit] =
     Sync[F].delay(ws.send(msg.asJson.toString))

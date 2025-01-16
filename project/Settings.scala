@@ -20,8 +20,8 @@ object Settings {
     val munit                    = "1.0.2"
     val munitCatsEffect          = "2.0.0"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
-    val scalaJSDom               = "2.8.0"
-    val scalaJSMacrotaskExecutor = "1.1.1"
+    val scalaJsDom               = "2.8.0"
+    val scalaJsMacrotaskExecutor = "1.1.1"
   }
 
   object Libraries {
@@ -152,15 +152,15 @@ object Settings {
       ).map(_.cross(CrossVersion.full))
     )
 
-    val ScalaJSDom = Def.setting(
+    val ScalaJsDom = Def.setting(
       Seq(
-        "org.scala-js" %%% "scalajs-dom" % scalaJSDom
+        "org.scala-js" %%% "scalajs-dom" % scalaJsDom
       )
     )
 
-    val ScalaJSMacrotaskExecutor = Def.setting(
+    val ScalaJsMacrotaskExecutor = Def.setting(
       Seq(
-        "org.scala-js" %%% "scala-js-macrotask-executor" % scalaJSMacrotaskExecutor
+        "org.scala-js" %%% "scala-js-macrotask-executor" % scalaJsMacrotaskExecutor
       )
     )
 

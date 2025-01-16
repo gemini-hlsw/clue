@@ -22,7 +22,7 @@ final case class GraphQLGenConfig(
   catsEq:            Boolean = true,
   catsShow:          Boolean = true,
   monocleLenses:     Boolean = true,
-  scalaJSReactReuse: Boolean = false,
+  scalaJsReactReuse: Boolean = false,
   circeEncoder:      Boolean = true,
   circeDecoder:      Boolean = true
 ) {

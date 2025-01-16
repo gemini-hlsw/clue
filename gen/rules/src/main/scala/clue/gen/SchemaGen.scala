@@ -16,7 +16,7 @@ trait SchemaGen extends Generator {
       "Scalars",
       catsEq = false,
       catsShow = false,
-      scalaJSReactReuse = false,
+      scalaJsReactReuse = false,
       bodyMod = _ :+ q"def ignoreUnusedImportScalars(): Unit = ()"
     )
 
@@ -25,7 +25,7 @@ trait SchemaGen extends Generator {
       "Enums",
       catsEq = false,
       catsShow = false,
-      scalaJSReactReuse = false,
+      scalaJsReactReuse = false,
       bodyMod = scala.Function
         .chain(
           List((parentBody: List[Stat]) =>
@@ -37,7 +37,7 @@ trait SchemaGen extends Generator {
                 _.addToParentBody(
                   config.catsEq,
                   config.catsShow,
-                  config.scalaJSReactReuse,
+                  config.scalaJsReactReuse,
                   circeEncoder = true,
                   circeDecoder = true
                 )
@@ -50,7 +50,7 @@ trait SchemaGen extends Generator {
       "Types",
       catsEq = false,
       catsShow = false,
-      scalaJSReactReuse = false,
+      scalaJsReactReuse = false,
       // TODO Only generate imports if not already defined. Use "RemoveUnused" instead?
       bodyMod = scala.Function.chain(
         List((parentBody: List[Stat]) =>
@@ -73,7 +73,7 @@ trait SchemaGen extends Generator {
                 config.catsEq,
                 config.catsShow,
                 config.monocleLenses,
-                scalaJSReactReuse = false,
+                scalaJsReactReuse = false,
                 circeEncoder = true
               )
             )
