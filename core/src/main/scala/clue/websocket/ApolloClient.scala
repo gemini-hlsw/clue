@@ -112,7 +112,7 @@ class ApolloClient[F[_], P, S](
   }
 
   // <StreamingClient>
-  override protected def subscribeInternal[D: Decoder](
+  override protected[clue] def subscribeInternal[D: Decoder](
     subscription:  String,
     operationName: Option[String],
     variables:     Option[JsonObject]
@@ -120,7 +120,7 @@ class ApolloClient[F[_], P, S](
     subscriptionResource(subscription, operationName, variables)
 
   // <FetchClient>
-  override protected def requestInternal[D: Decoder](
+  override protected[clue] def requestInternal[D: Decoder](
     document:      String,
     operationName: Option[String],
     variables:     Option[JsonObject],

@@ -73,6 +73,8 @@ object GraphQLResponse {
   final implicit class GraphQLResponseOps[F[_], D](
     val response: F[GraphQLResponse[D]]
   ) extends AnyVal {
+    // If you add methods here, be sure to add them too to the proxies in
+    // clue.syntax and clients.RequestApplied
     def raiseGraphQLErrors(implicit F: MonadThrow[F]): F[D] =
       response.map(_.result).flatMap {
         case Ior.Right(b)   => F.pure(b)
@@ -91,6 +93,8 @@ object GraphQLResponse {
   final implicit class GraphQLResponseResourceStreamOps[F[_], D](
     val streamResource: Resource[F, fs2.Stream[F, GraphQLResponse[D]]]
   ) extends AnyVal {
+    // If you add methods here, be sure to add them too to the proxies in
+    // clue.syntax and clients.SubscriptionApplied
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
       streamResource.map(
         _.through(
