@@ -6,6 +6,7 @@ package clue
 import cats.Applicative
 import cats.MonadThrow
 import cats.effect.Resource
+import cats.effect.Sync
 import cats.syntax.all.*
 import clue.model.GraphQLResponse
 import io.circe.*
@@ -128,6 +129,9 @@ object SubscriptionApplied {
   ) extends AnyVal {
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
       new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply).ignoreGraphQLErrors
+
+    def raiseFirstNoDataError(implicit F: Sync[F]): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
+      new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply).raiseFirstNoDataError
 
     def handleGraphQLErrors(
       onError: ResponseException[D] => F[Unit]

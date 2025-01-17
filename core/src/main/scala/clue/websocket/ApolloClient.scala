@@ -125,15 +125,16 @@ class ApolloClient[F[_], P, S](
     operationName: Option[String],
     variables:     Option[JsonObject],
     modParams:     Unit => Unit // This is ignored here.
-  ): F[GraphQLResponse[D]] = F.async(cb =>
-    startSubscription[D](document, operationName, variables).flatMap(subscription =>
-      subscription.stream.attempt
-        .evalMap(result => F.delay(cb(result)))
-        .compile
-        .drain
-        .as(none)
+  ): F[GraphQLResponse[D]] =
+    F.async(cb =>
+      startSubscription[D](document, operationName, variables)
+        .flatMap(subscription =>
+          subscription.stream.attempt.head.compile.onlyOrError.attempt.map(onlyOrError =>
+            cb(onlyOrError.flatten)
+          )
+        )
+        .as(none) // Don't return a cancellation cleanup. Subscription is cleaned up whenm stream is finalized.
     )
-  )
   // </FetchClient>
   // </StreamingClient>
   // </ApolloClient>
@@ -176,7 +177,6 @@ class ApolloClient[F[_], P, S](
               s
             ).logAndRaiseF
         }
-      // TODO Contemplate different states.
       case Right(msg @ StreamingMessage.FromServer.Error(subscriptionId, payload)) =>
         state.get.flatMap {
           case Connected(stateConnectionId, _, _, subscriptions)
@@ -186,7 +186,7 @@ class ApolloClient[F[_], P, S](
                 s"Received error for non existant subscription id [$subscriptionId]: $payload".warnF
               case Some(emitter) =>
                 s"Error message received for subscription id [$subscriptionId]:\n$payload".debugF >>
-                  emitter.emitErrors(payload)
+                  emitter.emitGraphQLErrors(payload)
             }
           case s @ _ =>
             UnexpectedServerMessageException[StreamingMessage.FromServer.Error, State[F]](
@@ -278,17 +278,22 @@ class ApolloClient[F[_], P, S](
     newLatch:         Latch[F],
     attempt:          Int
   ): (State[F], F[Unit]) = {
-    val disconnect: F[Unit] = oldConnection.map(_.closeInternal(none).start.void).getOrElse(F.unit)
+    val disconnectBackend: F[Unit] =
+      oldConnection.map(_.closeInternal(none).start.void).getOrElse(F.unit)
+
+    val errorSubscriptions: F[Unit] = subscriptions.toList.traverse { case (_, emitter) =>
+      emitter.crash(t)
+    }.void
 
     reconnectionStrategy(attempt, t.asLeft) match {
       case None       =>
         Disconnected(nextConnectionId) ->
-          (disconnect >> t.logAndRaiseF)
+          (errorSubscriptions >> disconnectBackend >> t.logAndRaiseF)
       case Some(wait) =>
         Connecting(nextConnectionId, none, payload, subscriptions, newLatch) ->
           (t.warnF(s"Error in connect() after attempt #[$attempt]. Retrying.") >>
             s"Waiting [$wait] before reconnect...".debugF >>
-            disconnect >>
+            disconnectBackend >>
             timer.sleep(wait) >>
             doConnect(nextConnectionId, attempt + 1))
     }
@@ -423,7 +428,7 @@ class ApolloClient[F[_], P, S](
       } yield ()
   }
 
-  private type DataQueueType[D] = Option[GraphQLResponse[D]]
+  private type DataQueueType[D] = Option[Either[Throwable, GraphQLResponse[D]]]
 
   private case class QueueEmitter[D: Decoder](
     val queue:   Queue[F, DataQueueType[D]],
@@ -434,11 +439,14 @@ class ApolloClient[F[_], P, S](
       for {
         _    <- s"Emitting data:\n$response".traceF
         data <- F.delay(response.traverse(_.as[D])).rethrow
-        _    <- queue.offer(data.some)
+        _    <- queue.offer(data.asRight.some)
       } yield ()
 
-    def emitErrors(errors: GraphQLErrors): F[Unit] =
-      s"Emitting error: $errors".traceF >> queue.offer(GraphQLResponse.errors(errors).some)
+    def emitGraphQLErrors(errors: GraphQLErrors): F[Unit] =
+      s"Emitting error: $errors".traceF >> queue.offer(GraphQLResponse.errors(errors).asRight.some)
+
+    def crash(t: Throwable): F[Unit] =
+      queue.offer(t.asLeft.some)
 
     val halt: F[Unit] = queue.offer(none)
   }
@@ -517,6 +525,7 @@ class ApolloClient[F[_], P, S](
               .fromQueueUnterminated(emitter.queue)
               .evalTap(v => s"Dequeuing for subscription [$id]: [$v]".traceF)
               .unNoneTerminate
+              .rethrow
               .onFinalizeCase(c =>
                 s"Stream for subscription [$id] finalized with ExitCase [$c]".traceF >>
                   (c match { // If canceled, we don't want to clean up. Other fibers may be evaluating the stream. Clients can explicitly call `stop()`.

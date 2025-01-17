@@ -10,7 +10,8 @@ import io.circe.*
 protected[clue] trait Emitter[F[_]] {
   val request: GraphQLRequest[JsonObject]
 
-  def emitData(response: GraphQLResponse[Json]): F[Unit]
-  def emitErrors(errors: GraphQLErrors): F[Unit]
+  def emitData(response:        GraphQLResponse[Json]): F[Unit]
+  def emitGraphQLErrors(errors: GraphQLErrors): F[Unit]
+  def crash(t:                  Throwable): F[Unit]
   val halt: F[Unit]
 }

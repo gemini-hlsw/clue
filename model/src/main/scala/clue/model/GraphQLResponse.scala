@@ -9,7 +9,9 @@ import cats.Eval
 import cats.MonadThrow
 import cats.Traverse
 import cats.data.Ior
+import cats.effect.Ref
 import cats.effect.Resource
+import cats.effect.Sync
 import cats.syntax.all.*
 import clue.ResponseException
 import org.typelevel.log4cats.Logger
@@ -104,6 +106,26 @@ object GraphQLResponse {
           }
         )
       )
+
+    /**
+     * Raise the first error found in the stream, which most probably indicates an error with the
+     * subscription.
+     */
+    def raiseFirstNoDataError(implicit F: Sync[F]): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
+      streamResource.map { stream =>
+        for {
+          ref       <- fs2.Stream.eval(Ref.of[F, Boolean](false)) // Data received?
+          refStream  = fs2.Stream.eval(ref.get).repeat
+          newStream <- stream.zip(refStream).flatMap {
+                         case (GraphQLResponse(Ior.Left(e), _), false) =>
+                           fs2.Stream.raiseError(ResponseException(e, none))
+                         case (r, false)                               =>
+                           fs2.Stream.eval(ref.set(true).as(r))
+                         case (r, _)                                   =>
+                           fs2.Stream.emit(r)
+                       }
+        } yield newStream
+      }
 
     def handleGraphQLErrors(
       onError: ResponseException[D] => F[Unit]

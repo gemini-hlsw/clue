@@ -6,6 +6,7 @@ package clue
 import cats.Applicative
 import cats.MonadThrow
 import cats.effect.Resource
+import cats.effect.Sync
 import clue.model.GraphQLResponse
 import org.typelevel.log4cats.Logger
 
@@ -29,6 +30,9 @@ object syntax {
   ) extends AnyVal {
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
       new GraphQLResponse.GraphQLResponseResourceStreamOps(streamResource).ignoreGraphQLErrors
+
+    def raiseFirstNoDataError(implicit F: Sync[F]): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
+      new GraphQLResponse.GraphQLResponseResourceStreamOps(streamResource).raiseFirstNoDataError
 
     def handleGraphQLErrors(
       onError: ResponseException[D] => F[Unit]
