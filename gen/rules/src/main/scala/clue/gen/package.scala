@@ -13,5 +13,7 @@ package object gen {
 
   def log(msg: String): IO[Unit] = IO(println(msg))
 
-  val GQLParser: QueryParser = QueryParser(GraphQLParser(GraphQLParser.defaultConfig))
+  private val config = GraphQLParser.defaultConfig.copy(maxInputValueDepth = 16)
+
+  val GQLParser: QueryParser = QueryParser(GraphQLParser(config))
 }
