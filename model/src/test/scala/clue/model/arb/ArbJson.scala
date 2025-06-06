@@ -17,7 +17,7 @@ trait ArbJson {
   val genJsonStringJsonTuple: Gen[(String, Json)] =
     for {
       str     <- arbitrary[String]
-      jsonStr <- arbitrary[Json](arbJsonString)
+      jsonStr <- arbitrary[Json](using arbJsonString)
     } yield (str, jsonStr)
 
   val arbJsonStringMap: Arbitrary[Map[String, Json]] =

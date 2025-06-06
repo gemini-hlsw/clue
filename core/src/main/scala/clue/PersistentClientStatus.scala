@@ -12,6 +12,6 @@ object PersistentClientStatus {
   case object Connected    extends PersistentClientStatus
   case object Disconnected extends PersistentClientStatus
 
-  implicit val eqStreamingClientStatus: Eq[PersistentClientStatus]     = Eq.fromUniversalEquals
-  implicit val showStreamingClientStatus: Show[PersistentClientStatus] = Show.fromToString
+  given Eq[PersistentClientStatus]   = Eq.fromUniversalEquals
+  given Show[PersistentClientStatus] = Show.fromToString
 }

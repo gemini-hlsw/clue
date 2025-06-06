@@ -21,7 +21,7 @@ trait FetchClientWithPars[F[_], P, S] {
     operation:     GraphQLOperation[S],
     operationName: Option[String] = none
   ): RequestApplied[F, P, S, operation.Variables, operation.Data] = {
-    import operation.implicits._
+    import operation.givens.given
     RequestApplied(this, operation, operationName)
   }
 
@@ -63,17 +63,14 @@ case class RequestApplied[
 }
 
 object RequestApplied {
-  implicit def withoutVariables[F[_], P, S, V, D](
-    applied: RequestApplied[F, P, S, V, D]
-  ): F[GraphQLResponse[D]] = applied.apply
+  given [F[_], P, S, V, D]: Conversion[RequestApplied[F, P, S, V, D], F[GraphQLResponse[D]]] =
+    _.apply
 
-  final implicit class RequestAppliedOps[F[_], P, S, V, D](
-    val applied: RequestApplied[F, P, S, V, D]
-  ) extends AnyVal {
-    def raiseGraphQLErrors(implicit F: MonadThrow[F]): F[D] =
+  extension [F[_], P, S, V, D](applied: RequestApplied[F, P, S, V, D]) {
+    def raiseGraphQLErrors(using MonadThrow[F]): F[D] =
       new GraphQLResponse.GraphQLResponseOps(applied.apply).raiseGraphQLErrors
 
-    def raiseGraphQLErrorsOnNoData(implicit F: MonadThrow[F]): F[D] =
+    def raiseGraphQLErrorsOnNoData(using MonadThrow[F]): F[D] =
       new GraphQLResponse.GraphQLResponseOps(applied.apply).raiseGraphQLErrorsOnNoData
   }
 }
@@ -86,7 +83,7 @@ trait StreamingClient[F[_], S] extends FetchClientWithPars[F, Unit, S] {
     subscription:  GraphQLOperation[S],
     operationName: Option[String] = none
   ): SubscriptionApplied[F, S, subscription.Variables, subscription.Data] = {
-    import subscription.implicits._
+    import subscription.givens.given
     SubscriptionApplied(this, subscription, operationName)
   }
 
@@ -119,30 +116,26 @@ case class SubscriptionApplied[
 }
 
 object SubscriptionApplied {
-  implicit def withoutVariables[F[_], S, V, D](
-    applied: SubscriptionApplied[F, S, V, D]
-  ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
-    applied.apply
+  given [F[_], S, V, D]
+    : Conversion[SubscriptionApplied[F, S, V, D], Resource[F, fs2.Stream[F, GraphQLResponse[D]]]] =
+    _.apply
 
-  final implicit class SubscriptionAppliedOps[F[_], S, V, D](
-    val applied: SubscriptionApplied[F, S, V, D]
-  ) extends AnyVal {
+  extension [F[_], S, V, D](applied: SubscriptionApplied[F, S, V, D]) {
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
       new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply).ignoreGraphQLErrors
 
-    def raiseFirstNoDataError(implicit F: Sync[F]): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
+    def raiseFirstNoDataError(using Sync[F]): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
       new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply).raiseFirstNoDataError
 
     def handleGraphQLErrors(
       onError: ResponseException[D] => F[Unit]
-    )(implicit F: Applicative[F]): Resource[F, fs2.Stream[F, D]] =
+    )(using Applicative[F]): Resource[F, fs2.Stream[F, D]] =
       new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply)
         .handleGraphQLErrors(onError)
 
-    def logGraphQLErrors(msg: ResponseException[D] => String)(implicit
-      F:      Applicative[F],
-      logger: Logger[F]
-    ): Resource[F, fs2.Stream[F, D]] =
+    def logGraphQLErrors(
+      msg: ResponseException[D] => String
+    )(using Applicative[F], Logger[F]): Resource[F, fs2.Stream[F, D]] =
       new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply).logGraphQLErrors(msg)
   }
 }

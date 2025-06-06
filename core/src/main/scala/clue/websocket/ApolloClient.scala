@@ -28,7 +28,7 @@ class ApolloClient[F[_], P, S](
   reconnectionStrategy: ReconnectionStrategy,
   state:                Ref[F, State[F]],
   connectionStatus:     SignallingRef[F, PersistentClientStatus]
-)(implicit
+)(using
   F:                    Async[F],
   backend:              WebSocketBackend[F, P],
   logger:               Logger[F],
@@ -570,7 +570,7 @@ object ApolloClient {
     connectionParams:     P,
     name:                 String = "",
     reconnectionStrategy: ReconnectionStrategy = ReconnectionStrategy.never
-  )(implicit
+  )(using
     F:                    Async[F],
     backend:              WebSocketBackend[F, P],
     logger:               Logger[F],
@@ -582,7 +582,7 @@ object ApolloClient {
       state            <- Ref[F].of[State[F]](State.Disconnected(ConnectionId.Zero))
       connectionStatus <-
         SignallingRef[F, PersistentClientStatus](PersistentClientStatus.Disconnected)
-    } yield new ApolloClient(connectionParams, reconnectionStrategy, state, connectionStatus)(
+    } yield new ApolloClient(connectionParams, reconnectionStrategy, state, connectionStatus)(using
       F,
       backend,
       logger.withModifiedString(s => s"$logPrefix $s"),

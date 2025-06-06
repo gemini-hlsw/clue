@@ -74,7 +74,7 @@ trait ArbFromServer {
 
   implicit val arbConnectionError: Arbitrary[ConnectionError] =
     Arbitrary {
-      arbitrary[JsonObject](arbitraryJsonObject).map(ConnectionError(_))
+      arbitrary[JsonObject](using arbitraryJsonObject).map(ConnectionError(_))
     }
 
   implicit val arbData: Arbitrary[Data] =
