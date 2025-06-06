@@ -451,14 +451,24 @@ class ApolloClient[F[_], P, S](
     val halt: F[Unit] = queue.offer(none)
   }
 
+  private def queryTypeAndName(query: String): Option[(String, String)] = {
+    val TypeAndName = "(\\w+).*\\{(?:.|\\s)*?(\\w+)".r.unanchored
+    query match {
+      case TypeAndName(queryType, name) => (queryType, name).some
+      case _                            => none
+    }
+  }
+
   private def buildQueue[D: Decoder](
     request: GraphQLRequest[JsonObject]
   ): F[(String, QueueEmitter[D])] =
     for {
-      queue  <- Queue.unbounded[F, DataQueueType[D]]
-      id     <- UUIDGen.randomString[F]
-      emitter = QueueEmitter(queue, request)
-      _      <- s"Building queue with id [$id] for query [${request.query}]}]".traceF
+      queue      <- Queue.unbounded[F, DataQueueType[D]]
+      uuid       <- UUIDGen.randomString[F]
+      typeAndName = queryTypeAndName(request.query)
+      id          = typeAndName.fold(uuid) { case (queryType, name) => s"$name-$queryType-$uuid" }
+      emitter     = QueueEmitter(queue, request)
+      _          <- s"Building queue with id [$id] for query [${request.query}]}]".traceF
     } yield (id, emitter)
 
   // TODO Handle interruptions in subscription and query.
