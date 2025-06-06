@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue.http4sjdkDemo
@@ -9,6 +9,7 @@ import cats.effect.IO
 import cats.effect.IOApp
 import cats.effect.Resource
 import cats.effect.Sync
+import cats.effect.std.SecureRandom
 import cats.syntax.all.*
 import clue.FetchClient
 import clue.GraphQLOperation
@@ -82,13 +83,17 @@ object Demo extends IOApp.Simple {
           .getOrElse(Map.empty)
       )
 
-  def withStreamingClient[F[_]: Async: Logger]: Resource[F, WebSocketClient[F, DemoDB]] =
+  def withStreamingClient[F[_]: Async: Logger: SecureRandom]
+    : Resource[F, WebSocketClient[F, DemoDB]] =
     for {
-      client <- Resource.eval(JdkWSClient.simple)
+      client <- JdkWSClient.simple
       backend = Http4sWebSocketBackend(client)
       uri     = uri"wss://lucuma-postgres-odb-dev.herokuapp.com/ws"
       sc     <-
-        Resource.eval(Http4sWebSocketClient.of[F, DemoDB](uri)(using Async[F], Logger[F], backend))
+        Resource.eval(
+          Http4sWebSocketClient
+            .of[F, DemoDB](uri)(using Async[F], Logger[F], backend, SecureRandom[F])
+        )
       _      <- Resource.make(sc.connect(initPayload))(_ => sc.disconnect())
     } yield sc
 

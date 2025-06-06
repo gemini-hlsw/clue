@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue.websocket
@@ -8,6 +8,7 @@ import cats.effect.Ref
 import cats.effect.Temporal
 import cats.effect.implicits.*
 import cats.effect.std.Queue
+import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import clue.*
@@ -34,7 +35,8 @@ class ApolloClient[F[_], P, S](
 )(implicit
   F:                    Async[F],
   backend:              WebSocketBackend[F, P],
-  logger:               Logger[F]
+  logger:               Logger[F],
+  secureRandom:         SecureRandom[F]
 ) extends WebSocketClient[F, S]
     with WebSocketHandler[F] {
   import State._
@@ -575,7 +577,8 @@ object ApolloClient {
   )(implicit
     F:                    Async[F],
     backend:              WebSocketBackend[F, P],
-    logger:               Logger[F]
+    logger:               Logger[F],
+    secureRandom:         SecureRandom[F]
   ): F[ApolloClient[F, P, S]] = {
     val logPrefix = s"clue.ApolloClient[${if (name.isEmpty) connectionParams else name}]"
 
@@ -586,7 +589,8 @@ object ApolloClient {
     } yield new ApolloClient(connectionParams, reconnectionStrategy, state, connectionStatus)(
       F,
       backend,
-      logger.withModifiedString(s => s"$logPrefix $s")
+      logger.withModifiedString(s => s"$logPrefix $s"),
+      secureRandom
     )
   }
 }

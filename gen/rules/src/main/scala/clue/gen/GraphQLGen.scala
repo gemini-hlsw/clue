@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2023 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package clue.gen
@@ -37,7 +37,7 @@ class GraphQLGen(config: GraphQLGenConfig)
   override def fix(implicit doc: SemanticDocument): Patch = {
     val importPatch: List[IO[Patch]] =
       doc.tokens.collect {
-        case token @ Token.Comment(value) if value.trim.startsWith("gql:") =>
+        case token @ scala.meta.tokens.Token.Comment(value) if value.trim.startsWith("gql:") =>
           IO.pure(Patch.replaceToken(token, value.trim.stripPrefix("gql:").trim))
       }.toList
 

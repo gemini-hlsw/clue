@@ -1,7 +1,7 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
 lazy val scala2Version      = V.scala213
-lazy val scala3Version      = "3.6.3"
+lazy val scala3Version      = "3.6.4"
 lazy val rulesCrossVersions = Seq(V.scala213)
 lazy val allVersions        = rulesCrossVersions :+ scala3Version
 
@@ -167,9 +167,9 @@ lazy val sbtPlugin = project
   .enablePlugins(SbtPlugin, BuildInfoPlugin)
   .settings(
     moduleName         := "sbt-clue",
-    crossScalaVersions := List("2.12.19"),
+    crossScalaVersions := List("2.12.20"),
     scalacOptions      := Nil,
-    addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % "0.13.0"),
+    addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % V.scalafixVersion),
     addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
     addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
     buildInfoPackage   := "clue.sbt",
@@ -190,9 +190,10 @@ lazy val sbtPlugin = project
         core.jvm / publishLocal
       )
       .evaluated,
-    scriptedLaunchOpts ++= Seq("-Xmx1024M",
-                               "-Dplugin.version=" + version.value,
-                               "-Dscala.version=" + (core.jvm / scalaVersion).value
+    scriptedLaunchOpts ++= Seq(
+      "-Xmx1024M",
+      "-Dplugin.version=" + version.value,
+      "-Dscala.version=" + (core.jvm / scalaVersion).value
     ),
     scriptedBufferLog  := false
   )
