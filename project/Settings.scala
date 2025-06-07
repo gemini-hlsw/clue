@@ -5,20 +5,20 @@ import sbt.librarymanagement._
 object Settings {
 
   object LibraryVersions {
-    val cats                     = "2.12.0"
-    val catsEffect               = "3.5.7"
-    val circe                    = "0.14.10"
+    val cats                     = "2.13.0"
+    val catsEffect               = "3.6.1"
+    val circe                    = "0.14.13"
     val disciplineMUnit          = "2.0.0"
-    val fs2                      = "3.11.0"
-    val grackle                  = "0.20.0"
+    val fs2                      = "3.12.0"
+    val grackle                  = "0.24.0"
     val http4s                   = "0.23.30"
     val http4sDom                = "0.2.7"
-    val http4sJDKClient          = "0.9.2"
+    val http4sJDKClient          = "0.10.0"
     val jawn                     = "1.3.2"
     val log4Cats                 = "2.7.0"
     val monocle                  = "3.3.0"
-    val munit                    = "1.0.2"
-    val munitCatsEffect          = "2.0.0"
+    val munit                    = "1.0.4"
+    val munitCatsEffect          = "2.1.0"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJsDom               = "2.8.0"
     val scalaJsMacrotaskExecutor = "1.1.1"
