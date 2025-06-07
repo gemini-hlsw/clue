@@ -5,7 +5,6 @@ package clue.js
 
 import cats.Applicative
 import cats.effect.*
-import cats.effect.Ref
 import cats.effect.implicits.*
 import cats.effect.std.Dispatcher
 import cats.syntax.all.*
