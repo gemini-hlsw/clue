@@ -4,16 +4,12 @@
 package clue.websocket
 
 import cats.effect.*
-import cats.effect.Ref
-import cats.effect.Temporal
 import cats.effect.implicits.*
 import cats.effect.std.Queue
 import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import clue.*
-import clue.StringOps
-import clue.ThrowableOps
 import clue.model.GraphQLErrors
 import clue.model.GraphQLRequest
 import clue.model.GraphQLResponse
