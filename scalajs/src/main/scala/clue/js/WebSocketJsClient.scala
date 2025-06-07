@@ -9,13 +9,10 @@ import clue.websocket.*
 import org.typelevel.log4cats.Logger
 
 object WebSocketJsClient {
-  def of[F[_]: Async: Logger, S](
+  def of[F[_]: Async: WebSocketJsBackend: Logger: SecureRandom, S](
     uri:                  String,
     name:                 String = "",
     reconnectionStrategy: ReconnectionStrategy = ReconnectionStrategy.never
-  )(implicit
-    backend:              WebSocketJsBackend[F],
-    secureRandom:         SecureRandom[F]
   ): F[WebSocketJsClient[F, S]] =
     ApolloClient.of[F, String, S](uri, name, reconnectionStrategy)
 }

@@ -1,16 +1,10 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-lazy val scala2Version      = V.scala213
-lazy val scala3Version      = "3.6.4"
-lazy val rulesCrossVersions = Seq(V.scala213)
-lazy val allVersions        = rulesCrossVersions :+ scala3Version
-
-ThisBuild / tlBaseVersion              := "0.44"
+ThisBuild / tlBaseVersion              := "0.45"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
-ThisBuild / scalaVersion               := scala2Version
-ThisBuild / crossScalaVersions         := allVersions
+ThisBuild / scalaVersion               := "3.7.1"
 Global / onChangedBuildSource          := ReloadOnSourceChanges
 
 lazy val root = tlCrossRootProject
@@ -35,7 +29,9 @@ lazy val model =
     .crossType(CrossType.Pure)
     .in(file("model"))
     .settings(
-      moduleName                         := "clue-model",
+      moduleName                              := "clue-model",
+      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
+      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
@@ -46,7 +42,7 @@ lazy val model =
           Settings.Libraries.Monocle.value ++
           Settings.Libraries.MonocleLaw.value ++
           Settings.Libraries.MUnit.value,
-      Test / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.Flat // Needed for circe's codec tests
+      Test / classLoaderLayeringStrategy      := ClassLoaderLayeringStrategy.Flat // Needed for circe's codec tests
     )
 
 lazy val core =
@@ -54,7 +50,9 @@ lazy val core =
     .crossType(CrossType.Pure)
     .in(file("core"))
     .settings(
-      moduleName := "clue-core",
+      moduleName                              := "clue-core",
+      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
+      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsEffect.value ++
@@ -70,8 +68,10 @@ lazy val scalaJS = project
   .in(file("scalajs"))
   .enablePlugins(ScalaJSPlugin)
   .settings(
-    moduleName      := "clue-scalajs",
-    coverageEnabled := false,
+    moduleName                              := "clue-scalajs",
+    coverageEnabled                         := false,
+    // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
+    dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
     libraryDependencies ++=
       Settings.Libraries.ScalaJsDom.value ++
         Settings.Libraries.ScalaJsMacrotaskExecutor.value
@@ -83,7 +83,9 @@ lazy val http4s =
     .crossType(CrossType.Pure)
     .in(file("http4s"))
     .settings(
-      moduleName := "clue-http4s",
+      moduleName                              := "clue-http4s",
+      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
+      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       libraryDependencies ++=
         Settings.Libraries.Http4sCirce.value ++
           Settings.Libraries.Http4sClient.value
@@ -100,7 +102,8 @@ lazy val http4sJDKDemo = project
     libraryDependencies ++= Seq(
       "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
       "org.slf4j"      % "slf4j-simple"   % "2.0.17"
-    ) ++ Settings.Libraries.Http4sJDKClient.value
+    ) ++ Settings.Libraries.Http4sJDKClient.value,
+    scalacOptions += "-language:implicitConversions"
   )
   .dependsOn(http4s.jvm)
 
@@ -108,8 +111,8 @@ lazy val genRules =
   project
     .in(file("gen/rules"))
     .settings(
-      moduleName         := "clue-generator",
-      crossScalaVersions := rulesCrossVersions,
+      moduleName   := "clue-generator",
+      scalaVersion := "2.13.16",
       libraryDependencies ++=
         Settings.Libraries.Grackle.value ++
           Settings.Libraries.ScalaFix.value ++
@@ -166,24 +169,24 @@ lazy val sbtPlugin = project
   .in(file("sbt-plugin"))
   .enablePlugins(SbtPlugin, BuildInfoPlugin)
   .settings(
-    moduleName         := "sbt-clue",
-    crossScalaVersions := List("2.12.20"),
-    scalacOptions      := Nil,
+    moduleName                              := "sbt-clue",
+    crossScalaVersions                      := List("2.12.20"),
+    scalacOptions                           := Nil,
     addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % V.scalafixVersion),
     addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
     addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
-    buildInfoPackage   := "clue.sbt",
-    buildInfoKeys      := Seq[BuildInfoKey](
+    buildInfoPackage                        := "clue.sbt",
+    buildInfoKeys                           := Seq[BuildInfoKey](
       version,
       organization,
       "rulesModule" -> (genRules / moduleName).value,
       "coreModule"  -> (core.jvm / moduleName).value
     ),
     buildInfoOptions += BuildInfoOption.PackagePrivate,
-    Test / test        := {
+    Test / test                             := {
       scripted.toTask("").value
     },
-    scripted           := scripted
+    scripted                                := scripted
       .dependsOn(
         genRules / publishLocal,
         model.jvm / publishLocal,
@@ -195,5 +198,7 @@ lazy val sbtPlugin = project
       "-Dplugin.version=" + version.value,
       "-Dscala.version=" + (core.jvm / scalaVersion).value
     ),
-    scriptedBufferLog  := false
+    scriptedBufferLog                       := false,
+    // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
+    dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value
   )

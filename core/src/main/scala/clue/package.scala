@@ -17,53 +17,51 @@ package object clue {
   //   None = canceled, Some(Right(())) = done, Some(Left(t)) = error
   protected[clue] type Latch[F[_]] = Deferred[F, Option[Either[Throwable, Unit]]]
 
-  final implicit class LatchOps[F[_]](val latch: Latch[F]) extends AnyVal {
-    def resolve(implicit F: MonadCancelThrow[F]): F[Unit] =
+  extension [F[_]](latch: Latch[F]) {
+    def resolve(using F: MonadCancelThrow[F]): F[Unit] =
       latch.get.flatMap(_.fold(F.canceled)(_.fold(F.raiseError, F.pure)))
 
-    def release(implicit F: Functor[F]): F[Unit] =
+    def release(using Functor[F]): F[Unit] =
       latch.complete(().asRight.some).void
 
-    def error(t: Throwable)(implicit F: Functor[F]): F[Unit] =
+    def error(t: Throwable)(using Functor[F]): F[Unit] =
       latch.complete(t.asLeft.some).void
 
-    def cancel(implicit F: Functor[F]): F[Unit] =
+    def cancel(using Functor[F]): F[Unit] =
       latch.complete(none).void
   }
 
-  final implicit class StringOps(val str: String) extends AnyVal {
-    def errorF[F[_]](implicit logger: Logger[F]): F[Unit] =
+  extension (str: String) {
+    def errorF[F[_]](using logger: Logger[F]): F[Unit] =
       logger.error(str)
 
-    def warnF[F[_]](implicit logger: Logger[F]): F[Unit] =
+    def warnF[F[_]](using logger: Logger[F]): F[Unit] =
       logger.warn(str)
 
-    def debugF[F[_]](implicit logger: Logger[F]): F[Unit] =
+    def debugF[F[_]](using logger: Logger[F]): F[Unit] =
       logger.debug(str)
 
-    def traceF[F[_]](implicit logger: Logger[F]): F[Unit] =
+    def traceF[F[_]](using logger: Logger[F]): F[Unit] =
       logger.trace(str)
   }
 
-  final implicit class ThrowableOps(val t: Throwable) extends AnyVal {
-    def logAndRaiseF[F[_]](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[Unit] =
+  extension (t: Throwable) {
+    def logAndRaiseF[F[_]](using MonadError[F, Throwable], Logger[F]): F[Unit] =
       logAndRaiseF_[F, Unit]
 
-    def logAndRaiseF_[F[_], A](implicit F: MonadError[F, Throwable], logger: Logger[F]): F[A] =
+    def logAndRaiseF_[F[_], A](using F: MonadError[F, Throwable])(using logger: Logger[F]): F[A] =
       logger.error(t)("") >> F.raiseError[A](t)
 
-    def raiseF[F[_]](implicit F: MonadError[F, Throwable]): F[Unit] =
+    def raiseF[F[_]](using F: MonadError[F, Throwable]): F[Unit] =
       F.raiseError(t)
 
-    def logF[F[_]](
-      msg: String
-    )(implicit logger: Logger[F]): F[Unit] =
+    def logF[F[_]](msg: String)(using logger: Logger[F]): F[Unit] =
       logger.error(t)(msg)
 
-    def warnF[F[_]](msg: String)(implicit logger: Logger[F]): F[Unit] =
+    def warnF[F[_]](msg: String)(using logger: Logger[F]): F[Unit] =
       logger.warn(t)(msg)
 
-    def debugF[F[_]](msg: String)(implicit logger: Logger[F]): F[Unit] =
+    def debugF[F[_]](msg: String)(using logger: Logger[F]): F[Unit] =
       logger.debug(t)(msg)
   }
 }
@@ -81,6 +79,6 @@ package clue {
   protected[clue] object ConnectionId {
     val Zero: ConnectionId = new ConnectionId(0)
 
-    implicit val eqConnectionId: Eq[ConnectionId] = Eq.by(_.value)
+    given Eq[ConnectionId] = Eq.by(_.value)
   }
 }

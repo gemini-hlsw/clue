@@ -9,10 +9,8 @@ abstract class ClientAppliedF[F[_], S, AFP[_[_], _]] {
 }
 
 object ClientAppliedF {
-  implicit def clientApplyP[F[_], P, S, AFP[_[_], _]](
-    applied: ClientAppliedF[F, S, AFP]
-  )(implicit
-    client:  clue.FetchClientWithPars[F, P, S]
-  ): AFP[F, P] =
-    applied.applyP(client)
+  given [F[_], P, S, AFP[_[_], _]](using
+    client: clue.FetchClientWithPars[F, P, S]
+  ): Conversion[ClientAppliedF[F, S, AFP], AFP[F, P]] =
+    _.applyP(client)
 }

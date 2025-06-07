@@ -15,8 +15,8 @@ abstract class GraphQLSubquery[S](val rootType: String) {
 
   val subquery: String
 
-  object implicits {
-    implicit val implicitDataDecoder: Decoder[Data] = dataDecoder
+  object givens {
+    given Decoder[Data] = dataDecoder
   }
 
   final override def toString = subquery
@@ -25,6 +25,6 @@ abstract class GraphQLSubquery[S](val rootType: String) {
 object GraphQLSubquery {
   abstract class Typed[S, T: Decoder](rootType: String) extends GraphQLSubquery[S](rootType) {
     override type Data = T
-    override val dataDecoder = implicitly[Decoder[T]]
+    override val dataDecoder = summon[Decoder[T]]
   }
 }

@@ -11,8 +11,7 @@ import io.circe.Encoder
 // include `// gql: import clue.BigNumberEncoders._`
 // For some reason, Sangria seemed to be able to handle them unquoted, but Grackle can't.
 object BigNumberEncoders {
-  implicit val longEncoder: Encoder[Long]             = Encoder.encodeString.contramap[Long](_.toString)
-  implicit val bigIntEncoder: Encoder[BigInt]         = Encoder.encodeString.contramap[BigInt](_.toString)
-  implicit val bigDecimalEncoder: Encoder[BigDecimal] =
-    Encoder.encodeString.contramap[BigDecimal](_.toString)
+  given Encoder[Long]       = Encoder.encodeString.contramap[Long](_.toString)
+  given Encoder[BigInt]     = Encoder.encodeString.contramap[BigInt](_.toString)
+  given Encoder[BigDecimal] = Encoder.encodeString.contramap[BigDecimal](_.toString)
 }

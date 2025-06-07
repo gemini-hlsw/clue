@@ -10,7 +10,7 @@ import org.scalajs.dom.Headers
 import org.typelevel.log4cats.Logger
 
 object FetchJsClient {
-  def of[F[_], S](uri: String, name: String = "", headers: Headers = new Headers())(implicit
+  def of[F[_], S](uri: String, name: String = "", headers: Headers = new Headers())(using
     F:       MonadThrow[F],
     backend: FetchJsBackend[F],
     logger:  Logger[F]
