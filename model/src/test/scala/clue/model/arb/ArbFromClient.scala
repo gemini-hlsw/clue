@@ -19,7 +19,7 @@ trait ArbFromClient {
 
   implicit val arbConnectionInit: Arbitrary[ConnectionInit] =
     Arbitrary {
-      arbitrary[Map[String, Json]](arbJsonStringMap).map(ConnectionInit(_))
+      arbitrary[Map[String, Json]](using arbJsonStringMap).map(ConnectionInit(_))
     }
 
   implicit val arbStart: Arbitrary[Start] =

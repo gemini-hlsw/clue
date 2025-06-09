@@ -18,7 +18,7 @@ import org.typelevel.log4cats.Logger
 //   "errors": [ ... ],
 //   "extensions": { ... }
 // }
-class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(implicit
+class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(using
   backend: FetchBackend[F, P]
 ) extends clue.FetchClientWithPars[F, P, S] {
   override protected[clue] def requestInternal[D: Decoder](

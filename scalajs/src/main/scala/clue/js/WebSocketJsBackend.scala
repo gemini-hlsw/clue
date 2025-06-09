@@ -5,8 +5,8 @@ package clue.js
 
 import cats.Applicative
 import cats.effect.*
-import cats.effect.implicits.*
 import cats.effect.std.Dispatcher
+import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import clue.*
 import clue.model.StreamingMessage
