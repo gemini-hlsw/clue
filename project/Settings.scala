@@ -15,7 +15,7 @@ object Settings {
     val http4sDom                = "0.2.7"
     val http4sJDKClient          = "0.10.0"
     val jawn                     = "1.3.2"
-    val log4Cats                 = "2.7.0"
+    val log4Cats                 = "2.7.1"
     val monocle                  = "3.3.0"
     val munit                    = "1.0.4"
     val munitCatsEffect          = "2.1.0"
