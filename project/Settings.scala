@@ -17,7 +17,7 @@ object Settings {
     val jawn                     = "1.3.2"
     val log4Cats                 = "2.7.0"
     val monocle                  = "3.3.0"
-    val munit                    = "1.0.4"
+    val munit                    = "1.1.1"
     val munitCatsEffect          = "2.1.0"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJsDom               = "2.8.0"
