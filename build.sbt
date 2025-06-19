@@ -1,6 +1,6 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-ThisBuild / tlBaseVersion              := "0.45"
+ThisBuild / tlBaseVersion              := "0.46"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))

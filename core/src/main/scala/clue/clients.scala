@@ -10,6 +10,7 @@ import cats.effect.Sync
 import cats.syntax.all.*
 import clue.model.GraphQLQuery
 import clue.model.GraphQLResponse
+import clue.syntax
 import io.circe.*
 import io.circe.syntax.*
 import org.typelevel.log4cats.Logger
@@ -69,10 +70,10 @@ object RequestApplied {
 
   extension [F[_], P, S, V, D](applied: RequestApplied[F, P, S, V, D]) {
     def raiseGraphQLErrors(using F: MonadThrow[F]): F[D] =
-      GraphQLResponse.raiseGraphQLErrors(applied.apply)
+      syntax.raiseGraphQLErrors(applied.apply)
 
     def raiseGraphQLErrorsOnNoData(using MonadThrow[F]): F[D] =
-      GraphQLResponse.raiseGraphQLErrorsOnNoData(applied.apply)
+      syntax.raiseGraphQLErrorsOnNoData(applied.apply)
   }
 }
 
@@ -123,20 +124,20 @@ object SubscriptionApplied {
 
   extension [F[_], S, V, D](applied: SubscriptionApplied[F, S, V, D]) {
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
-      GraphQLResponse.ignoreGraphQLErrors(applied.apply)
+      syntax.ignoreGraphQLErrors(applied.apply)
 
     def raiseFirstNoDataError(using Sync[F]): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
-      GraphQLResponse.raiseFirstNoDataError(applied.apply)
+      syntax.raiseFirstNoDataError(applied.apply)
 
     def handleGraphQLErrors(
       onError: ResponseException[D] => F[Unit]
     )(using Applicative[F]): Resource[F, fs2.Stream[F, D]] =
-      GraphQLResponse.handleGraphQLErrors(applied.apply)(onError)
+      syntax.handleGraphQLErrors(applied.apply)(onError)
 
     def logGraphQLErrors(
       msg: ResponseException[D] => String
     )(using Applicative[F], Logger[F]): Resource[F, fs2.Stream[F, D]] =
-      GraphQLResponse.logGraphQLErrors(applied.apply)(msg)
+      syntax.logGraphQLErrors(applied.apply)(msg)
   }
 }
 
