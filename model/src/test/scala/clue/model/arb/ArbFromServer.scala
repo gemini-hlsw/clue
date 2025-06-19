@@ -16,13 +16,13 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.*
 import org.scalacheck.Gen
 
-trait ArbFromServer {
-  import ArbJson._
-  import ArbGraphQLResponse._
+trait ArbFromServer:
+  import ArbJson.*
+  import ArbGraphQLResponse.given
 
-  val arbErrorJson: Arbitrary[Json] =
-    Arbitrary {
-      arbitrary[List[(String, Int, Int)]].map { errorList =>
+  given Arbitrary[Json] =
+    Arbitrary:
+      arbitrary[List[(String, Int, Int)]].map: errorList =>
         Json.obj(
           "errors" -> Json.fromValues(
             errorList.map { case (msg, line, column) =>
@@ -38,68 +38,59 @@ trait ArbFromServer {
             }
           )
         )
-      }
-    }
 
-  implicit val arbGraphQLErrorPathElement: Arbitrary[GraphQLError.PathElement] =
-    Arbitrary(
+  given Arbitrary[GraphQLError.PathElement] =
+    Arbitrary:
       Gen.oneOf(
         arbitrary[Int].map(GraphQLError.PathElement.int(_)),
         arbitrary[String].map(GraphQLError.PathElement.string(_))
       )
-    )
 
-  implicit val arbGraphQLErrorLocation: Arbitrary[GraphQLError.Location] =
-    Arbitrary(
-      for {
+  given Arbitrary[GraphQLError.Location] =
+    Arbitrary:
+      for
         line   <- arbitrary[Int]
         column <- arbitrary[Int]
-      } yield GraphQLError.Location(line, column)
-    )
+      yield GraphQLError.Location(line, column)
 
-  implicit val arbGraphQLError: Arbitrary[GraphQLError] =
-    Arbitrary {
-      for {
+  given Arbitrary[GraphQLError] =
+    Arbitrary:
+      for
         message    <- arbitrary[String]
         path       <- arbitrary[List[GraphQLError.PathElement]]
         locations  <- arbitrary[List[GraphQLError.Location]]
         extensions <- arbitrary[Option[GraphQLExtensions]]
-      } yield GraphQLError(
+      yield GraphQLError(
         message,
         NonEmptyList.fromList(path),
         NonEmptyList.fromList(locations),
         extensions
       )
-    }
 
-  implicit val arbConnectionError: Arbitrary[ConnectionError] =
-    Arbitrary {
+  given Arbitrary[ConnectionError] =
+    Arbitrary:
       arbitrary[JsonObject](using arbitraryJsonObject).map(ConnectionError(_))
-    }
 
-  implicit val arbData: Arbitrary[Data] =
-    Arbitrary {
-      for {
+  given Arbitrary[Data] =
+    Arbitrary:
+      for
         i <- arbitrary[String]
         p <- arbitrary[GraphQLResponse[Json]](using arbCombinedResponse(using arbJsonString))
-      } yield Data(i, p)
-    }
+      yield Data(i, p)
 
-  implicit val arbError: Arbitrary[Error] =
-    Arbitrary {
-      for {
+  given Arbitrary[Error] =
+    Arbitrary:
+      for
         i <- arbitrary[String]
         p <- arbitrary[List[GraphQLError]].suchThat(_.nonEmpty)
-      } yield Error(i, NonEmptyList.fromListUnsafe(p))
-    }
+      yield Error(i, NonEmptyList.fromListUnsafe(p))
 
-  implicit val arbComplete: Arbitrary[Complete] =
-    Arbitrary {
+  given Arbitrary[Complete] =
+    Arbitrary:
       arbitrary[String].map(Complete(_))
-    }
 
-  implicit val arbFromServer: Arbitrary[FromServer] =
-    Arbitrary {
+  given Arbitrary[FromServer] =
+    Arbitrary:
       Gen.oneOf[FromServer](
         Gen.const(ConnectionAck),
         arbitrary[ConnectionError],
@@ -108,7 +99,5 @@ trait ArbFromServer {
         arbitrary[Error],
         arbitrary[Complete]
       )
-    }
-}
 
 object ArbFromServer extends ArbFromServer

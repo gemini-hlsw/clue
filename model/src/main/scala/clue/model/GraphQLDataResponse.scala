@@ -26,7 +26,6 @@ final case class GraphQLDataResponse[D](
   extensions: Option[GraphQLExtensions] = none
 )
 
-object GraphQLDataResponse {
-  implicit def eqGraphQLDataResponse[D: Eq]: Eq[GraphQLDataResponse[D]] =
+object GraphQLDataResponse:
+  given [D: Eq]: Eq[GraphQLDataResponse[D]] =
     Eq.by(x => (x.data, x.errors, x.extensions))
-}

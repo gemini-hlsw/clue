@@ -6,7 +6,7 @@ package clue.http4s
 import cats.effect.*
 import clue.*
 import clue.model.GraphQLRequest
-import clue.model.json.*
+import clue.model.json.given
 import io.circe.Encoder
 import io.circe.syntax.*
 import org.http4s.Request

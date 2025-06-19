@@ -13,38 +13,32 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.*
 import org.scalacheck.Gen
 
-trait ArbFromClient {
-  import ArbGraphQLRequest._
-  import ArbJson._
+trait ArbFromClient:
+  import ArbGraphQLRequest.given
+  import ArbJson.*
 
-  implicit val arbConnectionInit: Arbitrary[ConnectionInit] =
-    Arbitrary {
+  given Arbitrary[ConnectionInit] =
+    Arbitrary:
       arbitrary[Map[String, Json]](using arbJsonStringMap).map(ConnectionInit(_))
-    }
 
-  implicit val arbStart: Arbitrary[Start] =
-    Arbitrary {
-      for {
+  given Arbitrary[Start] =
+    Arbitrary:
+      for
         i <- arbitrary[String]
         p <- arbitrary[GraphQLRequest[JsonObject]]
-      } yield Start(i, p)
-    }
+      yield Start(i, p)
 
-  implicit val arbStop: Arbitrary[Stop] =
-    Arbitrary {
+  given Arbitrary[Stop] =
+    Arbitrary:
       arbitrary[String].map(Stop(_))
-    }
 
-  implicit val arbFromClient: Arbitrary[FromClient] =
-    Arbitrary {
+  given Arbitrary[FromClient] =
+    Arbitrary:
       Gen.oneOf[FromClient](
         arbitrary[ConnectionInit],
         arbitrary[Start],
         arbitrary[Stop],
         Gen.const(ConnectionTerminate)
       )
-    }
-
-}
 
 object ArbFromClient extends ArbFromClient

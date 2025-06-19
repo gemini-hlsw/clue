@@ -5,9 +5,10 @@ package clue
 
 import cats.MonadThrow
 import cats.syntax.all.*
+import clue.model.GraphQLQuery
 import clue.model.GraphQLRequest
 import clue.model.GraphQLResponse
-import clue.model.json.*
+import clue.model.json.given
 import io.circe.*
 import io.circe.parser.*
 import org.typelevel.log4cats.Logger
@@ -22,7 +23,7 @@ class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(using
   backend: FetchBackend[F, P]
 ) extends clue.FetchClientWithPars[F, P, S] {
   override protected[clue] def requestInternal[D: Decoder](
-    document:      String,
+    document:      GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject],
     modParams:     P => P = identity
