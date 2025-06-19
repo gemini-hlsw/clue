@@ -69,10 +69,10 @@ object RequestApplied {
 
   extension [F[_], P, S, V, D](applied: RequestApplied[F, P, S, V, D]) {
     def raiseGraphQLErrors(using F: MonadThrow[F]): F[D] =
-      syntax.raiseGraphQLErrors(applied.apply)
+      clue.syntax.raiseGraphQLErrors(applied.apply)
 
     def raiseGraphQLErrorsOnNoData(using MonadThrow[F]): F[D] =
-      syntax.raiseGraphQLErrorsOnNoData(applied.apply)
+      clue.syntax.raiseGraphQLErrorsOnNoData(applied.apply)
   }
 }
 
@@ -123,20 +123,20 @@ object SubscriptionApplied {
 
   extension [F[_], S, V, D](applied: SubscriptionApplied[F, S, V, D]) {
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
-      syntax.ignoreGraphQLErrors(applied.apply)
+      clue.syntax.ignoreGraphQLErrors(applied.apply)
 
     def raiseFirstNoDataError(using Sync[F]): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
-      syntax.raiseFirstNoDataError(applied.apply)
+      clue.syntax.raiseFirstNoDataError(applied.apply)
 
     def handleGraphQLErrors(
       onError: ResponseException[D] => F[Unit]
     )(using Applicative[F]): Resource[F, fs2.Stream[F, D]] =
-      syntax.handleGraphQLErrors(applied.apply)(onError)
+      clue.syntax.handleGraphQLErrors(applied.apply)(onError)
 
     def logGraphQLErrors(
       msg: ResponseException[D] => String
     )(using Applicative[F], Logger[F]): Resource[F, fs2.Stream[F, D]] =
-      syntax.logGraphQLErrors(applied.apply)(msg)
+      clue.syntax.logGraphQLErrors(applied.apply)(msg)
   }
 }
 
