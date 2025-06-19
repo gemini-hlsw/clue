@@ -24,4 +24,4 @@ object GraphQLQuery:
       val typeAndName: Option[(String, String)] = queryTypeAndName(query)
       s"${typeAndName.map(_._1).getOrElse("<queryType?>")}-${typeAndName.map(_._2).getOrElse("<queryName?>")}"
 
-  given Eq[GraphQLQuery] = Eq.by(_.value)
+  inline given Eq[GraphQLQuery] = Eq.catsKernelInstancesForString
