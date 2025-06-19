@@ -7,22 +7,18 @@ import cats.data.NonEmptyList
 import clue.model.GraphQLDataResponse
 import clue.model.GraphQLError
 import clue.model.GraphQLExtensions
-import clue.model.arb.ArbGraphQLError.*
+import clue.model.arb.ArbGraphQLError.given
 import io.circe.testing.instances.*
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.*
 
-trait ArbGraphQLDataResponse {
-
-  implicit def arbGraphQLDataResponse[D: Arbitrary]: Arbitrary[GraphQLDataResponse[D]] =
-    Arbitrary {
-      for {
+trait ArbGraphQLDataResponse:
+  given [D: Arbitrary]: Arbitrary[GraphQLDataResponse[D]] =
+    Arbitrary:
+      for
         d <- arbitrary[D]
         e <- arbitrary[List[GraphQLError]]
         x <- arbitrary[Option[GraphQLExtensions]]
-      } yield GraphQLDataResponse(d, NonEmptyList.fromList(e), x)
-    }
-
-}
+      yield GraphQLDataResponse(d, NonEmptyList.fromList(e), x)
 
 object ArbGraphQLDataResponse extends ArbGraphQLDataResponse

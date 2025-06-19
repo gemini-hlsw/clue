@@ -34,57 +34,42 @@ final case class GraphQLError(
   extensions: Option[GraphQLExtensions] = none
 )
 
-object GraphQLError {
-  sealed trait PathElement extends Product with Serializable {
+object GraphQLError:
+  sealed trait PathElement extends Product with Serializable:
 
     def toEither: Either[Int, String] =
-      this match {
+      this match
         case StringPathElement(e) => e.asRight[Int]
         case IntPathElement(e)    => e.asLeft[String]
-      }
 
     def fold[A](fi: Int => A, fs: String => A): A =
-      this match {
+      this match
         case StringPathElement(e) => fs(e)
         case IntPathElement(e)    => fi(e)
-      }
-  }
 
-  object PathElement {
-
+  object PathElement:
     def int(element: Int): PathElement =
       IntPathElement(element)
 
     def string(element: String): PathElement =
       StringPathElement(element)
 
-    implicit val EqPathElement: Eq[PathElement] =
-      Eq.instance {
+    given Eq[PathElement] =
+      Eq.instance:
         case (IntPathElement(a), IntPathElement(b))       => a === b
         case (StringPathElement(a), StringPathElement(b)) => a === b
         case _                                            => false
-      }
-
-  }
 
   final case class StringPathElement(element: String) extends PathElement
   final case class IntPathElement(element: Int)       extends PathElement
 
   final case class Location(line: Int, column: Int)
 
-  object Location {
-    implicit val EqLocation: Eq[Location] =
-      Eq.by { a =>
-        (
-          a.line,
-          a.column
-        )
-      }
-  }
+  object Location:
+    given Eq[Location] =
+      Eq.by: a =>
+        (a.line, a.column)
 
-  implicit val EqGraphQLError: Eq[GraphQLError] =
-    Eq.by { a =>
+  given Eq[GraphQLError] =
+    Eq.by: a =>
       (a.message, a.path, a.locations, a.extensions)
-    }
-
-}

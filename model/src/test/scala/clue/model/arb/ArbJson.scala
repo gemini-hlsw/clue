@@ -8,22 +8,19 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.*
 import org.scalacheck.Gen
 
-trait ArbJson {
+trait ArbJson:
   val arbJsonString: Arbitrary[Json] =
-    Arbitrary {
+    Arbitrary:
       arbitrary[String].map(Json.fromString)
-    }
 
   val genJsonStringJsonTuple: Gen[(String, Json)] =
-    for {
+    for
       str     <- arbitrary[String]
       jsonStr <- arbitrary[Json](using arbJsonString)
-    } yield (str, jsonStr)
+    yield (str, jsonStr)
 
   val arbJsonStringMap: Arbitrary[Map[String, Json]] =
-    Arbitrary {
+    Arbitrary:
       Gen.mapOf[String, Json](genJsonStringJsonTuple)
-    }
-}
 
 object ArbJson extends ArbJson

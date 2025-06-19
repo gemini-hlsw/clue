@@ -10,11 +10,9 @@ import clue.model.arb.*
 import io.circe.testing.CodecTests
 import io.circe.testing.instances.*
 
-final class StreamingMessageJsonSpec extends ListLimitingDisciplineSuite {
-
-  import ArbFromClient._
-  import ArbFromServer._
+final class StreamingMessageJsonSpec extends ListLimitingDisciplineSuite:
+  import ArbFromClient.given
+  import ArbFromServer.given
 
   checkAll("FromClient", CodecTests[FromClient].codec)
   checkAll("FromServer", CodecTests[FromServer].codec)
-}

@@ -10,8 +10,7 @@ import io.circe.Json
 import io.circe.testing.CodecTests
 import io.circe.testing.instances.*
 
-final class GraphQLDataResponseJsonSpec extends ListLimitingDisciplineSuite {
-  import ArbGraphQLDataResponse._
+final class GraphQLDataResponseJsonSpec extends ListLimitingDisciplineSuite:
+  import ArbGraphQLDataResponse.given
 
   checkAll("GraphQLDataResponse", CodecTests[GraphQLDataResponse[Json]].codec)
-}

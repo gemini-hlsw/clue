@@ -8,7 +8,7 @@ import cats.effect.*
 import cats.syntax.all.*
 import clue.*
 import clue.model.GraphQLRequest
-import clue.model.json.*
+import clue.model.json.given
 import io.circe.Encoder
 import io.circe.syntax.*
 import org.scalajs.dom.AbortController
@@ -57,7 +57,7 @@ final class FetchJsBackend[F[_]: Async](fetchMethod: FetchMethod)
           Fetch
             .fetch(
               URIUtils.encodeURI(
-                s"${baseRequest.uri}?query=${request.query.trim.replaceAll(" +", " ")}$variables$op"
+                s"${baseRequest.uri}?query=${request.query.value.trim.replaceAll(" +", " ")}$variables$op"
               ),
               new RequestInit {
                 method = HttpMethod.GET

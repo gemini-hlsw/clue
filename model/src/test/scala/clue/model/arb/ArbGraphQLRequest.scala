@@ -3,21 +3,18 @@
 
 package clue.model.arb
 
+import clue.model.GraphQLQuery
 import clue.model.GraphQLRequest
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.*
 
-trait ArbGraphQLRequest {
-
-  implicit def arbGraphQLRequest[V: Arbitrary]: Arbitrary[GraphQLRequest[V]] =
-    Arbitrary {
-      for {
-        q <- arbitrary[String]
+trait ArbGraphQLRequest:
+  given [V: Arbitrary]: Arbitrary[GraphQLRequest[V]] =
+    Arbitrary:
+      for
+        q <- arbitrary[String].map(GraphQLQuery(_))
         o <- arbitrary[Option[String]]
         v <- arbitrary[Option[V]]
-      } yield GraphQLRequest(q, o, v)
-    }
-
-}
+      yield GraphQLRequest(q, o, v)
 
 object ArbGraphQLRequest extends ArbGraphQLRequest

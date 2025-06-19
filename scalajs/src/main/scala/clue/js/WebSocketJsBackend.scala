@@ -10,7 +10,7 @@ import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import clue.*
 import clue.model.StreamingMessage
-import clue.model.json.*
+import clue.model.json.given
 import clue.websocket.*
 import io.circe.syntax.*
 import org.scalajs.dom.CloseEvent

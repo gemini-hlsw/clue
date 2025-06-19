@@ -8,6 +8,7 @@ import cats.MonadThrow
 import cats.effect.Resource
 import cats.effect.Sync
 import cats.syntax.all.*
+import clue.model.GraphQLQuery
 import clue.model.GraphQLResponse
 import io.circe.*
 import io.circe.syntax.*
@@ -26,7 +27,7 @@ trait FetchClientWithPars[F[_], P, S] {
   }
 
   protected[clue] def requestInternal[D: Decoder](
-    document:      String,
+    document:      GraphQLQuery,
     operationName: Option[String] = none,
     variables:     Option[JsonObject] = none,
     modParams:     P => P = identity
@@ -49,17 +50,17 @@ case class RequestApplied[
 
   def withInput(variables: V, modParams: P => P): F[GraphQLResponse[D]] =
     client.requestInternal(
-      operation.document,
+      GraphQLQuery(operation.document),
       operationName,
       variables.asJsonObject.some,
       modParams
     )
 
   def withModParams(modParams: P => P): F[GraphQLResponse[D]] =
-    client.requestInternal(operation.document, operationName, none, modParams)
+    client.requestInternal(GraphQLQuery(operation.document), operationName, none, modParams)
 
   def apply: F[GraphQLResponse[D]] =
-    client.requestInternal(operation.document, operationName, none, identity)
+    client.requestInternal(GraphQLQuery(operation.document), operationName, none, identity)
 }
 
 object RequestApplied {
@@ -67,11 +68,11 @@ object RequestApplied {
     _.apply
 
   extension [F[_], P, S, V, D](applied: RequestApplied[F, P, S, V, D]) {
-    def raiseGraphQLErrors(using MonadThrow[F]): F[D] =
-      new GraphQLResponse.GraphQLResponseOps(applied.apply).raiseGraphQLErrors
+    def raiseGraphQLErrors(using F: MonadThrow[F]): F[D] =
+      GraphQLResponse.raiseGraphQLErrors(applied.apply)
 
     def raiseGraphQLErrorsOnNoData(using MonadThrow[F]): F[D] =
-      new GraphQLResponse.GraphQLResponseOps(applied.apply).raiseGraphQLErrorsOnNoData
+      GraphQLResponse.raiseGraphQLErrorsOnNoData(applied.apply)
   }
 }
 
@@ -88,7 +89,7 @@ trait StreamingClient[F[_], S] extends FetchClientWithPars[F, Unit, S] {
   }
 
   protected[clue] def subscribeInternal[D: Decoder](
-    document:      String,
+    document:      GraphQLQuery,
     operationName: Option[String] = none,
     variables:     Option[JsonObject] = none
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]]
@@ -106,13 +107,13 @@ case class SubscriptionApplied[
 ) {
   def withInput(variables: V): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     client.subscribeInternal(
-      subscription.document,
+      GraphQLQuery(subscription.document),
       operationName,
       variables.asJsonObject.some
     )
 
   def apply: Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
-    client.subscribeInternal(subscription.document, operationName, none)
+    client.subscribeInternal(GraphQLQuery(subscription.document), operationName, none)
 }
 
 object SubscriptionApplied {
@@ -122,21 +123,20 @@ object SubscriptionApplied {
 
   extension [F[_], S, V, D](applied: SubscriptionApplied[F, S, V, D]) {
     def ignoreGraphQLErrors: Resource[F, fs2.Stream[F, D]] =
-      new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply).ignoreGraphQLErrors
+      GraphQLResponse.ignoreGraphQLErrors(applied.apply)
 
     def raiseFirstNoDataError(using Sync[F]): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
-      new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply).raiseFirstNoDataError
+      GraphQLResponse.raiseFirstNoDataError(applied.apply)
 
     def handleGraphQLErrors(
       onError: ResponseException[D] => F[Unit]
     )(using Applicative[F]): Resource[F, fs2.Stream[F, D]] =
-      new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply)
-        .handleGraphQLErrors(onError)
+      GraphQLResponse.handleGraphQLErrors(applied.apply)(onError)
 
     def logGraphQLErrors(
       msg: ResponseException[D] => String
     )(using Applicative[F], Logger[F]): Resource[F, fs2.Stream[F, D]] =
-      new GraphQLResponse.GraphQLResponseResourceStreamOps(applied.apply).logGraphQLErrors(msg)
+      GraphQLResponse.logGraphQLErrors(applied.apply)(msg)
   }
 }
 

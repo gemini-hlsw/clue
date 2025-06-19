@@ -5,10 +5,10 @@ package clue.model
 
 import cats.laws.discipline.TraverseTests
 import clue.ListLimitingDisciplineSuite
-import clue.model.arb.*
+import clue.model.arb.ArbGraphQLResponse
 
 final class GraphQLResponseSpec extends ListLimitingDisciplineSuite {
-  import ArbGraphQLResponse._
+  import ArbGraphQLResponse.given
 
   checkAll(
     "Traversable[GraphQLResponse]",

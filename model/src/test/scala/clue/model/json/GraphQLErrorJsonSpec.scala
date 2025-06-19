@@ -10,11 +10,10 @@ import clue.model.arb.*
 import io.circe.testing.CodecTests
 import io.circe.testing.instances.*
 
-final class GraphQLErrorJsonSpec extends ListLimitingDisciplineSuite {
-  import ArbGraphQLError._
+final class GraphQLErrorJsonSpec extends ListLimitingDisciplineSuite:
+  import ArbGraphQLError.given
 
   checkAll("GraphQLError.PathElement", CodecTests[GraphQLError.PathElement].codec)
   checkAll("GraphQLError.Location", CodecTests[GraphQLError.Location].codec)
   checkAll("GraphQLError", CodecTests[GraphQLError].codec)
   checkAll("GraphQLErrors", CodecTests[GraphQLErrors].codec)
-}

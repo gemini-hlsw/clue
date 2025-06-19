@@ -11,10 +11,11 @@ import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import clue.*
 import clue.model.GraphQLErrors
+import clue.model.GraphQLQuery
 import clue.model.GraphQLRequest
 import clue.model.GraphQLResponse
 import clue.model.StreamingMessage
-import clue.model.json.*
+import clue.model.json.given
 import fs2.Stream
 import fs2.concurrent.SignallingRef
 import io.circe.*
@@ -111,7 +112,7 @@ class ApolloClient[F[_], P, S](
 
   // <StreamingClient>
   override protected[clue] def subscribeInternal[D: Decoder](
-    subscription:  String,
+    subscription:  GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject]
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
@@ -119,7 +120,7 @@ class ApolloClient[F[_], P, S](
 
   // <FetchClient>
   override protected[clue] def requestInternal[D: Decoder](
-    document:      String,
+    document:      GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject],
     modParams:     Unit => Unit // This is ignored here.
@@ -449,30 +450,21 @@ class ApolloClient[F[_], P, S](
     val halt: F[Unit] = queue.offer(none)
   }
 
-  private def queryTypeAndName(query: String): Option[(String, String)] = {
-    val TypeAndName = "(\\w+).*\\{(?:.|\\s)*?(\\w+)".r.unanchored
-    query match {
-      case TypeAndName(queryType, name) => (queryType, name).some
-      case _                            => none
-    }
-  }
-
   private def buildQueue[D: Decoder](
     request: GraphQLRequest[JsonObject]
   ): F[(String, QueueEmitter[D])] =
     for {
-      queue      <- Queue.unbounded[F, DataQueueType[D]]
-      uuid       <- UUIDGen.randomString[F]
-      typeAndName = queryTypeAndName(request.query)
-      id          = typeAndName.fold(uuid) { case (queryType, name) => s"$name-$queryType-$uuid" }
-      emitter     = QueueEmitter(queue, request)
-      _          <- s"Building queue with id [$id] for query [${request.query}]}]".traceF
+      queue  <- Queue.unbounded[F, DataQueueType[D]]
+      uuid   <- UUIDGen.randomString[F]
+      id      = s"${request.query.querySummary}-$uuid"
+      emitter = QueueEmitter(queue, request)
+      _      <- s"Building queue with id [$id] for query [${request.query}]}]".traceF
     } yield (id, emitter)
 
   // TODO Handle interruptions in subscription and query.
 
   private def subscriptionResource[D: Decoder, R](
-    subscription:  String,
+    subscription:  GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject]
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
@@ -484,7 +476,7 @@ class ApolloClient[F[_], P, S](
       .map(_.stream)
 
   private def startSubscription[D: Decoder](
-    subscription:  String,
+    subscription:  GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject]
   ): F[GraphQLSubscription[F, GraphQLResponse[D]]] =

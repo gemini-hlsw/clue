@@ -28,13 +28,12 @@ import cats.syntax.option.*
  *   values for protocol extension
  */
 final case class GraphQLRequest[V](
-  query:         String,
+  query:         GraphQLQuery,
   operationName: Option[String] = none,
   variables:     Option[V] = none,
   extensions:    Option[GraphQLExtensions] = none
 )
 
-object GraphQLRequest {
-  implicit def eqGraphQLRequest[V: Eq]: Eq[GraphQLRequest[V]] =
+object GraphQLRequest:
+  given [V: Eq]: Eq[GraphQLRequest[V]] =
     Eq.by(a => (a.query, a.operationName, a.variables, a.extensions))
-}
