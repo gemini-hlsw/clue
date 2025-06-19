@@ -10,7 +10,6 @@ import cats.effect.Sync
 import cats.syntax.all.*
 import clue.model.GraphQLQuery
 import clue.model.GraphQLResponse
-import clue.syntax
 import io.circe.*
 import io.circe.syntax.*
 import org.typelevel.log4cats.Logger
