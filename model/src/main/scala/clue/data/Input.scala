@@ -79,52 +79,43 @@ object Input {
       case None    => Unassign
     }
 
-  implicit def inputEq[A: Eq]: Eq[Input[A]] =
-    new Eq[Input[A]] {
+  given [A: Eq]: Eq[Input[A]] =
+    new Eq[Input[A]]:
       def eqv(x: Input[A], y: Input[A]): Boolean =
-        x match {
+        x match
           case Assign(ax) =>
-            y match {
+            y match
               case Assign(ay) => ax === ay
               case _          => false
-            }
           case Ignore     =>
-            y match {
+            y match
               case Ignore => true
               case _      => false
-            }
           case Unassign   =>
-            y match {
+            y match
               case Unassign => true
               case _        => false
-            }
-        }
-    }
 
-  implicit def inputShow[A: Show]: Show[Input[A]] =
-    new Show[Input[A]] {
-      override def show(t: Input[A]): String = t match {
-        case Assign(a) => s"Set(${a.show})"
-        case other @ _ => other.toString
-      }
-    }
+  given [A: Show]: Show[Input[A]] =
+    new Show[Input[A]]:
+      override def show(t: Input[A]): String =
+        t match
+          case Assign(a) => s"Set(${a.show})"
+          case other @ _ => other.toString
 
   private val IgnoreValue: Json = Json.fromString("<<clue.data.Ignore>>")
 
   def dropIgnores(obj: JsonObject): JsonObject = obj.deepFilter((_, value) => value =!= IgnoreValue)
 
-  implicit def inputEncoder[A: Encoder]: Encoder[Input[A]] = new Encoder[Input[A]] {
-    override def apply(a: Input[A]): Json = a match {
+  given [A: Encoder]: Encoder[Input[A]] =
+    Encoder.instance:
       case Ignore    => IgnoreValue
       case Unassign  => Json.Null
       case Assign(a) => a.asJson
-    }
-  }
 
-  implicit def inputDecoder[A: Decoder]: Decoder[Input[A]] = new Decoder[Input[A]] {
-    override def apply(c: HCursor): Decoder.Result[Input[A]] =
-      c.as[Option[A]].map(_.orUnassign)
-  }
+  given [A: Decoder]: Decoder[Input[A]] =
+    Decoder.instance:
+      _.as[Option[A]].map(_.orUnassign)
 
   implicit object InputCats extends Monad[Input] with Traverse[Input] with Align[Input] {
 
@@ -144,7 +135,7 @@ object Input {
 
     override def traverse[F[_], A, B](
       fa: Input[A]
-    )(f: A => F[B])(implicit F: Applicative[F]): F[Input[B]] =
+    )(f: A => F[B])(using F: Applicative[F]): F[Input[B]] =
       fa match {
         case Ignore    => F.pure(Ignore)
         case Unassign  => F.pure(Unassign)
@@ -171,25 +162,21 @@ object Input {
       alignWith(fa, fb)(identity)
 
     override def alignWith[A, B, C](fa: Input[A], fb: Input[B])(f: Ior[A, B] => C): Input[C] =
-      fa match {
+      fa match
         case Ignore    =>
-          fb match {
+          fb match
             case Ignore    => Ignore
             case Unassign  => Unassign
             case Assign(b) => Assign(f(Ior.right(b)))
-          }
         case Unassign  =>
-          fb match {
+          fb match
             case Ignore    => Ignore
             case Unassign  => Unassign
             case Assign(b) => Assign(f(Ior.right(b)))
-          }
         case Assign(a) =>
-          fb match {
+          fb match
             case Ignore    => Assign(f(Ior.left(a)))
             case Unassign  => Assign(f(Ior.left(a)))
             case Assign(b) => Assign(f(Ior.both(a, b)))
-          }
-      }
   }
 }
