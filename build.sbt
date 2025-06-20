@@ -14,6 +14,7 @@ lazy val root = tlCrossRootProject
     scalaJS,
     http4s,
     http4sJDKDemo,
+    natchez,
     genRules,
     genInput,
     genOutput,
@@ -64,19 +65,20 @@ lazy val core =
     )
     .dependsOn(model)
 
-lazy val scalaJS = project
-  .in(file("scalajs"))
-  .enablePlugins(ScalaJSPlugin)
-  .settings(
-    moduleName                              := "clue-scalajs",
-    coverageEnabled                         := false,
-    // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-    dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
-    libraryDependencies ++=
-      Settings.Libraries.ScalaJsDom.value ++
-        Settings.Libraries.ScalaJsMacrotaskExecutor.value
-  )
-  .dependsOn(core.js)
+lazy val scalaJS =
+  project
+    .in(file("scalajs"))
+    .enablePlugins(ScalaJSPlugin)
+    .settings(
+      moduleName                              := "clue-scalajs",
+      coverageEnabled                         := false,
+      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
+      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
+      libraryDependencies ++=
+        Settings.Libraries.ScalaJsDom.value ++
+          Settings.Libraries.ScalaJsMacrotaskExecutor.value
+    )
+    .dependsOn(core.js)
 
 lazy val http4s =
   crossProject(JVMPlatform, JSPlatform)
@@ -92,20 +94,31 @@ lazy val http4s =
     )
     .dependsOn(core)
 
-lazy val http4sJDKDemo = project
-  .in(file("http4s-jdk-demo"))
-  .enablePlugins(NoPublishPlugin)
-  .settings(
-    moduleName           := "clue-http4s-jdk-client-demo",
-    tlJdkRelease         := Some(11),
-    Compile / run / fork := true,
-    libraryDependencies ++= Seq(
-      "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
-      "org.slf4j"      % "slf4j-simple"   % "2.0.17"
-    ) ++ Settings.Libraries.Http4sJDKClient.value,
-    scalacOptions += "-language:implicitConversions"
-  )
-  .dependsOn(http4s.jvm)
+lazy val http4sJDKDemo =
+  project
+    .in(file("http4s-jdk-demo"))
+    .enablePlugins(NoPublishPlugin)
+    .settings(
+      moduleName           := "clue-http4s-jdk-client-demo",
+      tlJdkRelease         := Some(11),
+      Compile / run / fork := true,
+      libraryDependencies ++= Seq(
+        "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
+        "org.slf4j"      % "slf4j-simple"   % "2.0.17"
+      ) ++ Settings.Libraries.Http4sJDKClient.value,
+      scalacOptions += "-language:implicitConversions"
+    )
+    .dependsOn(http4s.jvm)
+
+lazy val natchez =
+  crossProject(JVMPlatform, JSPlatform)
+    .crossType(CrossType.Pure)
+    .in(file("natchez"))
+    .settings(
+      moduleName := "clue-natchez",
+      libraryDependencies ++= Settings.Libraries.Natchez.value
+    )
+    .dependsOn(core)
 
 lazy val genRules =
   project
@@ -138,67 +151,70 @@ lazy val genInput =
     .dependsOn(core.jvm)
 // .dependsOn(genRules % ScalafixConfig) // Only necessary to fix inputs in place.
 
-lazy val genOutput = project
-  .in(file("gen/output"))
-  .enablePlugins(NoPublishPlugin)
-  .disablePlugins(ScalafixPlugin)
-  .settings(
-    scalacOptions ++= { if (tlIsScala3.value) Nil else List("-Wconf:cat=unused:info") },
-    libraryDependencies ++= Settings.Libraries.Monocle.value,
-    tlFatalWarnings := false
-  )
-  .dependsOn(core.jvm)
+lazy val genOutput =
+  project
+    .in(file("gen/output"))
+    .enablePlugins(NoPublishPlugin)
+    .disablePlugins(ScalafixPlugin)
+    .settings(
+      scalacOptions ++= { if (tlIsScala3.value) Nil else List("-Wconf:cat=unused:info") },
+      libraryDependencies ++= Settings.Libraries.Monocle.value,
+      tlFatalWarnings := false
+    )
+    .dependsOn(core.jvm)
 
-lazy val genTests = project
-  .in(file("gen/tests"))
-  .enablePlugins(ScalafixTestkitPlugin, NoPublishPlugin)
-  .disablePlugins(ScalafixPlugin)
-  .settings(
-    libraryDependencies ~= (_.filterNot(_.name == "scalafix-testkit")),
-    libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value
-      .map(_.cross(CrossVersion.constant(V.scala213))),
-    scalafixTestkitOutputSourceDirectories := (genOutput / Compile / unmanagedSourceDirectories).value,
-    scalafixTestkitInputSourceDirectories  := (genInput / Compile / unmanagedSourceDirectories).value,
-    scalafixTestkitInputClasspath          := (genInput / Compile / fullClasspath).value,
-    scalafixTestkitInputScalacOptions      := (genInput / Compile / scalacOptions).value,
-    scalafixTestkitInputScalaVersion       := (genInput / Compile / scalaVersion).value
-  )
-  .dependsOn(genRules)
+lazy val genTests =
+  project
+    .in(file("gen/tests"))
+    .enablePlugins(ScalafixTestkitPlugin, NoPublishPlugin)
+    .disablePlugins(ScalafixPlugin)
+    .settings(
+      libraryDependencies ~= (_.filterNot(_.name == "scalafix-testkit")),
+      libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value
+        .map(_.cross(CrossVersion.constant(V.scala213))),
+      scalafixTestkitOutputSourceDirectories := (genOutput / Compile / unmanagedSourceDirectories).value,
+      scalafixTestkitInputSourceDirectories  := (genInput / Compile / unmanagedSourceDirectories).value,
+      scalafixTestkitInputClasspath          := (genInput / Compile / fullClasspath).value,
+      scalafixTestkitInputScalacOptions      := (genInput / Compile / scalacOptions).value,
+      scalafixTestkitInputScalaVersion       := (genInput / Compile / scalaVersion).value
+    )
+    .dependsOn(genRules)
 
-lazy val sbtPlugin = project
-  .in(file("sbt-plugin"))
-  .enablePlugins(SbtPlugin, BuildInfoPlugin)
-  .settings(
-    moduleName                              := "sbt-clue",
-    crossScalaVersions                      := List("2.12.20"),
-    scalacOptions                           := Nil,
-    addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % V.scalafixVersion),
-    addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
-    addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
-    buildInfoPackage                        := "clue.sbt",
-    buildInfoKeys                           := Seq[BuildInfoKey](
-      version,
-      organization,
-      "rulesModule" -> (genRules / moduleName).value,
-      "coreModule"  -> (core.jvm / moduleName).value
-    ),
-    buildInfoOptions += BuildInfoOption.PackagePrivate,
-    Test / test                             := {
-      scripted.toTask("").value
-    },
-    scripted                                := scripted
-      .dependsOn(
-        genRules / publishLocal,
-        model.jvm / publishLocal,
-        core.jvm / publishLocal
-      )
-      .evaluated,
-    scriptedLaunchOpts ++= Seq(
-      "-Xmx1024M",
-      "-Dplugin.version=" + version.value,
-      "-Dscala.version=" + (core.jvm / scalaVersion).value
-    ),
-    scriptedBufferLog                       := false,
-    // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-    dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value
-  )
+lazy val sbtPlugin =
+  project
+    .in(file("sbt-plugin"))
+    .enablePlugins(SbtPlugin, BuildInfoPlugin)
+    .settings(
+      moduleName                              := "sbt-clue",
+      crossScalaVersions                      := List("2.12.20"),
+      scalacOptions                           := Nil,
+      addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % V.scalafixVersion),
+      addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
+      addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
+      buildInfoPackage                        := "clue.sbt",
+      buildInfoKeys                           := Seq[BuildInfoKey](
+        version,
+        organization,
+        "rulesModule" -> (genRules / moduleName).value,
+        "coreModule"  -> (core.jvm / moduleName).value
+      ),
+      buildInfoOptions += BuildInfoOption.PackagePrivate,
+      Test / test                             := {
+        scripted.toTask("").value
+      },
+      scripted                                := scripted
+        .dependsOn(
+          genRules / publishLocal,
+          model.jvm / publishLocal,
+          core.jvm / publishLocal
+        )
+        .evaluated,
+      scriptedLaunchOpts ++= Seq(
+        "-Xmx1024M",
+        "-Dplugin.version=" + version.value,
+        "-Dscala.version=" + (core.jvm / scalaVersion).value
+      ),
+      scriptedBufferLog                       := false,
+      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
+      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value
+    )
