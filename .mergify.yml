@@ -58,6 +58,14 @@ pull_request_rules:
       add:
       - model
       remove: []
+- name: Label natchez PRs
+  conditions:
+  - files~=^natchez/
+  actions:
+    label:
+      add:
+      - natchez
+      remove: []
 - name: Label output PRs
   conditions:
   - files~=^gen/output/
