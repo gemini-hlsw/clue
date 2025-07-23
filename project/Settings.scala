@@ -21,7 +21,7 @@ object Settings {
     val munitCatsEffect          = "2.1.0"
     val natchez                  = "0.3.8"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
-    val scalaJsDom               = "2.8.0"
+    val scalaJsDom               = "2.8.1"
     val scalaJsMacrotaskExecutor = "1.1.1"
   }
 
