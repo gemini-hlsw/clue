@@ -127,6 +127,50 @@ class NatchezFetchClient[F[_]: Trace: MonadCancelThrow, P, S](
                                       "clue.response.errors" -> errs.toList.mkString("[", ", ", "]")
         yield result
 
+// Extension methods for convenient tracing
+object http4s:
+  extension [F[_], P, S](client: F[FetchClientWithPars[F, P, S]]) {
+    @scala.annotation.targetName("tracedFetchClient")
+    def traced(using
+      cats.effect.MonadCancelThrow[F],
+      natchez.Trace[F],
+      cats.Functor[F]
+    ): F[FetchClientWithPars[F, P, S]] =
+      client.map(NatchezMiddleware(_))
+
+    @scala.annotation.targetName("tracedWithFetchClient")
+    def tracedWith(
+      spanOptions: natchez.Span.Options,
+      additionalAttributesF: (clue.model.GraphQLQuery, Option[io.circe.JsonObject]) => F[Seq[(String, natchez.TraceValue)]]
+    )(using
+      cats.effect.MonadCancelThrow[F],
+      natchez.Trace[F],
+      cats.Functor[F]
+    ): F[FetchClientWithPars[F, P, S]] =
+      client.map(NatchezMiddleware(_, spanOptions, additionalAttributesF))
+  }
+
+  extension [F[_], S](client: F[StreamingClient[F, S]]) {
+    @scala.annotation.targetName("tracedStreamingClient")
+    def traced(using
+      cats.effect.MonadCancelThrow[F],
+      natchez.Trace[F],
+      cats.Functor[F]
+    ): F[StreamingClient[F, S]] =
+      client.map(NatchezMiddleware(_))
+
+    @scala.annotation.targetName("tracedWithStreamingClient")
+    def tracedWith(
+      spanOptions: natchez.Span.Options,
+      additionalAttributesF: (clue.model.GraphQLQuery, Option[io.circe.JsonObject]) => F[Seq[(String, natchez.TraceValue)]]
+    )(using
+      cats.effect.MonadCancelThrow[F],
+      natchez.Trace[F],
+      cats.Functor[F]
+    ): F[StreamingClient[F, S]] =
+      client.map(NatchezMiddleware(_, spanOptions, additionalAttributesF))
+  }
+
 class NatchezStreamingClient[F[_]: Trace: MonadCancelThrow, S](
   wrapped:               StreamingClient[F, S],
   spanOptions:           Span.Options,
