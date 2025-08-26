@@ -28,4 +28,5 @@ object Http4sHttpClient {
       )(using F, internalLogger, backend)
     )
   }
+
 }

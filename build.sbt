@@ -93,7 +93,7 @@ lazy val http4s =
         Settings.Libraries.Http4sCirce.value ++
           Settings.Libraries.Http4sClient.value
     )
-    .dependsOn(core)
+    .dependsOn(core, natchez)
 
 lazy val http4sJDKDemo =
   project
