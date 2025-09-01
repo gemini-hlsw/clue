@@ -29,7 +29,7 @@ final class Http4sWebSocketBackend[F[_]: Concurrent](client: WSClient[F])
   ): F[WebSocketConnection[F]] =
     client
       .connectHighLevel:
-        WSRequest(uri).withHeaders(Headers("Sec-WebSocket-Protocol" -> "graphql-ws"))
+        WSRequest(uri).withHeaders(Headers("Sec-WebSocket-Protocol" -> "graphql-transport-ws"))
       .allocated // TODO replace with allocatedCase
       .flatMap: (connection, release) =>
         connection.receiveStream

@@ -108,7 +108,7 @@ object StreamingMessage:
      * @param payload
      *   optional field can be used to transfer additional details about the ping
      */
-    final case class Ping(payload: Option[Map[String, Json]])
+    final case class Ping(payload: Option[Map[String, Json]] = none)
         extends FromServer
         with Payload[Option[Map[String, Json]]] derives Eq
 

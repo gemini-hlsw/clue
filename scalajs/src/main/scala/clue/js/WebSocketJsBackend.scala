@@ -24,7 +24,7 @@ import org.typelevel.log4cats.Logger
  */
 final class WebSocketJsBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
     extends WebSocketBackend[F, String] {
-  private val Protocol = "graphql-ws"
+  private val Protocol = "graphql-transport-ws"
 
   override def connect(
     uri:          String,
@@ -72,14 +72,15 @@ final class WebSocketJsBackend[F[_]: Async: Logger](dispatcher: Dispatcher[F])
           }
 
           ws.onclose = { (e: CloseEvent) =>
-            val close: F[Unit] =
+            val closeParams: CloseParams = CloseParams(e.code, e.reason)
+            val close: F[Unit]           =
               for {
                 _       <- s"WebSocket closed for URI [$uri]".traceF
                 errored <- isErrored.get
                 _       <- handler.onClose(
                              connectionId,
-                             if (errored) DisconnectedException.asLeft
-                             else CloseParams(e.code, e.reason).asRight
+                             if (errored) DisconnectedException(closeParams.show).asLeft
+                             else closeParams.asRight
                            )
               } yield ()
             dispatcher.unsafeRunAndForget(close)

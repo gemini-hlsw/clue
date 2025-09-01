@@ -148,8 +148,8 @@ trait PersistentClient[F[_], CP, CE] {
   def statusStream: fs2.Stream[F, PersistentClientStatus]
 
   // Initialization may repeat upon reconnection, that's why the payload is effectful since it may change over time (eg: auth tokens).
-  def connect(payload: F[Map[String, Json]]): F[Unit]
-  def connect(): F[Unit]
+  def connect(payload: F[Map[String, Json]]): F[Map[String, Json]]
+  def connect(): F[Map[String, Json]]
 
   def disconnect(closeParameters: CP): F[Unit]
   def disconnect(): F[Unit]
