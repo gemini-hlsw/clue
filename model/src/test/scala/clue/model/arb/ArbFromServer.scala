@@ -10,8 +10,6 @@ import clue.model.GraphQLResponse
 import clue.model.StreamingMessage.FromServer
 import clue.model.StreamingMessage.FromServer.*
 import io.circe.Json
-import io.circe.JsonObject
-import io.circe.testing.instances.*
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.*
 import org.scalacheck.Gen
@@ -67,16 +65,22 @@ trait ArbFromServer:
         extensions
       )
 
-  given Arbitrary[ConnectionError] =
+  given Arbitrary[ConnectionAck] =
     Arbitrary:
-      arbitrary[JsonObject](using arbitraryJsonObject).map(ConnectionError(_))
+      for p <- arbitrary[Option[Map[String, Json]]](using arbOptJsonStringMap)
+      yield ConnectionAck(p)
 
-  given Arbitrary[Data] =
+  given Arbitrary[Ping] =
+    Arbitrary:
+      for p <- arbitrary[Option[Map[String, Json]]](using arbOptJsonStringMap)
+      yield Ping(p)
+
+  given Arbitrary[Next] =
     Arbitrary:
       for
         i <- arbitrary[String]
         p <- arbitrary[GraphQLResponse[Json]](using arbCombinedResponse(using arbJsonString))
-      yield Data(i, p)
+      yield Next(i, p)
 
   given Arbitrary[Error] =
     Arbitrary:
@@ -92,10 +96,9 @@ trait ArbFromServer:
   given Arbitrary[FromServer] =
     Arbitrary:
       Gen.oneOf[FromServer](
-        Gen.const(ConnectionAck),
-        arbitrary[ConnectionError],
-        Gen.const(ConnectionKeepAlive),
-        arbitrary[Data],
+        arbitrary[ConnectionAck],
+        arbitrary[Ping],
+        arbitrary[Next],
         arbitrary[Error],
         arbitrary[Complete]
       )

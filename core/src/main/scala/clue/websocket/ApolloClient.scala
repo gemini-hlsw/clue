@@ -144,24 +144,24 @@ class ApolloClient[F[_], P, S](
       case Left(e)                                                                 =>
         ServerMessageDecodingException(e).logAndRaiseF
       case Right(StreamingMessage.FromServer.ConnectionAck)                        =>
-        stateModify {
+        stateModify:
           case s @ Connecting(stateConnectionId, _, _, _, latch)
               if connectionId === stateConnectionId =>
             s -> latch.release
           case s => s -> s"Unexpected connection_ack received from server.".warnF
-        }
-      case Right(StreamingMessage.FromServer.ConnectionError(payload))             =>
-        stateModify {
-          case s @ Connecting(stateConnectionId, _, _, _, latch)
-              if connectionId === stateConnectionId =>
-            // We don't disconnect here. According to spec:
-            // "It server (sic) also respond with this message in case of a parsing errors of the message (which does not disconnect the client, just ignore the message)."
-            s ->
-              latch.error(RemoteInitializationException(payload)).void
-          case s => s -> s"Unexpected connection_error received from server.".warnF
-        }
-      case Right(msg @ StreamingMessage.FromServer.Data(subscriptionId, response)) =>
-        state.get.flatMap {
+      // TODO Handle ConnectionErrors
+      // case Right(StreamingMessage.FromServer.ConnectionError(payload))             =>
+      //   stateModify {
+      //     case s @ Connecting(stateConnectionId, _, _, _, latch)
+      //         if connectionId === stateConnectionId =>
+      //       // We don't disconnect here. According to spec:
+      //       // "It server (sic) also respond with this message in case of a parsing errors of the message (which does not disconnect the client, just ignore the message)."
+      //       s ->
+      //         latch.error(RemoteInitializationException(payload)).void
+      //     case s => s -> s"Unexpected connection_error received from server.".warnF
+      //   }
+      case Right(msg @ StreamingMessage.FromServer.Next(subscriptionId, response)) =>
+        state.get.flatMap:
           case Connected(stateConnectionId, _, _, subscriptions)
               if connectionId === stateConnectionId =>
             subscriptions.get(subscriptionId) match {
@@ -171,13 +171,12 @@ class ApolloClient[F[_], P, S](
                 emitter.emitData(response)
             }
           case s @ _ =>
-            UnexpectedServerMessageException[StreamingMessage.FromServer.Data, State[F]](
+            UnexpectedServerMessageException[StreamingMessage.FromServer.Next, State[F]](
               msg,
               s
             ).logAndRaiseF
-        }
       case Right(msg @ StreamingMessage.FromServer.Error(subscriptionId, payload)) =>
-        state.get.flatMap {
+        state.get.flatMap:
           case Connected(stateConnectionId, _, _, subscriptions)
               if connectionId === stateConnectionId =>
             subscriptions.get(subscriptionId) match {
@@ -192,9 +191,8 @@ class ApolloClient[F[_], P, S](
               msg,
               s
             ).logAndRaiseF
-        }
       case Right(StreamingMessage.FromServer.Complete(subscriptionId))             =>
-        state.get.flatMap {
+        state.get.flatMap:
           case Connected(stateConnectionId, _, _, subscriptions)
               if connectionId === stateConnectionId =>
             subscriptions.get(subscriptionId) match {
@@ -212,8 +210,10 @@ class ApolloClient[F[_], P, S](
           case s @ _                                                                           =>
             s"UNEXPECTED Complete RECEIVED for subscription [$subscriptionId].".warnF >>
               s"  \\-- State Is: [$s]".traceF
-        }
-      case Right(StreamingMessage.FromServer.ConnectionKeepAlive)                  => F.unit
+      case Right(StreamingMessage.FromServer.Ping(_))                              =>
+        state.get.flatMap:
+          case Connected(_, connection, _, _) => connection.send(StreamingMessage.FromClient.Pong())
+          case _                              => F.unit
       case _                                                                       => s"Unexpected message received from server: [$msg]".warnF
     }
 
@@ -224,7 +224,7 @@ class ApolloClient[F[_], P, S](
 
     reconnectionStrategy(0, event.asRight) match {
       case None       =>
-        stateModify {
+        stateModify:
           case s @ Disconnected(_)                                                         =>
             s -> s"onClose() called while disconnected.".debugF
           case Connecting(stateConnectionId, _, _, _, latch)
@@ -234,16 +234,15 @@ class ApolloClient[F[_], P, S](
             Disconnected(connectionId.next) -> F.unit
           case s @ _                                                                       =>
             s -> debug
-        }
       case Some(wait) =>
-        Latch[F].flatMap { newLatch =>
+        Latch[F].flatMap: newLatch =>
           def waitAndConnect(nextConnectionId: ConnectionId): F[Unit] =
             s"Connection closed with event [$event]. Attempting to reconnect.".warnF >>
               s"Waiting [$wait] before reconnect...".debugF >>
               timer.sleep(wait) >>
               doConnect(nextConnectionId, attempt = 1)
 
-          stateModify {
+          stateModify:
             case s @ Disconnected(stateConnectionId) if connectionId === stateConnectionId =>
               s -> s"Unexpected onClose() called while disconnected. Not applying reconnectStrategy.".warnF
             case Connecting(stateConnectionId, _, initPayload, subscriptions, connectLatch)
@@ -261,8 +260,6 @@ class ApolloClient[F[_], P, S](
               ) -> waitAndConnect(connectionId.next)
             case s @ _                                                                     =>
               s -> debug
-          }
-        }
     }
   }
   // </WebSocketHandler>
@@ -284,7 +281,7 @@ class ApolloClient[F[_], P, S](
       emitter.crash(t)
     }.void
 
-    reconnectionStrategy(attempt, t.asLeft) match {
+    reconnectionStrategy(attempt, t.asLeft) match
       case None       =>
         Disconnected(nextConnectionId) ->
           (errorSubscriptions >> disconnectBackend >> t.logAndRaiseF)
@@ -295,7 +292,6 @@ class ApolloClient[F[_], P, S](
             disconnectBackend >>
             timer.sleep(wait) >>
             doConnect(nextConnectionId, attempt + 1))
-    }
   }
 
   private def doConnect(connectionId: ConnectionId, attempt: Int = 1): F[Unit] =
@@ -303,27 +299,23 @@ class ApolloClient[F[_], P, S](
       backend
         .connect(connectionParams, this, connectionId)
         .attempt
-        .flatMap { connectionAttempt =>
-          stateModify {
+        .flatMap: connectionAttempt =>
+          stateModify:
             case Connecting(connectionId, None, payload, subscriptions, latch) =>
-              connectionAttempt match {
+              connectionAttempt match
                 case Left(t)           =>
                   handleRetry(t, none, connectionId.next, payload, subscriptions, latch, attempt)
                 case Right(connection) =>
                   Connecting(connectionId, connection.some, payload, subscriptions, latch) ->
                     doInitialize(connection, payload, latch, attempt)
-              }
             case s                                                             =>
               s -> (s"Unexpected state in connect().".errorF >> s"State Is: [$s]".traceF >>
                 InvalidInvocationException(
                   s"Unexpected state in connect(). Unblocking clients, but state may be inconsistent."
                 ).raiseF)
-          }
-        }
-        .guaranteeCase {
+        .guaranteeCase:
           case Outcome.Succeeded(_) | Outcome.Errored(_) => F.unit
           case Outcome.Canceled()                        => disconnect().start.void // Cleanup
-        }
 
   private def doInitialize(
     connection: WebSocketConnection[F],
@@ -331,7 +323,7 @@ class ApolloClient[F[_], P, S](
     latch:      Latch[F],
     attempt:    Int
   ): F[Unit] =
-    (for {
+    (for
       p        <- payload
       _        <- s"Initializing. Attempt: [$attempt]. Payload: [$p].".traceF
       _        <- connection.send(StreamingMessage.FromClient.ConnectionInit(p))
@@ -360,18 +352,17 @@ class ApolloClient[F[_], P, S](
                           s"Unexpected state when initializing. State may be inconsistent."
                         ).raiseF)
                   }
-    } yield ())
-      .guaranteeCase {
+    yield ())
+      .guaranteeCase:
         case Outcome.Succeeded(_) | Outcome.Errored(_) => F.unit
         case Outcome.Canceled()                        => disconnect().start.void // Cleanup.
-      }
 
   private def gracefulTerminate(
     connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]]
   ): F[Unit] =
-    (stopSubscriptions(connection, subscriptions) >>
-      connection.send(StreamingMessage.FromClient.ConnectionTerminate)).attempt.void
+    stopSubscriptions(connection, subscriptions).attempt.void // >>
+  // connection.send(StreamingMessage.FromClient.ConnectionTerminate)).attempt.void
   // </ApolloClient Helpers>
 
   // <GraphQLStreamingClient Helpers>
@@ -379,9 +370,10 @@ class ApolloClient[F[_], P, S](
     connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]]
   ): F[Unit] =
-    subscriptions.toList.traverse { case (id, emitter) =>
-      connection.send(StreamingMessage.FromClient.Start(id, emitter.request))
-    }.void
+    subscriptions.toList
+      .traverse: (id, emitter) =>
+        connection.send(StreamingMessage.FromClient.Subscribe(id, emitter.request))
+      .void
 
   // Stop = Send stop message to server.
   private def stopSubscriptions(
@@ -389,7 +381,7 @@ class ApolloClient[F[_], P, S](
     subscriptions: Map[String, Emitter[F]]
   ): F[Unit] =
     subscriptions.toList.traverse { case (id, _) =>
-      connection.send(StreamingMessage.FromClient.Stop(id))
+      connection.send(StreamingMessage.FromClient.Complete(id))
     }.void
 
   // Halt = Terminate stream sent to client.
@@ -513,7 +505,7 @@ class ApolloClient[F[_], P, S](
           def sendStart: F[Unit] = state.get.flatMap {
             // The connection may have changed since we created the subscription, so we re-get it.
             case Connected(_, currentConnection, _, _) =>
-              currentConnection.send(StreamingMessage.FromClient.Start(id, request))
+              currentConnection.send(StreamingMessage.FromClient.Subscribe(id, request))
             case Connecting(_, _, _, _, latch)         =>
               latch.resolve >> sendStart
             case s @ _                                 =>
@@ -547,7 +539,7 @@ class ApolloClient[F[_], P, S](
     state.get.flatMap {
       // The connection may have changed since we created the subscription, so we re-get it.
       case Connected(_, currentConnection, _, _) =>
-        currentConnection.send(StreamingMessage.FromClient.Stop(subscriptionId))
+        currentConnection.send(StreamingMessage.FromClient.Complete(subscriptionId))
       case s @ _                                 =>
         InvalidSubscriptionOperationException("send stop", subscriptionId).logAndRaiseF
     }

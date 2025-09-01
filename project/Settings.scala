@@ -15,6 +15,7 @@ object Settings {
     val http4sDom                = "0.2.7"
     val http4sJDKClient          = "0.10.0"
     val jawn                     = "1.3.2"
+    val kittens                  = "3.5.0"
     val log4Cats                 = "2.7.1"
     val monocle                  = "3.3.0"
     val munit                    = "1.1.1"
@@ -106,6 +107,12 @@ object Settings {
     val Jawn = Def.setting(
       Seq(
         "org.typelevel" %%% "jawn-ast" % jawn
+      )
+    )
+
+    val Kittens = Def.setting(
+      Seq(
+        "org.typelevel" %%% "kittens" % kittens
       )
     )
 
