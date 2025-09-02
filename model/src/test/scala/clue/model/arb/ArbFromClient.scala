@@ -6,7 +6,6 @@ package clue.model.arb
 import clue.model.GraphQLRequest
 import clue.model.StreamingMessage.FromClient
 import clue.model.StreamingMessage.FromClient.*
-import io.circe.Json
 import io.circe.JsonObject
 import io.circe.testing.instances.*
 import org.scalacheck.Arbitrary
@@ -19,11 +18,11 @@ trait ArbFromClient:
 
   given Arbitrary[ConnectionInit] =
     Arbitrary:
-      arbitrary[Option[Map[String, Json]]](using arbOptJsonStringMap).map(ConnectionInit(_))
+      arbitrary[Option[JsonObject]](using arbOptJsonObject).map(ConnectionInit(_))
 
   given Arbitrary[Pong] =
     Arbitrary:
-      arbitrary[Option[Map[String, Json]]](using arbOptJsonStringMap).map(Pong(_))
+      arbitrary[Option[JsonObject]](using arbOptJsonObject).map(Pong(_))
 
   given Arbitrary[Subscribe] =
     Arbitrary:

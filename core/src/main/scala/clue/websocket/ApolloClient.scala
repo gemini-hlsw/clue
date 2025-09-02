@@ -20,6 +20,7 @@ import fs2.Stream
 import fs2.concurrent.SignallingRef
 import io.circe.*
 import io.circe.parser.*
+import io.circe.syntax.*
 import org.typelevel.log4cats.Logger
 
 import java.util.UUID
@@ -59,20 +60,20 @@ class ApolloClient[F[_], P, S](
   override def statusStream: fs2.Stream[F, PersistentClientStatus] =
     connectionStatus.discrete
 
-  override def connect(): F[Map[String, Json]] = connect(Map.empty.pure[F])
+  override def connect(): F[JsonObject] = connect(JsonObject.empty.pure[F])
 
-  override def connect(payload: F[Map[String, Json]]): F[Map[String, Json]] = {
+  override def connect[A: Encoder.AsObject](payload: F[A]): F[JsonObject] = {
     val warn = "connect() called while already connected or attempting to connect.".warnF
 
-    Latch[F, Map[String, Json]].flatMap { newLatch =>
+    Latch[F, JsonObject].flatMap { newLatch =>
       stateModify {
         case Disconnected(connectionId)        =>
-          Connecting(connectionId, none, payload, Map.empty, newLatch) ->
-            (doConnect(connectionId) >> newLatch.resolve.map(_.getOrElse(Map.empty)))
+          Connecting(connectionId, none, payload.map(_.asJsonObject), Map.empty, newLatch) ->
+            (doConnect(connectionId) >> newLatch.resolve.map(_.getOrElse(JsonObject.empty)))
         case s @ Connecting(_, _, _, _, latch) =>
-          s -> (warn >> latch.resolve.map(_.getOrElse(Map.empty)))
+          s -> (warn >> latch.resolve.map(_.getOrElse(JsonObject.empty)))
         case s                                 =>
-          s -> warn.as(Map.empty)
+          s -> warn.as(JsonObject.empty)
       }
     }
   }
@@ -226,7 +227,7 @@ class ApolloClient[F[_], P, S](
             case s @ _                                                                       =>
               s -> debug
         case Some(wait) =>
-          Latch[F, Map[String, Json]].flatMap: newLatch =>
+          Latch[F, JsonObject].flatMap: newLatch =>
             def waitAndConnect(nextConnectionId: ConnectionId): F[Unit] =
               "Attempting to reconnect.".warnF >>
                 s"Waiting [$wait] before reconnect...".debugF >>
@@ -260,9 +261,9 @@ class ApolloClient[F[_], P, S](
     t:                Throwable,
     oldConnection:    Option[WebSocketConnection[F]],
     nextConnectionId: ConnectionId,
-    payload:          F[Map[String, Json]],
+    payload:          F[JsonObject],
     subscriptions:    Map[String, Emitter[F]],
-    newLatch:         Latch[F, Map[String, Json]],
+    newLatch:         Latch[F, JsonObject],
     attempt:          Int
   ): (State[F], F[Unit]) = {
     val disconnectBackend: F[Unit] =
@@ -310,8 +311,8 @@ class ApolloClient[F[_], P, S](
 
   private def doInitialize(
     connection: WebSocketConnection[F],
-    payload:    F[Map[String, Json]],
-    latch:      Latch[F, Map[String, Json]],
+    payload:    F[JsonObject],
+    latch:      Latch[F, JsonObject],
     attempt:    Int
   ): F[Unit] =
     (for
@@ -319,7 +320,7 @@ class ApolloClient[F[_], P, S](
       _        <- s"Initializing. Attempt: [$attempt]. Payload: [$p].".traceF
       _        <- connection.send(StreamingMessage.FromClient.ConnectionInit(p))
       result   <- latch.resolve.attempt // Sync up with server response.
-      newLatch <- Latch[F, Map[String, Json]]
+      newLatch <- Latch[F, JsonObject]
       _        <- stateModify {
                     case Connecting(connectionId, Some(connection), payload, subscriptions, _) =>
                       result match

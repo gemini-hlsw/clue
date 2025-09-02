@@ -20,15 +20,15 @@ protected object State {
   final case class Connecting[F[_]](
     connectionId:  ConnectionId,
     connection:    Option[WebSocketConnection[F]],
-    initPayload:   F[Map[String, Json]],
+    initPayload:   F[JsonObject],
     subscriptions: Map[String, Emitter[F]],
-    latch:         Latch[F, Map[String, Json]]
+    latch:         Latch[F, JsonObject]
   ) extends State[F](PersistentClientStatus.Connecting)
 
   final case class Connected[F[_]](
     connectionId:  ConnectionId,
     connection:    WebSocketConnection[F],
-    initPayload:   F[Map[String, Json]],
+    initPayload:   F[JsonObject],
     subscriptions: Map[String, Emitter[F]]
   ) extends State[F](PersistentClientStatus.Connected)
 }

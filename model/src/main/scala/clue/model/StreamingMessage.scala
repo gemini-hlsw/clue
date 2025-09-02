@@ -42,12 +42,12 @@ object StreamingMessage:
      * @param payload
      *   any connection parameters that the client wishes to send
      */
-    final case class ConnectionInit(payload: Option[Map[String, Json]] = none)
+    final case class ConnectionInit(payload: Option[JsonObject] = none)
         extends FromClient
-        with Payload[Option[Map[String, Json]]] derives Eq
+        with Payload[Option[JsonObject]] derives Eq
 
     object ConnectionInit:
-      inline def apply(payload: Map[String, Json]) = new ConnectionInit(payload.some)
+      inline def apply(payload: JsonObject) = new ConnectionInit(payload.some)
 
     /**
      * Client initiated message that keeps the client connection alive.
@@ -55,12 +55,12 @@ object StreamingMessage:
      * @param payload
      *   optional field can be used to transfer additional details about the pong
      */
-    final case class Pong(payload: Option[Map[String, Json]] = none)
+    final case class Pong(payload: Option[JsonObject] = none)
         extends FromClient
-        with Payload[Option[Map[String, Json]]] derives Eq
+        with Payload[Option[JsonObject]] derives Eq
 
     object Pong:
-      inline def apply(payload: Map[String, Json]) = new Pong(payload.some)
+      inline def apply(payload: JsonObject) = new Pong(payload.some)
 
     /**
      * Starts a GraphQL operation. The operation contains an id so that it can be explicitly stopped
@@ -95,12 +95,12 @@ object StreamingMessage:
     /**
      * A server acknowledgement and acceptance of a `ConnectionInit` request.
      */
-    final case class ConnectionAck(payload: Option[Map[String, Json]] = none)
+    final case class ConnectionAck(payload: Option[JsonObject] = none)
         extends FromServer
-        with Payload[Option[Map[String, Json]]] derives Eq
+        with Payload[Option[JsonObject]] derives Eq
 
     object ConnectionAck:
-      inline def apply(payload: Map[String, Json]) = new ConnectionAck(payload.some)
+      inline def apply(payload: JsonObject) = new ConnectionAck(payload.some)
 
     /**
      * Server initiated message that keeps the client connection alive.
@@ -108,12 +108,12 @@ object StreamingMessage:
      * @param payload
      *   optional field can be used to transfer additional details about the ping
      */
-    final case class Ping(payload: Option[Map[String, Json]] = none)
+    final case class Ping(payload: Option[JsonObject] = none)
         extends FromServer
-        with Payload[Option[Map[String, Json]]] derives Eq
+        with Payload[Option[JsonObject]] derives Eq
 
     object Ping:
-      inline def apply(payload: Map[String, Json]) = new Ping(payload.some)
+      inline def apply(payload: JsonObject) = new Ping(payload.some)
 
     /**
      * GraphQL execution result from the server. The result is associated with an operation that was
