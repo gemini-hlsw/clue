@@ -10,6 +10,7 @@ import clue.model.GraphQLResponse
 import clue.model.StreamingMessage.FromServer
 import clue.model.StreamingMessage.FromServer.*
 import io.circe.Json
+import io.circe.JsonObject
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.*
 import org.scalacheck.Gen
@@ -57,7 +58,7 @@ trait ArbFromServer:
         message    <- arbitrary[String]
         path       <- arbitrary[List[GraphQLError.PathElement]]
         locations  <- arbitrary[List[GraphQLError.Location]]
-        extensions <- arbitrary[Option[GraphQLExtensions]]
+        extensions <- arbitrary[Option[GraphQLExtensions]](using arbOptJsonObject)
       yield GraphQLError(
         message,
         NonEmptyList.fromList(path),
@@ -67,12 +68,12 @@ trait ArbFromServer:
 
   given Arbitrary[ConnectionAck] =
     Arbitrary:
-      for p <- arbitrary[Option[Map[String, Json]]](using arbOptJsonStringMap)
+      for p <- arbitrary[Option[JsonObject]](using arbOptJsonObject)
       yield ConnectionAck(p)
 
   given Arbitrary[Ping] =
     Arbitrary:
-      for p <- arbitrary[Option[Map[String, Json]]](using arbOptJsonStringMap)
+      for p <- arbitrary[Option[JsonObject]](using arbOptJsonObject)
       yield Ping(p)
 
   given Arbitrary[Next] =

@@ -52,7 +52,7 @@ package object json {
     Decoder.instance: c =>
       for
         _ <- checkType(c, "connection_init")
-        p <- c.get[Option[Map[String, Json]]]("payload")
+        p <- c.get[Option[JsonObject]]("payload")
       yield FromClient.ConnectionInit(p)
 
   given Encoder[FromClient.Pong] =
@@ -68,7 +68,7 @@ package object json {
     Decoder.instance: c =>
       for
         _ <- checkType(c, "pong")
-        p <- c.get[Option[Map[String, Json]]]("payload")
+        p <- c.get[Option[JsonObject]]("payload")
       yield FromClient.Pong(p)
 
   given Encoder[FromClient.Subscribe] =
@@ -137,7 +137,7 @@ package object json {
     Decoder.instance: c =>
       for
         _ <- checkType(c, "connection_ack")
-        p <- c.get[Option[Map[String, Json]]]("payload")
+        p <- c.get[Option[JsonObject]]("payload")
       yield FromServer.ConnectionAck(p)
 
   given Encoder[FromServer.Ping] =
@@ -153,7 +153,7 @@ package object json {
     Decoder.instance: c =>
       for
         _ <- checkType(c, "ping")
-        p <- c.get[Option[Map[String, Json]]]("payload")
+        p <- c.get[Option[JsonObject]]("payload")
       yield FromServer.Ping(p)
 
   given Encoder[GraphQLError.PathElement] =

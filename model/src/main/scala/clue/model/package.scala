@@ -4,8 +4,8 @@
 package clue.model
 
 import cats.data.NonEmptyList
-import io.circe.Json
+import io.circe.JsonObject
 
 type GraphQLErrors = NonEmptyList[GraphQLError]
 
-type GraphQLExtensions = Map[String, Json]
+type GraphQLExtensions = JsonObject
