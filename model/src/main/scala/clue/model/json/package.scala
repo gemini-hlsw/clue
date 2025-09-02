@@ -246,7 +246,7 @@ package object json {
   given Encoder[FromServer.Next] =
     Encoder.instance: a =>
       Json.obj(
-        "type"    -> Json.fromString("data"),
+        "type"    -> Json.fromString("next"),
         "id"      -> Json.fromString(a.id),
         "payload" -> a.payload.asJson
       )
@@ -254,7 +254,7 @@ package object json {
   given Decoder[FromServer.Next] =
     Decoder.instance: c =>
       for
-        _ <- checkType(c, "data")
+        _ <- checkType(c, "next")
         i <- c.get[String]("id")
         p <- c.get[GraphQLResponse[Json]]("payload")
       yield FromServer.Next(i, p)
@@ -303,7 +303,7 @@ package object json {
         .flatMap:
           case "connection_ack" => c.as[FromServer.ConnectionAck]
           case "ping"           => c.as[FromServer.Ping]
-          case "data"           => c.as[FromServer.Next]
+          case "next"           => c.as[FromServer.Next]
           case "error"          => c.as[FromServer.Error]
           case "complete"       => c.as[FromServer.Complete]
           case other            =>
