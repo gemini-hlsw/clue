@@ -19,26 +19,30 @@ trait ArbFromClient:
 
   given Arbitrary[ConnectionInit] =
     Arbitrary:
-      arbitrary[Map[String, Json]](using arbJsonStringMap).map(ConnectionInit(_))
+      arbitrary[Option[Map[String, Json]]](using arbOptJsonStringMap).map(ConnectionInit(_))
 
-  given Arbitrary[Start] =
+  given Arbitrary[Pong] =
+    Arbitrary:
+      arbitrary[Option[Map[String, Json]]](using arbOptJsonStringMap).map(Pong(_))
+
+  given Arbitrary[Subscribe] =
     Arbitrary:
       for
         i <- arbitrary[String]
         p <- arbitrary[GraphQLRequest[JsonObject]]
-      yield Start(i, p)
+      yield Subscribe(i, p)
 
-  given Arbitrary[Stop] =
+  given Arbitrary[Complete] =
     Arbitrary:
-      arbitrary[String].map(Stop(_))
+      arbitrary[String].map(Complete(_))
 
   given Arbitrary[FromClient] =
     Arbitrary:
       Gen.oneOf[FromClient](
         arbitrary[ConnectionInit],
-        arbitrary[Start],
-        arbitrary[Stop],
-        Gen.const(ConnectionTerminate)
+        arbitrary[Pong],
+        arbitrary[Subscribe],
+        arbitrary[Complete]
       )
 
 object ArbFromClient extends ArbFromClient

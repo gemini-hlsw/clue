@@ -9,6 +9,9 @@ import cats.syntax.all.*
 import io.circe.*
 import io.circe.syntax.given
 
+import StreamingMessage.FromClient
+import StreamingMessage.FromServer
+
 /**
  * JSON codecs for `clue.model`.
  */
@@ -36,71 +39,84 @@ package object json {
 
   // ---- FromClient
 
-  import StreamingMessage.FromClient.*
-
-  given Encoder[ConnectionInit] =
+  given Encoder[FromClient.ConnectionInit] =
     Encoder.instance: a =>
-      Json.obj(
-        "type"    -> Json.fromString("connection_init"),
-        "payload" -> a.payload.asJson
-      )
+      Json
+        .obj(
+          "type"    -> Json.fromString("connection_init"),
+          "payload" -> a.payload.asJson
+        )
+        .dropNullValues
 
-  given Decoder[ConnectionInit] =
+  given Decoder[FromClient.ConnectionInit] =
     Decoder.instance: c =>
       for
         _ <- checkType(c, "connection_init")
-        p <- c.get[Map[String, Json]]("payload")
-      yield ConnectionInit(p)
+        p <- c.get[Option[Map[String, Json]]]("payload")
+      yield FromClient.ConnectionInit(p)
 
-  given Encoder[Start] =
+  given Encoder[FromClient.Pong] =
+    Encoder.instance: a =>
+      Json
+        .obj(
+          "type"    -> Json.fromString("pong"),
+          "payload" -> a.payload.asJson
+        )
+        .dropNullValues
+
+  given Decoder[FromClient.Pong] =
+    Decoder.instance: c =>
+      for
+        _ <- checkType(c, "pong")
+        p <- c.get[Option[Map[String, Json]]]("payload")
+      yield FromClient.Pong(p)
+
+  given Encoder[FromClient.Subscribe] =
     Encoder.instance: a =>
       Json.obj(
-        "type"    -> Json.fromString("start"),
+        "type"    -> Json.fromString("subscribe"),
         "id"      -> Json.fromString(a.id),
         "payload" -> a.payload.asJson
       )
 
-  given Decoder[Start] =
+  given Decoder[FromClient.Subscribe] =
     Decoder.instance: c =>
       for
-        _ <- checkType(c, "start")
+        _ <- checkType(c, "subscribe")
         i <- c.get[String]("id")
         p <- c.get[GraphQLRequest[JsonObject]]("payload")
-      yield Start(i, p)
+      yield FromClient.Subscribe(i, p)
 
-  given Encoder[Stop] =
+  given FromClientCompleteEncoder: Encoder[FromClient.Complete] =
     Encoder.instance: a =>
       Json.obj(
-        "type" -> Json.fromString("stop"),
+        "type" -> Json.fromString("complete"),
         "id"   -> Json.fromString(a.id)
       )
 
-  given Decoder[Stop] =
+  given FromClientCompleteDecoder: Decoder[FromClient.Complete] =
     Decoder.instance: c =>
-      for {
-        _ <- checkType(c, "stop")
+      for
+        _ <- checkType(c, "complete")
         i <- c.get[String]("id")
-      } yield Stop(i)
-
-  given Decoder[ConnectionTerminate.type] =
-    decodeCaseObject("connection_terminate", ConnectionTerminate)
+      yield FromClient.Complete(i)
 
   given Encoder[StreamingMessage.FromClient] =
     Encoder.instance:
-      case m @ ConnectionInit(_)  => m.asJson
-      case m @ Start(_, _)        => m.asJson
-      case m @ Stop(_)            => m.asJson
-      case _ @ConnectionTerminate => encodeCaseObject("connection_terminate")
+      case m @ FromClient.ConnectionInit(_) => m.asJson
+      case m @ FromClient.Pong(_)           => m.asJson
+      case m @ FromClient.Subscribe(_, _)   => m.asJson
+      case m @ FromClient.Complete(_)       => m.asJson
 
   given Decoder[StreamingMessage.FromClient] =
     Decoder.instance: c =>
       c.get[String]("type")
         .flatMap:
-          case "connection_init"      => Decoder[ConnectionInit].widen(c)
-          case "start"                => Decoder[Start].widen(c)
-          case "stop"                 => Decoder[Stop].widen(c)
-          case "connection_terminate" => Decoder[ConnectionTerminate.type].widen(c)
-          case other                  =>
+          case "connection_init" => Decoder[FromClient.ConnectionInit].widen(c)
+          case "pong"            => Decoder[FromClient.Pong].widen(c)
+          case "subscribe"       => Decoder[FromClient.Subscribe].widen(c)
+          case "complete"        => Decoder[FromClient.Complete].widen(c)
+          case other             =>
             DecodingFailure(
               s"Unexpected StreamingMessage.FromClient with type [$other]",
               c.history
@@ -108,27 +124,37 @@ package object json {
 
   // ---- FromServer
 
-  import StreamingMessage.FromServer.*
-
-  given Decoder[ConnectionAck.type] =
-    decodeCaseObject("connection_ack", ConnectionAck)
-
-  given Encoder[ConnectionError] =
+  given Encoder[FromServer.ConnectionAck] =
     Encoder.instance: a =>
-      Json.obj(
-        "type"    -> Json.fromString("connection_error"),
-        "payload" -> a.payload.asJson
-      )
+      Json
+        .obj(
+          "type"    -> Json.fromString("connection_ack"),
+          "payload" -> a.payload.asJson
+        )
+        .dropNullValues
 
-  given Decoder[ConnectionError] =
+  given Decoder[FromServer.ConnectionAck] =
     Decoder.instance: c =>
       for
-        _ <- checkType(c, "connection_error")
-        p <- c.get[JsonObject]("payload")
-      yield ConnectionError(p)
+        _ <- checkType(c, "connection_ack")
+        p <- c.get[Option[Map[String, Json]]]("payload")
+      yield FromServer.ConnectionAck(p)
 
-  given Decoder[ConnectionKeepAlive.type] =
-    decodeCaseObject("ka", ConnectionKeepAlive)
+  given Encoder[FromServer.Ping] =
+    Encoder.instance: a =>
+      Json
+        .obj(
+          "type"    -> Json.fromString("ping"),
+          "payload" -> a.payload.asJson
+        )
+        .dropNullValues
+
+  given Decoder[FromServer.Ping] =
+    Decoder.instance: c =>
+      for
+        _ <- checkType(c, "ping")
+        p <- c.get[Option[Map[String, Json]]]("payload")
+      yield FromServer.Ping(p)
 
   given Encoder[GraphQLError.PathElement] =
     (a: GraphQLError.PathElement) => a.fold(_.asJson, _.asJson)
@@ -217,7 +243,7 @@ package object json {
             )(_.asRight)
       yield GraphQLResponse(result, extensions)
 
-  given Encoder[Data] =
+  given Encoder[FromServer.Next] =
     Encoder.instance: a =>
       Json.obj(
         "type"    -> Json.fromString("data"),
@@ -225,15 +251,15 @@ package object json {
         "payload" -> a.payload.asJson
       )
 
-  given Decoder[Data] =
+  given Decoder[FromServer.Next] =
     Decoder.instance: c =>
       for
         _ <- checkType(c, "data")
         i <- c.get[String]("id")
         p <- c.get[GraphQLResponse[Json]]("payload")
-      yield Data(i, p)
+      yield FromServer.Next(i, p)
 
-  implicit val EncoderError: Encoder[Error] =
+  implicit val EncoderError: Encoder[FromServer.Error] =
     Encoder.instance: a =>
       Json.obj(
         "type"    -> Json.fromString("error"),
@@ -241,48 +267,46 @@ package object json {
         "payload" -> a.payload.asJson
       )
 
-  given Decoder[Error] =
+  given Decoder[FromServer.Error] =
     Decoder.instance: c =>
       for
         _ <- checkType(c, "error")
         i <- c.get[String]("id")
         p <- c.get[GraphQLErrors]("payload")
-      yield Error(i, p)
+      yield FromServer.Error(i, p)
 
-  given Encoder[Complete] =
+  given FromServerCompleteEncoder: Encoder[FromServer.Complete] =
     Encoder.instance: a =>
       Json.obj(
         "type" -> Json.fromString("complete"),
         "id"   -> Json.fromString(a.id)
       )
 
-  given Decoder[Complete] =
+  given FromServerCompleteDecoder: Decoder[FromServer.Complete] =
     Decoder.instance: c =>
       for {
         _ <- checkType(c, "complete")
         i <- c.get[String]("id")
-      } yield Complete(i)
+      } yield FromServer.Complete(i)
 
   given Encoder[StreamingMessage.FromServer] =
     Encoder.instance:
-      case _ @ConnectionAck       => encodeCaseObject("connection_ack")
-      case m @ ConnectionError(_) => m.asJson
-      case _ @ConnectionKeepAlive => encodeCaseObject("ka")
-      case m @ Data(_, _)         => m.asJson
-      case m @ Error(_, _)        => m.asJson
-      case m @ Complete(_)        => m.asJson
+      case m @ FromServer.ConnectionAck(_) => m.asJson
+      case m @ FromServer.Ping(_)          => m.asJson
+      case m @ FromServer.Next(_, _)       => m.asJson
+      case m @ FromServer.Error(_, _)      => m.asJson
+      case m @ FromServer.Complete(_)      => m.asJson
 
   given Decoder[StreamingMessage.FromServer] =
     Decoder.instance: c =>
       c.get[String]("type")
         .flatMap:
-          case "connection_ack"   => c.as[ConnectionAck.type]
-          case "connection_error" => c.as[ConnectionError]
-          case "ka"               => c.as[ConnectionKeepAlive.type]
-          case "data"             => c.as[Data]
-          case "error"            => c.as[Error]
-          case "complete"         => c.as[Complete]
-          case other              =>
+          case "connection_ack" => c.as[FromServer.ConnectionAck]
+          case "ping"           => c.as[FromServer.Ping]
+          case "data"           => c.as[FromServer.Next]
+          case "error"          => c.as[FromServer.Error]
+          case "complete"       => c.as[FromServer.Complete]
+          case other            =>
             DecodingFailure(
               s"Unexpected StreamingMessage.FromServer with type [$other]",
               c.history

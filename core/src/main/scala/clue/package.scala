@@ -14,15 +14,15 @@ package object clue {
   type FetchClient[F[_], S] = FetchClientWithPars[F, ?, S]
 
   // The Latch value is interpreted as:
-  //   None = canceled, Some(Right(())) = done, Some(Left(t)) = error
-  protected[clue] type Latch[F[_]] = Deferred[F, Option[Either[Throwable, Unit]]]
+  //   None = canceled, Some(Right(Option(a))) = done with optional result a, Some(Left(t)) = error
+  protected[clue] type Latch[F[_], A] = Deferred[F, Option[Either[Throwable, Option[A]]]]
 
-  extension [F[_]](latch: Latch[F]) {
-    def resolve(using F: MonadCancelThrow[F]): F[Unit] =
-      latch.get.flatMap(_.fold(F.canceled)(_.fold(F.raiseError, F.pure)))
+  extension [F[_], A](latch: Latch[F, A]) {
+    def resolve(using F: MonadCancelThrow[F]): F[Option[A]] =
+      latch.get.flatMap(_.fold(F.canceled.as(none))(_.fold(F.raiseError, F.pure)))
 
-    def release(using Functor[F]): F[Unit] =
-      latch.complete(().asRight.some).void
+    def release(using Functor[F])(a: Option[A]): F[Unit] =
+      latch.complete(a.asRight.some).void
 
     def error(t: Throwable)(using Functor[F]): F[Unit] =
       latch.complete(t.asLeft.some).void
@@ -68,8 +68,8 @@ package object clue {
 
 package clue {
   protected[clue] object Latch {
-    def apply[F[_]: Concurrent]: F[Latch[F]] =
-      Deferred[F, Option[Either[Throwable, Unit]]]
+    def apply[F[_]: Concurrent, A]: F[Latch[F, A]] =
+      Deferred[F, Option[Either[Throwable, Option[A]]]]
   }
 
   protected[clue] class ConnectionId(val value: Int) extends AnyVal {

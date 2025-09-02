@@ -1,6 +1,6 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-ThisBuild / tlBaseVersion              := "0.46"
+ThisBuild / tlBaseVersion              := "0.47"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
@@ -39,6 +39,7 @@ lazy val model =
           Settings.Libraries.Circe.value ++
           Settings.Libraries.DisciplineMUnit.value ++
           Settings.Libraries.Fs2.value ++
+          Settings.Libraries.Kittens.value ++
           Settings.Libraries.Log4Cats.value ++
           Settings.Libraries.Monocle.value ++
           Settings.Libraries.MonocleLaw.value ++

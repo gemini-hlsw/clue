@@ -4,14 +4,15 @@
 package clue
 
 import clue.model.GraphQLErrors
-import io.circe.JsonObject
 
 class GraphQLException(msg: String) extends Exception(msg)
 
 case class ConnectionException(msg: String) extends GraphQLException(msg)
 
-case class RemoteInitializationException(payload: JsonObject)
-    extends GraphQLException(s"The server returned an error on initialization: [$payload]")
+case class RemoteInitializationException(exception: Throwable)
+    extends GraphQLException(
+      s"The server returned an error on initialization: [${exception.getMessage}]"
+    )
 
 case object ConnectionNotInitializedException extends GraphQLException("Connection not initialized")
 
@@ -20,7 +21,8 @@ case class UnexpectedInternalStateException[S](when: String, state: S)
       s"Unexpected internal state when [$when]. Cannot recover. State is [$state]"
     )
 
-case object DisconnectedException extends GraphQLException("Connection was closed")
+case class DisconnectedException(reason: String)
+    extends GraphQLException(s"Connection was closed. Reason: $reason.")
 
 case class InvalidSubscriptionOperationException(operation: String, subscriptionId: String)
     extends GraphQLException(

@@ -22,7 +22,7 @@ protected object State {
     connection:    Option[WebSocketConnection[F]],
     initPayload:   F[Map[String, Json]],
     subscriptions: Map[String, Emitter[F]],
-    latch:         Latch[F]
+    latch:         Latch[F, Map[String, Json]]
   ) extends State[F](PersistentClientStatus.Connecting)
 
   final case class Connected[F[_]](
