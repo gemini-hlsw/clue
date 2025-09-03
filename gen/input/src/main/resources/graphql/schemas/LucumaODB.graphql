@@ -560,7 +560,7 @@ enum EphemerisKeyType {
   ASTEROID_NEW
 
   # EphemerisKeyType AsteroidOld
-  ASTEROID_OLD
+  ASTEROID_OLD @deprecated(reason: "Use ASTEROID_NEW instead")
 
   # EphemerisKeyType MajorBody
   MAJOR_BODY

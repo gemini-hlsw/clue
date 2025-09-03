@@ -64,7 +64,7 @@ object StarWarsQuery extends GraphQLOperation[StarWars] {
         implicit val showHuman: cats.Show[Data.Character.Human] = cats.Show.fromToString
         implicit val jsonDecoderHuman: io.circe.Decoder[Data.Character.Human] = io.circe.generic.semiauto.deriveDecoder[Data.Character.Human]
       }
-      case class Droid(override val id: String, override val name: Option[String] = None, override val friends: Option[List[Data.Character.Friends]] = None, val primaryFunction: Option[String] = None) extends Character()
+      case class Droid(override val id: String, override val name: Option[String] = None, override val friends: Option[List[Data.Character.Friends]] = None, @deprecated("Use 'functions' instead") val primaryFunction: Option[String] = None) extends Character()
       object Droid {
         val id: monocle.Lens[Data.Character.Droid, String] = monocle.macros.GenLens[Data.Character.Droid](_.id)
         val name: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.name)

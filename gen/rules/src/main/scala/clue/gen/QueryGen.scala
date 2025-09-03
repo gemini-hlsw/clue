@@ -270,7 +270,7 @@ trait QueryGen extends Generator {
 
           ClassAccumulator(parAccum = List(param))
         case UntypedSelect(name, alias, _, _, child)   =>
-          val paramName = alias.getOrElse(name)
+          val paramName: String = alias.getOrElse(name)
 
           MetaTypes
             .get(name)
@@ -280,7 +280,18 @@ trait QueryGen extends Generator {
                 s"Could not resolve type for field [$name] - Is this a valid field present in the schema?"
               )
             ) { nextType =>
-              val accumulatorOpt =
+              val deprecation: Option[Deprecation] =
+                currentType
+                  .flatMap(_.fieldInfo(name))
+                  .flatMap(info => Deprecation.fromDirectives(info.directives))
+
+              deprecation.foreach { d =>
+                System.err.println(
+                  s"WARNING: Field [$name] in [${currentType.getOrElse("root")}] is deprecated (${d.reason})."
+                )
+              }
+
+              val accumulatorOpt: Option[ClassAccumulator] =
                 nextType.underlyingObject.map(baseType => go(child, baseType.some))
 
               val (newClass, paramTypeNameOverride) =
@@ -297,7 +308,8 @@ trait QueryGen extends Generator {
                     paramName,
                     nextType.dealias,
                     isInput = false,
-                    paramTypeNameOverride
+                    paramTypeNameOverride,
+                    deprecation = deprecation
                   )
                 )
               )
@@ -325,7 +337,8 @@ trait QueryGen extends Generator {
           })
 
           // (Also, check what Grackle is returning when there's an interface)
-          val hierarchyAccumulators =
+          val hierarchyAccumulators
+            : List[(Option[String], List[(Accumulator[Class, ClassParam, Sum], Int)])] =
             fixedSelections.zipWithIndex // We want to preserve order of appeareance
               .groupBy {
                 _._1 match {
@@ -415,14 +428,15 @@ trait QueryGen extends Generator {
           )(parentBody)
         case Define(_, _, _) => // For now, we don't allow specifying Data class parents.
           // For some reason, schema.schemaType only returns the Query type.
-          val schemaType = schema.definition("Schema").getOrElse(schema.defaultSchemaType)
+          val schemaType: NamedType =
+            schema.definition("Schema").getOrElse(schema.defaultSchemaType)
 
           // Leaving this comment in order to reproduce the issue.
           // log(schema.schemaType.asInstanceOf[ObjectType].fields).unsafeRunSync()
           // log(schema.definition("Schema").getOrElse(schema.defaultSchemaType)
           //     .asInstanceOf[ObjectType].fields).unsafeRunSync()
 
-          val rootType = operation match {
+          val rootType: Option[NamedType] = operation match {
             // This is how things should look like, but for some reason it's not working.
             // case _: UntypedQuery        => schema.queryType
             // case _: UntypedMutation     => schema.mutationType
