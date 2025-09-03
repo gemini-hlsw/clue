@@ -1634,7 +1634,7 @@ object LucumaODB {
       implicit val showCreateHourAngleRangeInput: cats.Show[CreateHourAngleRangeInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateHourAngleRangeInput: io.circe.Encoder.AsObject[CreateHourAngleRangeInput] = io.circe.generic.semiauto.deriveEncoder[CreateHourAngleRangeInput].mapJsonObject(clue.data.Input.dropIgnores)
     }
-    case class CreateNonsiderealInput(val targetId: clue.data.Input[TargetId] = clue.data.Ignore, val programIds: clue.data.Input[List[ProgramId]] = clue.data.Ignore, val name: NonEmptyString, val key: EphemerisKeyType, val des: String, val magnitudes: clue.data.Input[List[MagnitudeInput]] = clue.data.Ignore)
+    case class CreateNonsiderealInput(val targetId: clue.data.Input[TargetId] = clue.data.Ignore, val programIds: clue.data.Input[List[ProgramId]] = clue.data.Ignore, val name: NonEmptyString, val key: EphemerisKeyType, val des: String, @deprecated("Use brightnesses instead") val magnitudes: clue.data.Input[List[MagnitudeInput]] = clue.data.Ignore)
     object CreateNonsiderealInput {
       val targetId: monocle.Lens[CreateNonsiderealInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[CreateNonsiderealInput](_.targetId)
       val programIds: monocle.Lens[CreateNonsiderealInput, clue.data.Input[List[ProgramId]]] = monocle.macros.GenLens[CreateNonsiderealInput](_.programIds)
