@@ -6,6 +6,7 @@ package clue.gen
 // import scalafix.v1._
 import cats.syntax.all.*
 import grackle.ScalarType
+import grackle.SchemaRenderer
 import grackle.Type as GType
 
 import java.util.regex.Pattern
@@ -70,12 +71,40 @@ trait Generator {
       nestedTypeTree(tree, tpe)
     }
 
+  protected case class DeprecationArg(name: String, value: String) {
+    def render: String = s"$name: $value"
+  }
+  protected case class Deprecation(args: List[DeprecationArg])     {
+    def renderArgs: String = args.map(_.render).mkString
+  }
+  object Deprecation                                               {
+    def fromDirectives(directives: List[grackle.Directive]): Option[Deprecation] =
+      directives.find(_.name == "deprecated").map { d =>
+        Deprecation(
+          d.args.map(a =>
+            DeprecationArg(
+              a.name,
+              SchemaRenderer
+                .renderValue(a.value) // unquote
+                .replaceFirst("^\"", "")
+                .replaceFirst("\"$", "")
+            )
+          )
+        )
+      }
+  }
+
   /**
    * Represents a parameter that will be used for a generated case class or variable.
    *
    * Consists of the name of the parameter and its Grackle type.
    */
-  protected case class ClassParam(name: String, tpe: Type, overrides: Boolean = false) {
+  protected case class ClassParam(
+    name:        String,
+    tpe:         Type,
+    overrides:   Boolean = false,
+    deprecation: Option[Deprecation] = None
+  ) {
 
     def typeTree(nestTree: Option[Term.Ref], nestedTypes: Map[String, Term.Ref]): Type =
       nestTree match {
@@ -105,7 +134,9 @@ trait Generator {
           if (!asVals) q"clue.data.Ignore".some else none
         case _                                          => none
       }
-      val mods: List[Mod] = if (!asVals && overrides) List(mod"override") else List.empty
+      val mods: List[Mod] =
+        deprecation.fold(List.empty[Mod])(dep => List(mod"@deprecated(${dep.renderArgs})")) ++
+          (if (!asVals && overrides) List(mod"override") else List.empty)
       param"..$mods val $n: $t = $d"
     }
   }
@@ -116,7 +147,8 @@ trait Generator {
       tpe:          grackle.Type,
       isInput:      Boolean,
       alias:        Option[String] = None,
-      typeOverride: Option[Type] = None
+      typeOverride: Option[Type] = None,
+      deprecation:  Option[Deprecation] = None
     ): ClassParam = {
       def resolveType(tpe: grackle.Type): Type =
         tpe match {
@@ -133,7 +165,7 @@ trait Generator {
             )
         }
 
-      ClassParam(name, resolveType(tpe))
+      ClassParam(name, resolveType(tpe), deprecation = deprecation)
     }
   }
 

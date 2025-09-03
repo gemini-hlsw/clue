@@ -34,5 +34,6 @@ type Droid implements Character {
   friends: [Character!]
   more_friends: [Character!]
   appearsIn: [Episode!]
-  primaryFunction: String
+  functions: [String!]
+  primaryFunction: String @deprecated(reason: "Use 'functions' instead")
 }
