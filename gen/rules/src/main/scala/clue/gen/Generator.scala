@@ -71,25 +71,20 @@ trait Generator {
       nestedTypeTree(tree, tpe)
     }
 
-  protected case class DeprecationArg(name: String, value: String) {
-    def render: String = s"$name: $value"
-  }
-  protected case class Deprecation(args: List[DeprecationArg])     {
-    def renderArgs: String = args.map(_.render).mkString
-  }
-  object Deprecation                                               {
+  protected case class Deprecation(reason: String)
+  object Deprecation {
     def fromDirectives(directives: List[grackle.Directive]): Option[Deprecation] =
       directives.find(_.name == "deprecated").map { d =>
         Deprecation(
-          d.args.map(a =>
-            DeprecationArg(
-              a.name,
+          d.args
+            .find(_.name == "reason")
+            .map(binding =>
               SchemaRenderer
-                .renderValue(a.value) // unquote
+                .renderValue(binding.value) // unquote
                 .replaceFirst("^\"", "")
                 .replaceFirst("\"$", "")
             )
-          )
+            .getOrElse("No longer supported")
         )
       }
   }
@@ -135,7 +130,7 @@ trait Generator {
         case _                                          => none
       }
       val mods: List[Mod] =
-        deprecation.fold(List.empty[Mod])(dep => List(mod"@deprecated(${dep.renderArgs})")) ++
+        deprecation.fold(List.empty[Mod])(dep => List(mod"@deprecated(${dep.reason})")) ++
           (if (!asVals && overrides) List(mod"override") else List.empty)
       param"..$mods val $n: $t = $d"
     }
@@ -440,7 +435,7 @@ trait Generator {
       }
   }
 
-  protected case class Enum(name: String, values: List[String]) {
+  protected case class Enum(name: String, values: List[(String, Option[Deprecation])]) {
     def addToParentBody(
       catsEq:            Boolean,
       catsShow:          Boolean,
@@ -448,19 +443,20 @@ trait Generator {
       circeEncoder:      Boolean = false,
       circeDecoder:      Boolean = false
     ): List[Stat] => List[Stat] =
-      addEnum(snakeToCamel(name),
-              values,
-              catsEq,
-              catsShow,
-              scalaJsReactReuse,
-              circeEncoder,
-              circeDecoder
+      addEnum(
+        snakeToCamel(name),
+        values,
+        catsEq,
+        catsShow,
+        scalaJsReactReuse,
+        circeEncoder,
+        circeDecoder
       )
   }
 
   protected def addEnum(
     name:              String,
-    values:            List[String],
+    values:            List[(String, Option[Deprecation])],
     catsEq:            Boolean,
     catsShow:          Boolean,
     scalaJsReactReuse: Boolean,
@@ -473,7 +469,7 @@ trait Generator {
           parentBody
         case Define(newParentBody, early, inits) =>
           val allInits   = inits :+ init"${Type.Name(name)}()"
-          val enumValues = values.map(EnumValue.fromString)
+          val enumValues = values.map(v => EnumValue.fromStringAndDeprecation(v._1, v._2))
           addModuleDefs(
             name,
             catsEq,
@@ -483,8 +479,12 @@ trait Generator {
             circeDecoder,
             TypeType.Enum(enumValues),
             _ ++ enumValues.map { enumValue =>
-              q"case object ${Term.Name(enumValue.className)} ${buildTemplate(early, allInits)}"
-            }
+              val mods: List[Mod] = enumValue.deprecation.fold(List.empty[Mod])(dep =>
+                List(mod"@deprecated(${dep.reason})")
+              )
+              q"..$mods case object ${Term.Name(enumValue.className)} ${buildTemplate(early, allInits)}"
+            },
+            ignoreDeprecation = enumValues.exists(_.deprecation.isDefined)
           )(
             newParentBody :+ q"sealed trait ${Type.Name(name)}"
           )
@@ -501,9 +501,14 @@ trait Generator {
     sb.toString
   }
 
-  protected case class EnumValue(asString: String, className: String)
+  protected case class EnumValue(
+    asString:    String,
+    className:   String,
+    deprecation: Option[Deprecation]
+  )
   protected object EnumValue {
-    def fromString(asString: String): EnumValue = EnumValue(asString, snakeToCamel(asString))
+    def fromStringAndDeprecation(asString: String, deprecation: Option[Deprecation]): EnumValue =
+      EnumValue(asString, snakeToCamel(asString), deprecation)
   }
 
   protected sealed trait TypeType
@@ -514,8 +519,9 @@ trait Generator {
   }
 
   protected def modifyModuleStatements(
-    moduleName: String,
-    bodyMod:    List[Stat] => List[Stat]
+    moduleName:        String,
+    bodyMod:           List[Stat] => List[Stat],
+    ignoreDeprecation: Boolean = false
   ): List[Stat] => List[Stat] =
     parentBody => {
       val (newStats, modified) =
@@ -532,10 +538,13 @@ trait Generator {
               (newStats :+ other, modified)
           }
         }
-      if (modified)
-        newStats
-      else // TODO Check if this quasiquote works, or we need to build a template.
-        newStats :+ q"object ${Term.Name(moduleName)} { ..${bodyMod(List.empty)} }"
+      if (modified) newStats
+      else {
+        val mods: List[Mod] =
+          if (ignoreDeprecation) List(mod"@scala.annotation.nowarn(${"cat=deprecation"})")
+          else List.empty
+        newStats :+ q"..$mods object ${Term.Name(moduleName)} { ..${bodyMod(List.empty)} }"
+      }
     }
 
   /**
@@ -550,7 +559,8 @@ trait Generator {
     circeDecoder:      Boolean = false,
     typeType:          TypeType = TypeType.CaseClass,
     bodyMod:           List[Stat] => List[Stat] = identity,
-    nestPath:          Option[Term.Ref] = None
+    nestPath:          Option[Term.Ref] = None,
+    ignoreDeprecation: Boolean = false
   ): List[Stat] => List[Stat] = {
     val n: Type.Ref =
       nestPath.fold[Type.Ref](Type.Name(name))(t => Type.Select(t, Type.Name(name)))
@@ -612,7 +622,8 @@ trait Generator {
 
     modifyModuleStatements(
       name,
-      stats => bodyMod(stats) ++ List(eqDef, showDef, reuseDef, encoderDef, decoderDef).flatten
+      stats => bodyMod(stats) ++ List(eqDef, showDef, reuseDef, encoderDef, decoderDef).flatten,
+      ignoreDeprecation
     )
   }
 }

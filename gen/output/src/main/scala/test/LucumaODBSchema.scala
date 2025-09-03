@@ -145,10 +145,10 @@ object LucumaODB {
       })
     }
     sealed trait EphemerisKeyType
-    object EphemerisKeyType {
+    @scala.annotation.nowarn("cat=deprecation") object EphemerisKeyType {
       case object Comet extends EphemerisKeyType()
       case object AsteroidNew extends EphemerisKeyType()
-      case object AsteroidOld extends EphemerisKeyType()
+      @deprecated("Use ASTEROID_NEW instead") case object AsteroidOld extends EphemerisKeyType()
       case object MajorBody extends EphemerisKeyType()
       case object UserSupplied extends EphemerisKeyType()
       implicit val eqEphemerisKeyType: cats.Eq[EphemerisKeyType] = cats.Eq.fromUniversalEquals

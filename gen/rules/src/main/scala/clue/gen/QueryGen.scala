@@ -286,10 +286,8 @@ trait QueryGen extends Generator {
                   .flatMap(info => Deprecation.fromDirectives(info.directives))
 
               deprecation.foreach { d =>
-                val renderedArgs: String = d.renderArgs
-                val argsString: String   = if (renderedArgs.nonEmpty) s" ($renderedArgs)" else ""
                 System.err.println(
-                  s"WARNING: Field [$name] in [${currentType.getOrElse("root")}] is deprecated${argsString}."
+                  s"WARNING: Field [$name] in [${currentType.getOrElse("root")}] is deprecated (${d.reason})."
                 )
               }
 
