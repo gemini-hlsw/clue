@@ -15,6 +15,7 @@ lazy val root = tlCrossRootProject
     http4s,
     http4sJDKDemo,
     natchez,
+    otel4s,
     genRules,
     genInput,
     genOutput,
@@ -91,7 +92,8 @@ lazy val http4s =
       dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       libraryDependencies ++=
         Settings.Libraries.Http4sCirce.value ++
-          Settings.Libraries.Http4sClient.value
+          Settings.Libraries.Http4sClient.value ++
+          Settings.Libraries.Http4sOtel4sMiddleware.value
     )
     .dependsOn(core, natchez)
 
@@ -118,6 +120,16 @@ lazy val natchez =
     .settings(
       moduleName := "clue-natchez",
       libraryDependencies ++= Settings.Libraries.Natchez.value
+    )
+    .dependsOn(core)
+
+lazy val otel4s =
+  crossProject(JVMPlatform, JSPlatform)
+    .crossType(CrossType.Pure)
+    .in(file("otel4s"))
+    .settings(
+      moduleName := "clue-otel4s",
+      libraryDependencies ++= Settings.Libraries.Otel4s.value
     )
     .dependsOn(core)
 

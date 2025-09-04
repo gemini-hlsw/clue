@@ -7,6 +7,7 @@ import cats.Applicative
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.syntax.all.*
+import clue.BuildInfo
 import clue.FetchClientWithPars
 import clue.StreamingClient
 import clue.model.GraphQLQuery
@@ -116,6 +117,8 @@ class NatchezFetchClient[F[_]: Trace: MonadCancelThrow, P, S](
     MonadCancelThrow[F].uncancelable: poll =>
       Trace[F].span(s"clue-client-request-${document.querySummary}", spanOptions):
         for
+          // Add clue library version
+          _                    <- Trace[F].put("clue.version" -> BuildInfo.version)
           additionalAttributes <- additionalAttributesF(document, variables)
           _                    <- Trace[F].put(additionalAttributes*)
           result               <- poll:
@@ -186,6 +189,8 @@ class NatchezStreamingClient[F[_]: Trace: MonadCancelThrow, S](
       Resource.applyFull: poll =>
         Trace[F].span(s"clue-client-start-${document.querySummary}", spanOptions):
           for
+            // Add clue library version
+            _                    <- Trace[F].put("clue.version" -> BuildInfo.version)
             additionalAttributes <- additionalAttributesF(document, variables)
             _                    <- Trace[F].put(additionalAttributes*)
             result               <- poll:
