@@ -6,6 +6,8 @@ package clue.gen
 import cats.data.State
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all.*
+import grackle.Query.Binding
+import grackle.Query.UntypedFragment
 import grackle.UntypedOperation.*
 import grackle.Value.VariableRef
 import grackle.{Term as _, Type as GType, *}
@@ -108,39 +110,6 @@ trait QueryGen extends Generator {
       ) ++ parentBody
     }
 
-  //
-  // START COPIED FROM GRACKLE.
-  //
-  import Query._
-  protected[this] def compileVarDefs(
-    schema:         Schema,
-    untypedVarDefs: UntypedVarDefs
-  ): Result[VarDefs] =
-    untypedVarDefs.traverse { case UntypedVarDef(name, untypedTpe, default, directives) =>
-      compileType(schema, untypedTpe).map(tpe => InputValue(name, None, tpe, default, directives))
-    }
-
-  protected[this] def compileType(schema: Schema, tpe: Ast.Type): Result[GType] = {
-    def loop(tpe: Ast.Type, nonNull: Boolean): Result[GType] = tpe match {
-      case Ast.Type.NonNull(Left(named)) => loop(named, nonNull = true)
-      case Ast.Type.NonNull(Right(list)) => loop(list, nonNull = true)
-      case Ast.Type.List(elem)           =>
-        loop(elem, nonNull = false).map(e =>
-          if (nonNull) ListType(e) else NullableType(ListType(e))
-        )
-      case Ast.Type.Named(name)          =>
-        schema.definition(name.value) match {
-          case None     => Result.internalError(s"Undefine typed '${name.value}'")
-          case Some(tp) => Result.success(if (nonNull) tp else NullableType(tp))
-        }
-    }
-
-    loop(tpe, nonNull = false)
-  }
-  //
-  // END COPIED FROM GRACKLE.
-  //
-
   /**
    * Resolve the types of the operation's variable arguments.
    */
@@ -148,7 +117,8 @@ trait QueryGen extends Generator {
     schema: Schema,
     vars:   List[Query.UntypedVarDef]
   ): List[InputValue] = {
-    val inputs: Result[List[InputValue]] = compileVarDefs(schema, vars)
+    val compiler: QueryCompiler          = new QueryCompiler(GQLParser, schema, List.empty)
+    val inputs: Result[List[InputValue]] = compiler.compileVarDefs(vars)
 
     if (!inputs.hasValue)
       abort(
