@@ -7,6 +7,7 @@ import cats.data.State
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all.*
 import grackle.UntypedOperation.*
+import grackle.Value.VariableRef
 import grackle.{Term as _, Type as GType, *}
 
 import scala.meta.*
@@ -143,11 +144,11 @@ trait QueryGen extends Generator {
   /**
    * Resolve the types of the operation's variable arguments.
    */
-  private[this] def resolveVariables(
+  def computeVarDefs(
     schema: Schema,
     vars:   List[Query.UntypedVarDef]
-  ): CaseClass = {
-    val inputs = compileVarDefs(schema, vars)
+  ): List[InputValue] = {
+    val inputs: Result[List[InputValue]] = compileVarDefs(schema, vars)
 
     if (!inputs.hasValue)
       abort(
@@ -162,17 +163,13 @@ trait QueryGen extends Generator {
       )
         .unsafeRunSync()
 
-    CaseClass(
-      "Variables",
-      inputs.toOption.get.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true))
-    )
+    inputs.toOption.get
   }
 
   import DefineType._
   protected def addVars(
-    schema:    Schema,
-    operation: UntypedOperation,
-    config:    GraphQLGenConfig
+    inputs: List[InputValue],
+    config: GraphQLGenConfig
   ): List[Stat] => List[Stat] =
     parentBody =>
       mustDefineType("Variables")(parentBody) match {
@@ -187,7 +184,10 @@ trait QueryGen extends Generator {
             parentBody
           )
         case Define(_, _, _) => // For now, we don't allow specifying Variables class parents.
-          resolveVariables(schema, operation.variables).addToParentBody(
+          CaseClass(
+            "Variables",
+            inputs.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true))
+          ).addToParentBody(
             config.catsEq,
             config.catsShow,
             config.monocleLenses,
@@ -215,12 +215,69 @@ trait QueryGen extends Generator {
       )
   }
 
+  private def validateArguments(
+    currentType: Option[GType],
+    fieldName:   String,
+    fieldArgs:   List[InputValue],
+    bindings:    List[Binding],
+    inputs:      List[InputValue]
+  ): Unit = {
+    val requiredArgs: List[InputValue] =
+      fieldArgs
+        .filter { arg =>
+          arg.tpe match { // Required and no default
+            case NullableType(_) => false
+            case _               => arg.defaultValue.isEmpty
+          }
+        }
+
+    val problems: List[String] =
+      requiredArgs
+        .filter(arg => !bindings.exists(_.name == arg.name))
+        .map { arg =>
+          s"Missing required argument [${arg.name}] for field [$fieldName] in [${currentType.getOrElse("root")}]"
+        } ++
+        bindings.foldLeft(List.empty[String]) { (acc, b) =>
+          fieldArgs
+            .find(_.name == b.name)
+            .fold(
+              acc :+ s"Unknown argument [${b.name}] for field [$fieldName] in [${currentType.getOrElse("root")}]"
+            ) { arg =>
+              def addResult[A](result: Result[A], onSuccess: A => List[String]): List[String] =
+                result.fold(
+                  failure = problems => acc ++ problems.toList.map(_.message),
+                  success = a => onSuccess(a),
+                  warning = (_, a) => onSuccess(a),
+                  error = t => acc :+ t.getMessage
+                )
+
+              b.value match {
+                case VariableRef(name) =>
+                  inputs
+                    .find(_.name == name)
+                    .fold(
+                      acc :+ s"Unknown variable reference [$$$name] for argument [${b.name}] in [$fieldName]"
+                    )(iv =>
+                      if (iv.tpe <:< arg.tpe) acc
+                      else
+                        acc :+ s"Type mismatch for variable reference [$$$name] for argument [${b.name}] in [$fieldName]: expected [${arg.tpe}], found [${iv.tpe}]"
+                    )
+                case _                 =>
+                  addResult(Value.checkValue(arg, b.value.some, s"[$fieldName]"), (_: Value) => acc)
+              }
+            }
+        }
+
+    if (problems.nonEmpty) throw new Exception(problems.mkString("; "))
+  }
+
   /**
    * Recurse the query AST and collect the necessary [[CaseClass]] es to hold its results.
    */
   protected def resolveData(
     schema:     Schema,
     algebra:    Query,
+    inputs:     List[InputValue],
     subqueries: List[Term],
     fragments:  List[UntypedFragment],
     rootType:   Option[GType]
@@ -269,7 +326,7 @@ trait QueryGen extends Generator {
             }
 
           ClassAccumulator(parAccum = List(param))
-        case UntypedSelect(name, alias, _, _, child)   =>
+        case UntypedSelect(name, alias, bindings, _, child) =>
           val paramName: String = alias.getOrElse(name)
 
           MetaTypes
@@ -290,6 +347,10 @@ trait QueryGen extends Generator {
                   s"WARNING: Field [$name] in [${currentType.getOrElse("root")}] is deprecated (${d.reason})."
                 )
               }
+
+              currentType
+                .flatMap(_.fieldInfo(name).map(_.args))
+                .foreach(args => validateArguments(currentType, name, args, bindings, inputs))
 
               val accumulatorOpt: Option[ClassAccumulator] =
                 nextType.underlyingObject.map(baseType => go(child, baseType.some))
@@ -314,13 +375,13 @@ trait QueryGen extends Generator {
                 )
               )
             }
-        case UntypedInlineFragment(typeName, _, child) =>
+        case UntypedInlineFragment(typeName, _, child)      =>
           // Single element in inline fragment
           go(child, typeName.map(getType).orElse(currentType))
-        case UntypedFragmentSpread(name, _)            =>
+        case UntypedFragmentSpread(name, _)                 =>
           val fragment: UntypedFragment = fragmentsMap(name)
           go(fragment.child, getType(fragment.tpnme).some)
-        case Group(selections)                         =>
+        case Group(selections)                              =>
           // A Group in an inline fragment "... on X" will be represented as Group(List(UntypedInlineFragment(X, ...), UntypedInlineFragment(X, ...))).
           // We fix that to UntypedInlineFragment(X, Group(List(..., ...)))
           val fixedSelections = selections.map(_ match {
@@ -396,8 +457,8 @@ trait QueryGen extends Generator {
                 Sum(baseParams, baseAccumulator.classes, subTypes).some
               )
           }
-        case Empty                                     => ClassAccumulator()
-        case _                                         =>
+        case Empty                                          => ClassAccumulator()
+        case _                                              =>
           throw new Exception(
             s"Unhandled Algebra: [$currentAlgebra] - Current Type: [$currentType]"
           )
@@ -411,6 +472,7 @@ trait QueryGen extends Generator {
   protected def addData(
     schema:           Schema,
     operation:        UntypedOperation,
+    inputs:           List[InputValue],
     config:           GraphQLGenConfig,
     subqueries:       List[Term],
     fragments:        List[UntypedFragment],
@@ -449,6 +511,7 @@ trait QueryGen extends Generator {
           resolveData(
             schema,
             operation.query,
+            inputs,
             subqueries,
             fragments,
             rootTypeOverride.orElse(rootType)
