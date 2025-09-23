@@ -3,9 +3,11 @@
 
 package clue.gen
 
+import cats.Endo
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all.*
+import grackle.InputValue
 import grackle.Query.UntypedFragment
 import grackle.Result
 import grackle.UntypedOperation
@@ -134,23 +136,36 @@ class GraphQLGen(config: GraphQLGenConfig)
                             s"Warning parsing document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
                           )
                         ) >> IO {
-                          val (operations, fragments) = queryResult.toOption.get
+                          val (operations, fragments)
+                            : (List[UntypedOperation], List[UntypedFragment]) =
+                            queryResult.toOption.get
+
                           // TODO Support multi-operation queries?
-                          val operation               = operations.head
+                          val operation: UntypedOperation = operations.head
+
+                          val inputs: List[InputValue] = computeVarDefs(schema, operation.variables)
 
                           // Modifications to add the missing definitions.
-                          val modObjDefs = scala.Function.chain(
-                            List(
-                              addImports(schemaType.value),
-                              addVars(schema, operation, config),
-                              addData(schema, operation, config, document.subqueries, fragments),
-                              addVarEncoder,
-                              addDataDecoder,
-                              addConvenienceMethod(schemaType, operation, objName)
+                          val modObjDefs: Endo[List[Stat]] =
+                            scala.Function.chain(
+                              List(
+                                addImports(schemaType.value),
+                                addVars(inputs, config),
+                                addData(
+                                  schema,
+                                  operation,
+                                  inputs,
+                                  config,
+                                  document.subqueries,
+                                  fragments
+                                ),
+                                addVarEncoder,
+                                addDataDecoder,
+                                addConvenienceMethod(schemaType, operation, objName)
+                              )
                             )
-                          )
 
-                          val newMods = GraphQLAnnotation.removeFrom(mods)
+                          val newMods: List[Mod] = GraphQLAnnotation.removeFrom(mods)
 
                           // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
                           Patch.replaceTree(
@@ -215,6 +230,8 @@ class GraphQLGen(config: GraphQLGenConfig)
                           // TODO Support multi-operation queries?
                           val operation               = operations.head
 
+                          val inputs: List[InputValue] = computeVarDefs(schema, operation.variables)
+
                           // Modifications to add the missing definitions.
                           val modObjDefs = scala.Function.chain(
                             List(
@@ -222,6 +239,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                               addData(
                                 schema,
                                 operation,
+                                inputs,
                                 config,
                                 subquery.subqueries,
                                 fragments,
