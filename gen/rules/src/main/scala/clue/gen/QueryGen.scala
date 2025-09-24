@@ -6,7 +6,11 @@ package clue.gen
 import cats.data.State
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all.*
+import grackle.Query.Binding
+import grackle.Query.UntypedFragment
 import grackle.UntypedOperation.*
+import grackle.Value.ListValue
+import grackle.Value.ObjectValue
 import grackle.{Term as _, Type as GType, *}
 
 import scala.meta.*
@@ -107,47 +111,15 @@ trait QueryGen extends Generator {
       ) ++ parentBody
     }
 
-  //
-  // START COPIED FROM GRACKLE.
-  //
-  import Query._
-  protected[this] def compileVarDefs(
-    schema:         Schema,
-    untypedVarDefs: UntypedVarDefs
-  ): Result[VarDefs] =
-    untypedVarDefs.traverse { case UntypedVarDef(name, untypedTpe, default, directives) =>
-      compileType(schema, untypedTpe).map(tpe => InputValue(name, None, tpe, default, directives))
-    }
-
-  protected[this] def compileType(schema: Schema, tpe: Ast.Type): Result[GType] = {
-    def loop(tpe: Ast.Type, nonNull: Boolean): Result[GType] = tpe match {
-      case Ast.Type.NonNull(Left(named)) => loop(named, nonNull = true)
-      case Ast.Type.NonNull(Right(list)) => loop(list, nonNull = true)
-      case Ast.Type.List(elem)           =>
-        loop(elem, nonNull = false).map(e =>
-          if (nonNull) ListType(e) else NullableType(ListType(e))
-        )
-      case Ast.Type.Named(name)          =>
-        schema.definition(name.value) match {
-          case None     => Result.internalError(s"Undefine typed '${name.value}'")
-          case Some(tp) => Result.success(if (nonNull) tp else NullableType(tp))
-        }
-    }
-
-    loop(tpe, nonNull = false)
-  }
-  //
-  // END COPIED FROM GRACKLE.
-  //
-
   /**
    * Resolve the types of the operation's variable arguments.
    */
-  private[this] def resolveVariables(
+  def computeVarDefs(
     schema: Schema,
     vars:   List[Query.UntypedVarDef]
-  ): CaseClass = {
-    val inputs = compileVarDefs(schema, vars)
+  ): List[InputValue] = {
+    val compiler: QueryCompiler          = new QueryCompiler(GQLParser, schema, List.empty)
+    val inputs: Result[List[InputValue]] = compiler.compileVarDefs(vars)
 
     if (!inputs.hasValue)
       abort(
@@ -162,17 +134,13 @@ trait QueryGen extends Generator {
       )
         .unsafeRunSync()
 
-    CaseClass(
-      "Variables",
-      inputs.toOption.get.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true))
-    )
+    inputs.toOption.get
   }
 
   import DefineType._
   protected def addVars(
-    schema:    Schema,
-    operation: UntypedOperation,
-    config:    GraphQLGenConfig
+    inputs: List[InputValue],
+    config: GraphQLGenConfig
   ): List[Stat] => List[Stat] =
     parentBody =>
       mustDefineType("Variables")(parentBody) match {
@@ -187,7 +155,10 @@ trait QueryGen extends Generator {
             parentBody
           )
         case Define(_, _, _) => // For now, we don't allow specifying Variables class parents.
-          resolveVariables(schema, operation.variables).addToParentBody(
+          CaseClass(
+            "Variables",
+            inputs.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true))
+          ).addToParentBody(
             config.catsEq,
             config.catsShow,
             config.monocleLenses,
@@ -209,10 +180,85 @@ trait QueryGen extends Generator {
 
   protected implicit class ClassAccumulatorOps(classAccumulator: ClassAccumulator) {
     def withOverrideParams: ClassAccumulator =
-      new ClassAccumulator(classAccumulator.classes,
-                           parAccum = classAccumulator.parAccum.map(_.copy(overrides = true)),
-                           classAccumulator.sum
+      new ClassAccumulator(
+        classAccumulator.classes,
+        parAccum = classAccumulator.parAccum.map(_.copy(overrides = true)),
+        classAccumulator.sum
       )
+  }
+
+  private def createDummyValue(tpe: GType): Value =
+    tpe.dealias match {
+      case NullableType(_)                  => Value.AbsentValue
+      case ScalarType.IntType               => Value.IntValue(0)
+      case ScalarType.FloatType             => Value.FloatValue(0.0)
+      case ScalarType.StringType            => Value.StringValue("")
+      case ScalarType.BooleanType           => Value.BooleanValue(true)
+      case ScalarType.IDType                => Value.IDValue("")
+      case ScalarType(_, _, _)              => Value.IntValue(0)
+      case EnumType(_, _, values, _)        => Value.EnumValue(values.head.name)
+      case ListType(tpe0)                   => ListValue(List(createDummyValue(tpe0)))
+      case InputObjectType(_, _, fields, _) =>
+        ObjectValue(fields.map(iv => iv.name -> createDummyValue(iv.tpe)))
+      case t @ TypeRef(_, _)                => createDummyValue(t.dealias)
+      case _                                => Value.AbsentValue
+    }
+
+  private def createDummyVars(inputs: List[InputValue]): Query.Vars =
+    inputs.map(iv => iv.name -> (iv.tpe, createDummyValue(iv.tpe))).toMap
+
+  private def validateArguments(
+    currentType: Option[GType],
+    fieldName:   String,
+    fieldArgs:   List[InputValue],
+    bindings:    List[Binding],
+    inputs:      List[InputValue]
+  ): Unit = {
+    // Grackle doesn't have a way to check just argument types, but it has a way to resolve values.
+    // So we trick it with dummy values to check the types.
+    val dummyVals: Query.Vars = createDummyVars(inputs)
+
+    def go(
+      parentName:  String,
+      currentType: Option[GType],
+      fieldArgs:   List[InputValue],
+      bindings:    List[Binding]
+    ): List[String] = {
+      val requiredArgs: List[InputValue] =
+        fieldArgs
+          .filter { arg =>
+            arg.tpe match { // Required and no default
+              case NullableType(_) => false
+              case _               => arg.defaultValue.isEmpty
+            }
+          }
+
+      requiredArgs
+        .filter(arg => !bindings.exists(_.name == arg.name))
+        .map { arg =>
+          s"Missing required argument [${arg.name}] for field [$parentName: ${currentType.getOrElse("root")}]"
+        } ++
+        bindings.foldLeft(List.empty[String]) { (acc, b) =>
+          fieldArgs
+            .find(_.name == b.name)
+            .fold(
+              acc :+ s"Unknown argument [${b.name}] for field [$parentName: ${currentType.getOrElse("root")}]"
+            ) { arg =>
+              Value
+                .elaborateValue(b.value, dummyVals)
+                .flatMap(value => Value.checkValue(arg, value.some, s"[$parentName]"))
+                .fold(
+                  failure = problems => acc ++ problems.toList.map(_.message),
+                  success = _ => acc,
+                  warning = (_, _) => acc,
+                  error = t => acc :+ t.getMessage
+                )
+            }
+        }
+    }
+
+    val problems: List[String] = go(fieldName, currentType, fieldArgs, bindings)
+    if (problems.nonEmpty) throw new Exception(problems.mkString("; "))
   }
 
   /**
@@ -221,6 +267,7 @@ trait QueryGen extends Generator {
   protected def resolveData(
     schema:     Schema,
     algebra:    Query,
+    inputs:     List[InputValue],
     subqueries: List[Term],
     fragments:  List[UntypedFragment],
     rootType:   Option[GType]
@@ -269,7 +316,7 @@ trait QueryGen extends Generator {
             }
 
           ClassAccumulator(parAccum = List(param))
-        case UntypedSelect(name, alias, _, _, child)   =>
+        case UntypedSelect(name, alias, bindings, _, child) =>
           val paramName: String = alias.getOrElse(name)
 
           MetaTypes
@@ -290,6 +337,10 @@ trait QueryGen extends Generator {
                   s"WARNING: Field [$name] in [${currentType.getOrElse("root")}] is deprecated (${d.reason})."
                 )
               }
+
+              currentType
+                .flatMap(_.fieldInfo(name).map(_.args))
+                .foreach(args => validateArguments(currentType, name, args, bindings, inputs))
 
               val accumulatorOpt: Option[ClassAccumulator] =
                 nextType.underlyingObject.map(baseType => go(child, baseType.some))
@@ -314,13 +365,13 @@ trait QueryGen extends Generator {
                 )
               )
             }
-        case UntypedInlineFragment(typeName, _, child) =>
+        case UntypedInlineFragment(typeName, _, child)      =>
           // Single element in inline fragment
           go(child, typeName.map(getType).orElse(currentType))
-        case UntypedFragmentSpread(name, _)            =>
+        case UntypedFragmentSpread(name, _)                 =>
           val fragment: UntypedFragment = fragmentsMap(name)
           go(fragment.child, getType(fragment.tpnme).some)
-        case Group(selections)                         =>
+        case Group(selections)                              =>
           // A Group in an inline fragment "... on X" will be represented as Group(List(UntypedInlineFragment(X, ...), UntypedInlineFragment(X, ...))).
           // We fix that to UntypedInlineFragment(X, Group(List(..., ...)))
           val fixedSelections = selections.map(_ match {
@@ -396,8 +447,8 @@ trait QueryGen extends Generator {
                 Sum(baseParams, baseAccumulator.classes, subTypes).some
               )
           }
-        case Empty                                     => ClassAccumulator()
-        case _                                         =>
+        case Empty                                          => ClassAccumulator()
+        case _                                              =>
           throw new Exception(
             s"Unhandled Algebra: [$currentAlgebra] - Current Type: [$currentType]"
           )
@@ -411,6 +462,7 @@ trait QueryGen extends Generator {
   protected def addData(
     schema:           Schema,
     operation:        UntypedOperation,
+    inputs:           List[InputValue],
     config:           GraphQLGenConfig,
     subqueries:       List[Term],
     fragments:        List[UntypedFragment],
@@ -449,6 +501,7 @@ trait QueryGen extends Generator {
           resolveData(
             schema,
             operation.query,
+            inputs,
             subqueries,
             fragments,
             rootTypeOverride.orElse(rootType)
