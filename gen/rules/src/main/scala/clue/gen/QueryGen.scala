@@ -9,7 +9,8 @@ import cats.syntax.all.*
 import grackle.Query.Binding
 import grackle.Query.UntypedFragment
 import grackle.UntypedOperation.*
-import grackle.Value.VariableRef
+import grackle.Value.ListValue
+import grackle.Value.ObjectValue
 import grackle.{Term as _, Type as GType, *}
 
 import scala.meta.*
@@ -179,11 +180,32 @@ trait QueryGen extends Generator {
 
   protected implicit class ClassAccumulatorOps(classAccumulator: ClassAccumulator) {
     def withOverrideParams: ClassAccumulator =
-      new ClassAccumulator(classAccumulator.classes,
-                           parAccum = classAccumulator.parAccum.map(_.copy(overrides = true)),
-                           classAccumulator.sum
+      new ClassAccumulator(
+        classAccumulator.classes,
+        parAccum = classAccumulator.parAccum.map(_.copy(overrides = true)),
+        classAccumulator.sum
       )
   }
+
+  private def createDummyValue(tpe: GType): Value =
+    tpe.dealias match {
+      case NullableType(_)                  => Value.AbsentValue
+      case ScalarType.IntType               => Value.IntValue(0)
+      case ScalarType.FloatType             => Value.FloatValue(0.0)
+      case ScalarType.StringType            => Value.StringValue("")
+      case ScalarType.BooleanType           => Value.BooleanValue(true)
+      case ScalarType.IDType                => Value.IDValue("")
+      case ScalarType(_, _, _)              => Value.IntValue(0)
+      case EnumType(_, _, values, _)        => Value.EnumValue(values.head.name)
+      case ListType(tpe0)                   => ListValue(List(createDummyValue(tpe0)))
+      case InputObjectType(_, _, fields, _) =>
+        ObjectValue(fields.map(iv => iv.name -> createDummyValue(iv.tpe)))
+      case t @ TypeRef(_, _)                => createDummyValue(t.dealias)
+      case _                                => Value.AbsentValue
+    }
+
+  private def createDummyVars(inputs: List[InputValue]): Query.Vars =
+    inputs.map(iv => iv.name -> (iv.tpe, createDummyValue(iv.tpe))).toMap
 
   private def validateArguments(
     currentType: Option[GType],
@@ -192,52 +214,50 @@ trait QueryGen extends Generator {
     bindings:    List[Binding],
     inputs:      List[InputValue]
   ): Unit = {
-    val requiredArgs: List[InputValue] =
-      fieldArgs
-        .filter { arg =>
-          arg.tpe match { // Required and no default
-            case NullableType(_) => false
-            case _               => arg.defaultValue.isEmpty
-          }
-        }
+    // Grackle doesn't have a way to check just argument types, but it has a way to resolve values.
+    // So we trick it with dummy values to check the types.
+    val dummyVals: Query.Vars = createDummyVars(inputs)
 
-    val problems: List[String] =
+    def go(
+      parentName:  String,
+      currentType: Option[GType],
+      fieldArgs:   List[InputValue],
+      bindings:    List[Binding]
+    ): List[String] = {
+      val requiredArgs: List[InputValue] =
+        fieldArgs
+          .filter { arg =>
+            arg.tpe match { // Required and no default
+              case NullableType(_) => false
+              case _               => arg.defaultValue.isEmpty
+            }
+          }
+
       requiredArgs
         .filter(arg => !bindings.exists(_.name == arg.name))
         .map { arg =>
-          s"Missing required argument [${arg.name}] for field [$fieldName] in [${currentType.getOrElse("root")}]"
+          s"Missing required argument [${arg.name}] for field [$parentName: ${currentType.getOrElse("root")}]"
         } ++
         bindings.foldLeft(List.empty[String]) { (acc, b) =>
           fieldArgs
             .find(_.name == b.name)
             .fold(
-              acc :+ s"Unknown argument [${b.name}] for field [$fieldName] in [${currentType.getOrElse("root")}]"
+              acc :+ s"Unknown argument [${b.name}] for field [$parentName: ${currentType.getOrElse("root")}]"
             ) { arg =>
-              def addResult[A](result: Result[A], onSuccess: A => List[String]): List[String] =
-                result.fold(
+              Value
+                .elaborateValue(b.value, dummyVals)
+                .flatMap(value => Value.checkValue(arg, value.some, s"[$parentName]"))
+                .fold(
                   failure = problems => acc ++ problems.toList.map(_.message),
-                  success = a => onSuccess(a),
-                  warning = (_, a) => onSuccess(a),
+                  success = _ => acc,
+                  warning = (_, _) => acc,
                   error = t => acc :+ t.getMessage
                 )
-
-              b.value match {
-                case VariableRef(name) =>
-                  inputs
-                    .find(_.name == name)
-                    .fold(
-                      acc :+ s"Unknown variable reference [$$$name] for argument [${b.name}] in [$fieldName]"
-                    )(iv =>
-                      if (iv.tpe <:< arg.tpe) acc
-                      else
-                        acc :+ s"Type mismatch for variable reference [$$$name] for argument [${b.name}] in [$fieldName]: expected [${arg.tpe}], found [${iv.tpe}]"
-                    )
-                case _                 =>
-                  addResult(Value.checkValue(arg, b.value.some, s"[$fieldName]"), (_: Value) => acc)
-              }
             }
         }
+    }
 
+    val problems: List[String] = go(fieldName, currentType, fieldArgs, bindings)
     if (problems.nonEmpty) throw new Exception(problems.mkString("; "))
   }
 
