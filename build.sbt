@@ -200,9 +200,8 @@ lazy val sbtPlugin =
         "coreModule"  -> (core.jvm / moduleName).value
       ),
       buildInfoOptions += BuildInfoOption.PackagePrivate,
-      Test / test                             := {
-        scripted.toTask("").value
-      },
+      Test / test                             :=
+        scripted.toTask("").value,
       scripted                                := scripted
         .dependsOn(
           genRules / publishLocal,
