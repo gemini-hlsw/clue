@@ -129,9 +129,8 @@ class ApolloClient[F[_], P, S](
     F.async(cb =>
       startSubscription[D](document, operationName, variables)
         .flatMap(subscription =>
-          subscription.stream.attempt.head.compile.onlyOrError.attempt.map(onlyOrError =>
-            cb(onlyOrError.flatten)
-          )
+          subscription.stream.attempt.head.compile.onlyOrError.attempt
+            .map(onlyOrError => cb(onlyOrError.flatten))
         )
         .as(none) // Don't return a cancellation cleanup. Subscription is cleaned up whenm stream is finalized.
     )
@@ -204,7 +203,7 @@ class ApolloClient[F[_], P, S](
         state.get.flatMap:
           case Connected(_, connection, _, _) =>
             connection.send(StreamingMessage.FromClient.Pong(payload)) // Respond the same payload.
-          case _ => F.unit
+          case _                              => F.unit
       case _                                                                       => s"Unexpected message received from server: [$msg]".warnF
     }
 
