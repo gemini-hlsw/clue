@@ -173,7 +173,9 @@ class GraphQLGen(config: GraphQLGenConfig)
                             indented(obj)(
                               List(
                                 q"..$newMods object ${Term
-                                    .Name(objName)} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
+                                    .Name(
+                                      objName
+                                    )} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
                               ).mkString("\n")
                             )
                           ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
@@ -261,7 +263,9 @@ class GraphQLGen(config: GraphQLGenConfig)
                             indented(obj)(
                               List(
                                 q"..$newMods object ${Term
-                                    .Name(objName)} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
+                                    .Name(
+                                      objName
+                                    )} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
                               ).mkString("\n")
                             )
                           ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
