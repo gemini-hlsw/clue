@@ -4,7 +4,7 @@ ThisBuild / tlBaseVersion              := "0.49"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
 ThisBuild / tlJdkRelease               := Some(8)
 ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
-ThisBuild / scalaVersion               := "3.7.1"
+ThisBuild / scalaVersion               := "3.7.4"
 Global / onChangedBuildSource          := ReloadOnSourceChanges
 
 lazy val root = tlCrossRootProject
@@ -200,9 +200,8 @@ lazy val sbtPlugin =
         "coreModule"  -> (core.jvm / moduleName).value
       ),
       buildInfoOptions += BuildInfoOption.PackagePrivate,
-      Test / test                             := {
-        scripted.toTask("").value
-      },
+      Test / test                             :=
+        scripted.toTask("").value,
       scripted                                := scripted
         .dependsOn(
           genRules / publishLocal,

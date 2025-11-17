@@ -337,7 +337,9 @@ trait Generator {
         val allInits = inits ++ extending.map(t => init"${Type.Name(t)}()")
 
         (newParentBody :+
-           q"sealed trait ${Type.Name(name)} ${buildTemplate(early, allInits, (none, pars.map(paramToVal)))}",
+           q"sealed trait ${Type.Name(
+               name
+             )} ${buildTemplate(early, allInits, (none, pars.map(paramToVal)))}",
          true
         )
     }
@@ -531,7 +533,10 @@ trait Generator {
             case Defn.Object(mods, objName, Template.Initial(early, inits, self, body))
                 if objName.value == moduleName =>
               (
-                newStats :+ q"..$mods object $objName ${buildTemplate(early, inits, (self.some, bodyMod(body)))}",
+                newStats :+ q"..$mods object $objName ${buildTemplate(early,
+                                                                      inits,
+                                                                      (self.some, bodyMod(body))
+                  )}",
                 true
               )
             case other =>
