@@ -395,12 +395,12 @@ trait QueryGen extends Generator {
                 _._1 match {
                   case UntypedInlineFragment(typeName, _, _) =>
                     typeName // Selection in inline fragment, group by discriminator
-                  case _ =>
+                  case _                                     =>
                     none // Selection in base group, group by none
                 }
               }
               .toList
-              .sortBy(_._2.head._2)      // Sort by first appeareance of each subtype
+              .sortBy(_._2.head._2) // Sort by first appeareance of each subtype
               .map { // Resolve groups
                 case (Some(typeName), subQueries) =>
                   (typeName.some, // Unwrap inline fragment selections
