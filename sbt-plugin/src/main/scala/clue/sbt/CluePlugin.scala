@@ -28,13 +28,12 @@ object CluePlugin extends AutoPlugin {
   )
 
   override def projectSettings: Seq[Setting[_]] = Seq(
-    Compile / clueSourceDirectory := {
+    Compile / clueSourceDirectory :=
       crossProjectCrossType.?.value
         .flatMap { crossType =>
           crossType.sharedSrcDir(baseDirectory.value, "clue").map(_.getParentFile)
         }
-        .getOrElse(sourceDirectory.value / "clue")
-    },
+        .getOrElse(sourceDirectory.value / "clue"),
     Compile / sourceGenerators ++= (Compile / clueSourceGenerators).value, // workaround for sbt/sbt#7173
     libraryDependencies += BuildInfo.organization %%% BuildInfo.coreModule % BuildInfo.version,
     // another workaround
@@ -72,9 +71,8 @@ object CluePlugin extends AutoPlugin {
         }.taskValue,
 
         // register clean
-        LocalProject(proj.id) / clueClean := {
-          clean.value
-        },
+        LocalProject(proj.id) / clueClean :=
+          clean.value,
 
         // scalafix stuff
         semanticdbEnabled := true,
