@@ -67,7 +67,14 @@ trait SchemaGen extends Generator {
             .collect { case InputObjectType(name, _, fields, _) =>
               CaseClass(
                 name.capitalize,
-                fields.map(iv => ClassParam.fromGrackleType(iv.name, iv.tpe, isInput = true))
+                fields.map(iv =>
+                  ClassParam.fromGrackleType(
+                    iv.name,
+                    iv.tpe,
+                    isInput = true,
+                    deprecation = Deprecation.fromDirectives(iv.directives)
+                  )
+                )
               )
             }
             .map(
