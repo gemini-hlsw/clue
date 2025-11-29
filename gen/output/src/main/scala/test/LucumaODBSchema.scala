@@ -1658,7 +1658,7 @@ object LucumaODB {
       implicit val showCreateObservationInput: cats.Show[CreateObservationInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateObservationInput: io.circe.Encoder.AsObject[CreateObservationInput] = io.circe.generic.semiauto.deriveEncoder[CreateObservationInput].mapJsonObject(clue.data.Input.dropIgnores)
     }
-    case class CreateSiderealInput(val targetId: clue.data.Input[TargetId] = clue.data.Ignore, val programIds: clue.data.Input[List[ProgramId]] = clue.data.Ignore, val name: NonEmptyString, val catalogId: clue.data.Input[CatalogIdInput] = clue.data.Ignore, val ra: RightAscensionInput, val dec: DeclinationInput, val epoch: clue.data.Input[EpochString] = clue.data.Ignore, val properMotion: clue.data.Input[ProperMotionInput] = clue.data.Ignore, val radialVelocity: clue.data.Input[RadialVelocityInput] = clue.data.Ignore, val parallax: clue.data.Input[ParallaxModelInput] = clue.data.Ignore, val magnitudes: clue.data.Input[List[MagnitudeInput]] = clue.data.Ignore)
+    case class CreateSiderealInput(val targetId: clue.data.Input[TargetId] = clue.data.Ignore, val programIds: clue.data.Input[List[ProgramId]] = clue.data.Ignore, val name: NonEmptyString, val catalogId: clue.data.Input[CatalogIdInput] = clue.data.Ignore, val ra: RightAscensionInput, val dec: DeclinationInput, val epoch: clue.data.Input[EpochString] = clue.data.Ignore, val properMotion: clue.data.Input[ProperMotionInput] = clue.data.Ignore, val radialVelocity: clue.data.Input[RadialVelocityInput] = clue.data.Ignore, val parallax: clue.data.Input[ParallaxModelInput] = clue.data.Ignore, val brightnesses: clue.data.Input[List[MagnitudeInput]] = clue.data.Ignore, @deprecated("Use brightnesses instead") val magnitudes: clue.data.Input[List[MagnitudeInput]] = clue.data.Ignore)
     object CreateSiderealInput {
       val targetId: monocle.Lens[CreateSiderealInput, clue.data.Input[TargetId]] = monocle.macros.GenLens[CreateSiderealInput](_.targetId)
       val programIds: monocle.Lens[CreateSiderealInput, clue.data.Input[List[ProgramId]]] = monocle.macros.GenLens[CreateSiderealInput](_.programIds)
@@ -1670,7 +1670,8 @@ object LucumaODB {
       val properMotion: monocle.Lens[CreateSiderealInput, clue.data.Input[ProperMotionInput]] = monocle.macros.GenLens[CreateSiderealInput](_.properMotion)
       val radialVelocity: monocle.Lens[CreateSiderealInput, clue.data.Input[RadialVelocityInput]] = monocle.macros.GenLens[CreateSiderealInput](_.radialVelocity)
       val parallax: monocle.Lens[CreateSiderealInput, clue.data.Input[ParallaxModelInput]] = monocle.macros.GenLens[CreateSiderealInput](_.parallax)
-      val magnitudes: monocle.Lens[CreateSiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[CreateSiderealInput](_.magnitudes)
+      val brightnesses: monocle.Lens[CreateSiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[CreateSiderealInput](_.brightnesses)
+      @deprecated("Use brightnesses instead") val magnitudes: monocle.Lens[CreateSiderealInput, clue.data.Input[List[MagnitudeInput]]] = monocle.macros.GenLens[CreateSiderealInput](_.magnitudes)
       implicit val eqCreateSiderealInput: cats.Eq[CreateSiderealInput] = cats.Eq.fromUniversalEquals
       implicit val showCreateSiderealInput: cats.Show[CreateSiderealInput] = cats.Show.fromToString
       implicit val jsonEncoderCreateSiderealInput: io.circe.Encoder.AsObject[CreateSiderealInput] = io.circe.generic.semiauto.deriveEncoder[CreateSiderealInput].mapJsonObject(clue.data.Input.dropIgnores)

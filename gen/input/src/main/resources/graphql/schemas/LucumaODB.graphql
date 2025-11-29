@@ -352,7 +352,8 @@ input CreateSiderealInput {
   properMotion: ProperMotionInput
   radialVelocity: RadialVelocityInput
   parallax: ParallaxModelInput
-  magnitudes: [MagnitudeInput!]
+  brightnesses: [MagnitudeInput!]
+  magnitudes: [MagnitudeInput!] @deprecated(reason: "Use brightnesses instead")
 }
 
 # Opaque object cursor

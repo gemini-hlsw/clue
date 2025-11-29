@@ -289,9 +289,10 @@ trait Generator {
 
         val addLenses = Option.when(monocleLenses) { (moduleBody: List[Stat]) =>
           val lensesDef = params.map { param =>
-            val thisType  = qualifiedNestedType(nestPath, Type.Name(camelName))
-            val childType = param.typeTree(nextPath, nextTypes)
-            q"val ${Pat.Var(Term.Name(param.name))}:  monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term
+            val thisType: Type   = qualifiedNestedType(nestPath, Type.Name(camelName))
+            val childType: Type  = param.typeTree(nextPath, nextTypes)
+            val mod: Option[Mod] = param.deprecation.map(d => mod"@deprecated(${d.reason})")
+            q"..$mod val ${Pat.Var(Term.Name(param.name))}:  monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term
                 .Name(param.name)})"
           // q"val ${Term.Name(param.name)}: monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term.Name(param.name)})"
           }

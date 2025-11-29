@@ -80,7 +80,7 @@ object Wrapper extends Something {
           val id: monocle.Lens[Data.Character.Droid, String] = monocle.macros.GenLens[Data.Character.Droid](_.id)
           val name: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.name)
           val friends: monocle.Lens[Data.Character.Droid, Option[List[Data.Character.Friends]]] = monocle.macros.GenLens[Data.Character.Droid](_.friends)
-          val primaryFunction: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.primaryFunction)
+          @deprecated("Use 'functions' instead") val primaryFunction: monocle.Lens[Data.Character.Droid, Option[String]] = monocle.macros.GenLens[Data.Character.Droid](_.primaryFunction)
           implicit val eqDroid: cats.Eq[Data.Character.Droid] = cats.Eq.fromUniversalEquals
           implicit val showDroid: cats.Show[Data.Character.Droid] = cats.Show.fromToString
           implicit val reuseDroid: japgolly.scalajs.react.Reusability[Data.Character.Droid] = {
