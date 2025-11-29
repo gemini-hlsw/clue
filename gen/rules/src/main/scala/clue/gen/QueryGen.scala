@@ -189,19 +189,21 @@ trait QueryGen extends Generator {
 
   private def createDummyValue(tpe: GType): Value =
     tpe.dealias match {
-      case NullableType(_)                  => Value.AbsentValue
-      case ScalarType.IntType               => Value.IntValue(0)
-      case ScalarType.FloatType             => Value.FloatValue(0.0)
-      case ScalarType.StringType            => Value.StringValue("")
-      case ScalarType.BooleanType           => Value.BooleanValue(true)
-      case ScalarType.IDType                => Value.IDValue("")
-      case ScalarType(_, _, _)              => Value.IntValue(0)
-      case EnumType(_, _, values, _)        => Value.EnumValue(values.head.name)
-      case ListType(tpe0)                   => ListValue(List(createDummyValue(tpe0)))
-      case InputObjectType(_, _, fields, _) =>
-        ObjectValue(fields.map(iv => iv.name -> createDummyValue(iv.tpe)))
-      case t @ TypeRef(_, _)                => createDummyValue(t.dealias)
-      case _                                => Value.AbsentValue
+      case NullableType(tpe)                    => createDummyValue(tpe)
+      case ScalarType.IntType                   => Value.IntValue(0)
+      case ScalarType.FloatType                 => Value.FloatValue(0.0)
+      case ScalarType.StringType                => Value.StringValue("")
+      case ScalarType.BooleanType               => Value.BooleanValue(true)
+      case ScalarType.IDType                    => Value.IDValue("")
+      case ScalarType(_, _, _)                  => Value.IntValue(0)
+      case EnumType(_, _, values, _)            => Value.EnumValue(values.head.name)
+      case ListType(tpe0)                       => ListValue(List(createDummyValue(tpe0)))
+      case i @ InputObjectType(_, _, fields, _) =>
+        // For oneOf input objects, only set one field.
+        val fieldsHandlingOneOf = if (i.isOneOf) fields.headOption.toList else fields
+        ObjectValue(fieldsHandlingOneOf.map(iv => iv.name -> createDummyValue(iv.tpe)))
+      case t @ TypeRef(_, _)                    => createDummyValue(t.dealias)
+      case _                                    => Value.AbsentValue
     }
 
   private def createDummyVars(inputs: List[InputValue]): Query.Vars =
