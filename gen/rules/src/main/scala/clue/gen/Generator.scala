@@ -191,7 +191,7 @@ trait Generator {
       nestPath:          Option[Term.Ref] = None,
       nestedTypes:       Map[String, Term.Ref] = Map.empty,
       extending:         Option[String] = None,
-      dedupeAsScalar:    Boolean = false
+      scalarTypes:       List[String] = List.empty
     ): List[Stat] => List[Stat]
   }
 
@@ -265,7 +265,7 @@ trait Generator {
       nestPath:          Option[Term.Ref] = None,
       nestedTypes:       Map[String, Term.Ref] = Map.empty,
       extending:         Option[String] = None,
-      dedupeAsScalar:    Boolean = false
+      scalarTypes:       List[String] = List.empty
     ): List[Stat] => List[Stat] =
       parentBody => {
         val nextPath: Option[Term.Ref]       = nextNestPath(nestPath)
@@ -273,9 +273,9 @@ trait Generator {
 
         def dedupeScalar(param: ClassParam): ClassParam =
           param.copy(tpe = param.tpe match {
-            case Type.Name(n) if n === camelName && dedupeAsScalar && nextTypes.isEmpty =>
+            case Type.Name(n) if n === camelName && scalarTypes.contains_(n) =>
               Type.Select(Term.Name("Scalars"), Type.Name(n))
-            case other                                                                  => other
+            case other                                                       => other
           })
 
         val qualifiedParams: List[Term.Param] =
@@ -376,7 +376,7 @@ trait Generator {
       nestPath:          Option[Term.Ref] = None,
       nestedTypes:       Map[String, Term.Ref] = Map.empty,
       extending:         Option[String] = None,
-      dedupeAsScalar:    Boolean = false
+      scalarTypes:       List[String] = List.empty
     ): List[Stat] => List[Stat] =
       parentBody => {
         val nextPath              = nextNestPath(nestPath)
@@ -416,7 +416,7 @@ trait Generator {
                 nextPath,
                 nextTypes,
                 camelName.some, // Extends
-                dedupeAsScalar
+                scalarTypes
               )
             )
 

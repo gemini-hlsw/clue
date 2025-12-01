@@ -84,7 +84,10 @@ trait SchemaGen extends Generator {
       isOneOfInput = true
     )
 
-  protected def addInputs(schema: Schema, config: GraphQLGenConfig): List[Stat] => List[Stat] =
+  protected def addInputs(schema: Schema, config: GraphQLGenConfig): List[Stat] => List[Stat] = {
+    val scalarTypes: List[String] = schema.baseTypes.collect {
+      case namedType if namedType.isScalar => namedType.name
+    }
     addModuleDefs(
       "Types",
       catsEq = false,
@@ -112,9 +115,10 @@ trait SchemaGen extends Generator {
                 config.monocleLenses,
                 scalaJsReactReuse = false,
                 circeEncoder = true,
-                dedupeAsScalar = true
+                scalarTypes = scalarTypes
               )
             )
       )
     )
+  }
 }

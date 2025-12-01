@@ -394,6 +394,8 @@ input DeclinationInput @oneOf {
   fromDecimal: DeclinationDecimalInput
 }
 
+scalar GroupId
+
 input GroupElementInput @oneOf {
   groupId: GroupId
   observationId: ObservationId
