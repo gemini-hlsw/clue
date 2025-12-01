@@ -1741,6 +1741,36 @@ object LucumaODB {
         }
       }
     }
+    sealed trait GroupElementInput
+    object GroupElementInput {
+      case class GroupId(val value: Scalars.GroupId) extends GroupElementInput()
+      object GroupId {
+        val value: monocle.Iso[GroupElementInput.GroupId, Scalars.GroupId] = monocle.Focus[GroupElementInput.GroupId](_.value)
+        implicit val eqGroupId: cats.Eq[GroupElementInput.GroupId] = cats.Eq.fromUniversalEquals
+        implicit val showGroupId: cats.Show[GroupElementInput.GroupId] = cats.Show.fromToString
+      }
+      case class ObservationId(val value: Scalars.ObservationId) extends GroupElementInput()
+      object ObservationId {
+        val value: monocle.Iso[GroupElementInput.ObservationId, Scalars.ObservationId] = monocle.Focus[GroupElementInput.ObservationId](_.value)
+        implicit val eqObservationId: cats.Eq[GroupElementInput.ObservationId] = cats.Eq.fromUniversalEquals
+        implicit val showObservationId: cats.Show[GroupElementInput.ObservationId] = cats.Show.fromToString
+      }
+      val groupId: monocle.Prism[GroupElementInput, GroupElementInput.GroupId] = monocle.macros.GenPrism[GroupElementInput, GroupElementInput.GroupId]
+      val observationId: monocle.Prism[GroupElementInput, GroupElementInput.ObservationId] = monocle.macros.GenPrism[GroupElementInput, GroupElementInput.ObservationId]
+      implicit val eqGroupElementInput: cats.Eq[GroupElementInput] = cats.Eq.fromUniversalEquals
+      implicit val showGroupElementInput: cats.Show[GroupElementInput] = cats.Show.fromToString
+      implicit val jsonEncoderGroupElementInput: io.circe.Encoder.AsObject[GroupElementInput] = io.circe.Encoder.AsObject.instance[GroupElementInput] {
+        instance => io.circe.JsonObject.empty.+: {
+          import io.circe.syntax._
+          instance match {
+            case GroupElementInput.GroupId(value) =>
+              "groupId" -> value.asJson
+            case GroupElementInput.ObservationId(value) =>
+              "observationId" -> value.asJson
+          }
+        }
+      }
+    }
     case class DeclinationLongInput(val value: Long, val units: DeclinationUnits)
     object DeclinationLongInput {
       val value: monocle.Lens[DeclinationLongInput, Long] = monocle.macros.GenLens[DeclinationLongInput](_.value)

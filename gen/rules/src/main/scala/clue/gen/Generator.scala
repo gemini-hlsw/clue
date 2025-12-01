@@ -3,7 +3,6 @@
 
 package clue.gen
 
-// import scalafix.v1._
 import cats.syntax.all.*
 import grackle.ScalarType
 import grackle.SchemaRenderer
@@ -191,7 +190,8 @@ trait Generator {
       forceModule:       Boolean = false,
       nestPath:          Option[Term.Ref] = None,
       nestedTypes:       Map[String, Term.Ref] = Map.empty,
-      extending:         Option[String] = None
+      extending:         Option[String] = None,
+      dedupeAsScalar:    Boolean = false
     ): List[Stat] => List[Stat]
   }
 
@@ -264,16 +264,25 @@ trait Generator {
       forceModule:       Boolean = false,
       nestPath:          Option[Term.Ref] = None,
       nestedTypes:       Map[String, Term.Ref] = Map.empty,
-      extending:         Option[String] = None
+      extending:         Option[String] = None,
+      dedupeAsScalar:    Boolean = false
     ): List[Stat] => List[Stat] =
       parentBody => {
         val nextPath: Option[Term.Ref]       = nextNestPath(nestPath)
         val nextTypes: Map[String, Term.Ref] = nextNestedTypes(nested, nestPath, nestedTypes)
 
+        def dedupeScalar(param: ClassParam): ClassParam =
+          param.copy(tpe = param.tpe match {
+            case Type.Name(n) if n === camelName && dedupeAsScalar && nextTypes.isEmpty =>
+              Type.Select(Term.Name("Scalars"), Type.Name(n))
+            case other                                                                  => other
+          })
+
+        val qualifiedParams: List[Term.Param] =
+          params.map(dedupeScalar(_)).map(_.toTree(nextPath, nextTypes))
+
         val (newBody, wasMissing) =
-          addCaseClassDef(camelName, params.map(_.toTree(nextPath, nextTypes)), extending)(
-            parentBody
-          )
+          addCaseClassDef(camelName, qualifiedParams, extending)(parentBody)
 
         val addNested = nested.map(
           _.addToParentBody(
@@ -291,7 +300,7 @@ trait Generator {
           val thisType: Type       = qualifiedNestedType(nestPath, Type.Name(camelName))
           val uniqueParam: Boolean = params.length === 1
           val lensesDef            = params.map { param =>
-            val childType: Type  = param.typeTree(nextPath, nextTypes)
+            val childType: Type  = dedupeScalar(param).typeTree(nextPath, nextTypes)
             val mod: Option[Mod] = param.deprecation.map(d => mod"@deprecated(${d.reason})")
             if (uniqueParam)
               q"..$mod val ${Pat.Var(Term.Name(param.name))}:  monocle.Iso[$thisType, $childType] = monocle.Focus[$thisType](_.${Term.Name(param.name)})"
@@ -366,7 +375,8 @@ trait Generator {
       forceModule:       Boolean,
       nestPath:          Option[Term.Ref] = None,
       nestedTypes:       Map[String, Term.Ref] = Map.empty,
-      extending:         Option[String] = None
+      extending:         Option[String] = None,
+      dedupeAsScalar:    Boolean = false
     ): List[Stat] => List[Stat] =
       parentBody => {
         val nextPath              = nextNestPath(nestPath)
@@ -405,7 +415,8 @@ trait Generator {
                 forceModule,
                 nextPath,
                 nextTypes,
-                camelName.some // Extends
+                camelName.some, // Extends
+                dedupeAsScalar
               )
             )
 
@@ -624,7 +635,7 @@ trait Generator {
             )
           )
         q"""implicit val ${valName("jsonEncoder")}: io.circe.Encoder.AsObject[$n] = 
-          io.circe.Encoder.AsObject.instance[DeclinationInput] {
+          io.circe.Encoder.AsObject.instance[$n] {
             instance => io.circe.JsonObject.empty.+: {
               import io.circe.syntax._
               instance match {

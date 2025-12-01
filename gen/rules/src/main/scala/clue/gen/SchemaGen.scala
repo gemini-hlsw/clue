@@ -111,7 +111,8 @@ trait SchemaGen extends Generator {
                 config.catsShow,
                 config.monocleLenses,
                 scalaJsReactReuse = false,
-                circeEncoder = true
+                circeEncoder = true,
+                dedupeAsScalar = true
               )
             )
       )

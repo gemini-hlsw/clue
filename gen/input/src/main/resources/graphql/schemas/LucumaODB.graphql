@@ -394,6 +394,11 @@ input DeclinationInput @oneOf {
   fromDecimal: DeclinationDecimalInput
 }
 
+input GroupElementInput @oneOf {
+  groupId: GroupId
+  observationId: ObservationId
+}
+
 # Integral value in Declination
 input DeclinationLongInput {
   # integral value in associated units
