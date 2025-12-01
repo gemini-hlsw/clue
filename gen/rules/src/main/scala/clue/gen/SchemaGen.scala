@@ -8,6 +8,7 @@ import grackle.InputObjectType
 import grackle.Schema
 
 import scala.meta.*
+import grackle.InputValue
 
 trait SchemaGen extends Generator {
   // Just make sure "object Scalars" exists.
@@ -47,6 +48,42 @@ trait SchemaGen extends Generator {
         )
     )
 
+  private def buildInputCaseClass(name: String, fields: List[InputValue]): CaseClass =
+    CaseClass(
+      name.capitalize,
+      fields.map(iv =>
+        ClassParam.fromGrackleType(
+          iv.name,
+          iv.tpe,
+          isInput = true,
+          deprecation = Deprecation.fromDirectives(iv.directives)
+        )
+      )
+    )
+
+  private def buildInputSumType(name: String, fields: List[InputValue]): SumClass =
+    SumClass(
+      name.capitalize,
+      Sum(
+        List.empty,
+        List.empty,
+        fields.map(iv =>
+          CaseClass(
+            iv.name.capitalize,
+            List(
+              ClassParam.fromGrackleType(
+                "value",
+                iv.tpe.nonNull,
+                isInput = false,
+                deprecation = Deprecation.fromDirectives(iv.directives)
+              )
+            )
+          )
+        )
+      ),
+      isOneOfInput = true
+    )
+
   protected def addInputs(schema: Schema, config: GraphQLGenConfig): List[Stat] => List[Stat] =
     addModuleDefs(
       "Types",
@@ -64,18 +101,9 @@ trait SchemaGen extends Generator {
           ) ++ parentBody
         ) ++
           schema.types
-            .collect { case InputObjectType(name, _, fields, _) =>
-              CaseClass(
-                name.capitalize,
-                fields.map(iv =>
-                  ClassParam.fromGrackleType(
-                    iv.name,
-                    iv.tpe,
-                    isInput = true,
-                    deprecation = Deprecation.fromDirectives(iv.directives)
-                  )
-                )
-              )
+            .collect[Class] { case InputObjectType(name, _, fields, directives) =>
+              if (directives.exists(_.name == "oneOf")) buildInputSumType(name, fields)
+              else buildInputCaseClass(name, fields)
             }
             .map(
               _.addToParentBody(

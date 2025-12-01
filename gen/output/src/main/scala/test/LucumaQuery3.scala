@@ -63,6 +63,8 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
             implicit val showAsterism: cats.Show[Data.Observations.Nodes.ObservationTarget.Asterism] = cats.Show.fromToString
             implicit val jsonDecoderAsterism: io.circe.Decoder[Data.Observations.Nodes.ObservationTarget.Asterism] = io.circe.generic.semiauto.deriveDecoder[Data.Observations.Nodes.ObservationTarget.Asterism]
           }
+          val target: monocle.Prism[Data.Observations.Nodes.ObservationTarget, Data.Observations.Nodes.ObservationTarget.Target] = monocle.macros.GenPrism[Data.Observations.Nodes.ObservationTarget, Data.Observations.Nodes.ObservationTarget.Target]
+          val asterism: monocle.Prism[Data.Observations.Nodes.ObservationTarget, Data.Observations.Nodes.ObservationTarget.Asterism] = monocle.macros.GenPrism[Data.Observations.Nodes.ObservationTarget, Data.Observations.Nodes.ObservationTarget.Asterism]
           implicit val eqObservationTarget: cats.Eq[Data.Observations.Nodes.ObservationTarget] = cats.Eq.fromUniversalEquals
           implicit val showObservationTarget: cats.Show[Data.Observations.Nodes.ObservationTarget] = cats.Show.fromToString
           implicit val jsonDecoderObservationTarget: io.circe.Decoder[Data.Observations.Nodes.ObservationTarget] = List[io.circe.Decoder[Data.Observations.Nodes.ObservationTarget]](io.circe.Decoder[Data.Observations.Nodes.ObservationTarget.Target].asInstanceOf[io.circe.Decoder[Data.Observations.Nodes.ObservationTarget]], io.circe.Decoder[Data.Observations.Nodes.ObservationTarget.Asterism].asInstanceOf[io.circe.Decoder[Data.Observations.Nodes.ObservationTarget]]).reduceLeft(_ or _)
@@ -73,12 +75,12 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
         implicit val showNodes: cats.Show[Data.Observations.Nodes] = cats.Show.fromToString
         implicit val jsonDecoderNodes: io.circe.Decoder[Data.Observations.Nodes] = io.circe.generic.semiauto.deriveDecoder[Data.Observations.Nodes]
       }
-      val nodes: monocle.Lens[Data.Observations, List[Data.Observations.Nodes]] = monocle.macros.GenLens[Data.Observations](_.nodes)
+      val nodes: monocle.Iso[Data.Observations, List[Data.Observations.Nodes]] = monocle.Focus[Data.Observations](_.nodes)
       implicit val eqObservations: cats.Eq[Data.Observations] = cats.Eq.fromUniversalEquals
       implicit val showObservations: cats.Show[Data.Observations] = cats.Show.fromToString
       implicit val jsonDecoderObservations: io.circe.Decoder[Data.Observations] = io.circe.generic.semiauto.deriveDecoder[Data.Observations]
     }
-    val observations: monocle.Lens[Data, Data.Observations] = monocle.macros.GenLens[Data](_.observations)
+    val observations: monocle.Iso[Data, Data.Observations] = monocle.Focus[Data](_.observations)
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]

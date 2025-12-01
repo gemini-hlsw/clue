@@ -1684,16 +1684,62 @@ object LucumaODB {
       implicit val showDeclinationDecimalInput: cats.Show[DeclinationDecimalInput] = cats.Show.fromToString
       implicit val jsonEncoderDeclinationDecimalInput: io.circe.Encoder.AsObject[DeclinationDecimalInput] = io.circe.generic.semiauto.deriveEncoder[DeclinationDecimalInput].mapJsonObject(clue.data.Input.dropIgnores)
     }
-    case class DeclinationInput(val microarcseconds: clue.data.Input[Long] = clue.data.Ignore, val degrees: clue.data.Input[BigDecimal] = clue.data.Ignore, val dms: clue.data.Input[DmsString] = clue.data.Ignore, val fromLong: clue.data.Input[DeclinationLongInput] = clue.data.Ignore, val fromDecimal: clue.data.Input[DeclinationDecimalInput] = clue.data.Ignore)
+    sealed trait DeclinationInput
     object DeclinationInput {
-      val microarcseconds: monocle.Lens[DeclinationInput, clue.data.Input[Long]] = monocle.macros.GenLens[DeclinationInput](_.microarcseconds)
-      val degrees: monocle.Lens[DeclinationInput, clue.data.Input[BigDecimal]] = monocle.macros.GenLens[DeclinationInput](_.degrees)
-      val dms: monocle.Lens[DeclinationInput, clue.data.Input[DmsString]] = monocle.macros.GenLens[DeclinationInput](_.dms)
-      val fromLong: monocle.Lens[DeclinationInput, clue.data.Input[DeclinationLongInput]] = monocle.macros.GenLens[DeclinationInput](_.fromLong)
-      val fromDecimal: monocle.Lens[DeclinationInput, clue.data.Input[DeclinationDecimalInput]] = monocle.macros.GenLens[DeclinationInput](_.fromDecimal)
+      case class Microarcseconds(val value: Long) extends DeclinationInput()
+      object Microarcseconds {
+        val value: monocle.Iso[DeclinationInput.Microarcseconds, Long] = monocle.Focus[DeclinationInput.Microarcseconds](_.value)
+        implicit val eqMicroarcseconds: cats.Eq[DeclinationInput.Microarcseconds] = cats.Eq.fromUniversalEquals
+        implicit val showMicroarcseconds: cats.Show[DeclinationInput.Microarcseconds] = cats.Show.fromToString
+      }
+      case class Degrees(val value: BigDecimal) extends DeclinationInput()
+      object Degrees {
+        val value: monocle.Iso[DeclinationInput.Degrees, BigDecimal] = monocle.Focus[DeclinationInput.Degrees](_.value)
+        implicit val eqDegrees: cats.Eq[DeclinationInput.Degrees] = cats.Eq.fromUniversalEquals
+        implicit val showDegrees: cats.Show[DeclinationInput.Degrees] = cats.Show.fromToString
+      }
+      case class Dms(val value: DmsString) extends DeclinationInput()
+      object Dms {
+        val value: monocle.Iso[DeclinationInput.Dms, DmsString] = monocle.Focus[DeclinationInput.Dms](_.value)
+        implicit val eqDms: cats.Eq[DeclinationInput.Dms] = cats.Eq.fromUniversalEquals
+        implicit val showDms: cats.Show[DeclinationInput.Dms] = cats.Show.fromToString
+      }
+      case class FromLong(val value: DeclinationLongInput) extends DeclinationInput()
+      object FromLong {
+        val value: monocle.Iso[DeclinationInput.FromLong, DeclinationLongInput] = monocle.Focus[DeclinationInput.FromLong](_.value)
+        implicit val eqFromLong: cats.Eq[DeclinationInput.FromLong] = cats.Eq.fromUniversalEquals
+        implicit val showFromLong: cats.Show[DeclinationInput.FromLong] = cats.Show.fromToString
+      }
+      case class FromDecimal(val value: DeclinationDecimalInput) extends DeclinationInput()
+      object FromDecimal {
+        val value: monocle.Iso[DeclinationInput.FromDecimal, DeclinationDecimalInput] = monocle.Focus[DeclinationInput.FromDecimal](_.value)
+        implicit val eqFromDecimal: cats.Eq[DeclinationInput.FromDecimal] = cats.Eq.fromUniversalEquals
+        implicit val showFromDecimal: cats.Show[DeclinationInput.FromDecimal] = cats.Show.fromToString
+      }
+      val microarcseconds: monocle.Prism[DeclinationInput, DeclinationInput.Microarcseconds] = monocle.macros.GenPrism[DeclinationInput, DeclinationInput.Microarcseconds]
+      val degrees: monocle.Prism[DeclinationInput, DeclinationInput.Degrees] = monocle.macros.GenPrism[DeclinationInput, DeclinationInput.Degrees]
+      val dms: monocle.Prism[DeclinationInput, DeclinationInput.Dms] = monocle.macros.GenPrism[DeclinationInput, DeclinationInput.Dms]
+      val fromLong: monocle.Prism[DeclinationInput, DeclinationInput.FromLong] = monocle.macros.GenPrism[DeclinationInput, DeclinationInput.FromLong]
+      val fromDecimal: monocle.Prism[DeclinationInput, DeclinationInput.FromDecimal] = monocle.macros.GenPrism[DeclinationInput, DeclinationInput.FromDecimal]
       implicit val eqDeclinationInput: cats.Eq[DeclinationInput] = cats.Eq.fromUniversalEquals
       implicit val showDeclinationInput: cats.Show[DeclinationInput] = cats.Show.fromToString
-      implicit val jsonEncoderDeclinationInput: io.circe.Encoder.AsObject[DeclinationInput] = io.circe.generic.semiauto.deriveEncoder[DeclinationInput].mapJsonObject(clue.data.Input.dropIgnores)
+      implicit val jsonEncoderDeclinationInput: io.circe.Encoder.AsObject[DeclinationInput] = io.circe.Encoder.AsObject.instance[DeclinationInput] {
+        instance => io.circe.JsonObject.empty.+: {
+          import io.circe.syntax._
+          instance match {
+            case DeclinationInput.Microarcseconds(value) =>
+              "microarcseconds" -> value.asJson
+            case DeclinationInput.Degrees(value) =>
+              "degrees" -> value.asJson
+            case DeclinationInput.Dms(value) =>
+              "dms" -> value.asJson
+            case DeclinationInput.FromLong(value) =>
+              "fromLong" -> value.asJson
+            case DeclinationInput.FromDecimal(value) =>
+              "fromDecimal" -> value.asJson
+          }
+        }
+      }
     }
     case class DeclinationLongInput(val value: Long, val units: DeclinationUnits)
     object DeclinationLongInput {

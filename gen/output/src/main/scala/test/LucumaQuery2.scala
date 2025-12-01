@@ -49,7 +49,7 @@ object LucumaQuery2 extends GraphQLOperation[LucumaODB] {
         object Nodes {
           case class Tracking(val epoch: EpochString)
           object Tracking {
-            val epoch: monocle.Lens[Data.Program.Targets.Nodes.Tracking, EpochString] = monocle.macros.GenLens[Data.Program.Targets.Nodes.Tracking](_.epoch)
+            val epoch: monocle.Iso[Data.Program.Targets.Nodes.Tracking, EpochString] = monocle.Focus[Data.Program.Targets.Nodes.Tracking](_.epoch)
             implicit val eqTracking: cats.Eq[Data.Program.Targets.Nodes.Tracking] = cats.Eq.fromUniversalEquals
             implicit val showTracking: cats.Show[Data.Program.Targets.Nodes.Tracking] = cats.Show.fromToString
             implicit val jsonDecoderTracking: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets.Nodes.Tracking]
@@ -61,7 +61,7 @@ object LucumaQuery2 extends GraphQLOperation[LucumaODB] {
           implicit val showNodes: cats.Show[Data.Program.Targets.Nodes] = cats.Show.fromToString
           implicit val jsonDecoderNodes: io.circe.Decoder[Data.Program.Targets.Nodes] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets.Nodes]
         }
-        val nodes: monocle.Lens[Data.Program.Targets, List[Data.Program.Targets.Nodes]] = monocle.macros.GenLens[Data.Program.Targets](_.nodes)
+        val nodes: monocle.Iso[Data.Program.Targets, List[Data.Program.Targets.Nodes]] = monocle.Focus[Data.Program.Targets](_.nodes)
         implicit val eqTargets: cats.Eq[Data.Program.Targets] = cats.Eq.fromUniversalEquals
         implicit val showTargets: cats.Show[Data.Program.Targets] = cats.Show.fromToString
         implicit val jsonDecoderTargets: io.circe.Decoder[Data.Program.Targets] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets]
@@ -73,7 +73,7 @@ object LucumaQuery2 extends GraphQLOperation[LucumaODB] {
       implicit val showProgram: cats.Show[Data.Program] = cats.Show.fromToString
       implicit val jsonDecoderProgram: io.circe.Decoder[Data.Program] = io.circe.generic.semiauto.deriveDecoder[Data.Program]
     }
-    val program: monocle.Lens[Data, Option[Data.Program]] = monocle.macros.GenLens[Data](_.program)
+    val program: monocle.Iso[Data, Option[Data.Program]] = monocle.Focus[Data](_.program)
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]

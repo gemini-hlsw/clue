@@ -22,7 +22,7 @@ object StarWarsSubquery extends GraphQLSubquery[StarWars]("Character") {
       """
   case class Data(val name: Option[String] = None)
   object Data {
-    val name: monocle.Lens[Data, Option[String]] = monocle.macros.GenLens[Data](_.name)
+    val name: monocle.Iso[Data, Option[String]] = monocle.Focus[Data](_.name)
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]

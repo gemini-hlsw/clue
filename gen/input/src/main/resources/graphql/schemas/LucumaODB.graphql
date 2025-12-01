@@ -386,7 +386,7 @@ input DeclinationDecimalInput {
 }
 
 # Declination, choose one of the available units
-input DeclinationInput {
+input DeclinationInput @oneOf {
   microarcseconds: Long
   degrees: BigDecimal
   dms: DmsString
