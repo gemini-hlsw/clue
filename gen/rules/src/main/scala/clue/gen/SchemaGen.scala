@@ -5,10 +5,10 @@ package clue.gen
 
 import grackle.EnumType
 import grackle.InputObjectType
+import grackle.InputValue
 import grackle.Schema
 
 import scala.meta.*
-import grackle.InputValue
 
 trait SchemaGen extends Generator {
   // Just make sure "object Scalars" exists.
