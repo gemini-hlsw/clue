@@ -21,6 +21,7 @@ object LucumaODB {
     type TargetId = String
     type NonEmptyString = String
     type ConstraintSetId = String
+    type GroupId = String
     def ignoreUnusedImportScalars(): Unit = ()
   }
   object Enums {
