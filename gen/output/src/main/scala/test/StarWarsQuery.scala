@@ -34,7 +34,7 @@ object StarWarsQuery extends GraphQLOperation[StarWars] {
       """
   case class Variables(val charId: String)
   object Variables {
-    val charId: monocle.Lens[Variables, String] = monocle.macros.GenLens[Variables](_.charId)
+    val charId: monocle.Iso[Variables, String] = monocle.Focus[Variables](_.charId)
     implicit val eqVariables: cats.Eq[Variables] = cats.Eq.fromUniversalEquals
     implicit val showVariables: cats.Show[Variables] = cats.Show.fromToString
     implicit val jsonEncoderVariables: io.circe.Encoder.AsObject[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJsonObject(clue.data.Input.dropIgnores)
@@ -49,7 +49,7 @@ object StarWarsQuery extends GraphQLOperation[StarWars] {
     object Character {
       case class Friends(val name: Option[String] = None)
       object Friends {
-        val name: monocle.Lens[Data.Character.Friends, Option[String]] = monocle.macros.GenLens[Data.Character.Friends](_.name)
+        val name: monocle.Iso[Data.Character.Friends, Option[String]] = monocle.Focus[Data.Character.Friends](_.name)
         implicit val eqFriends: cats.Eq[Data.Character.Friends] = cats.Eq.fromUniversalEquals
         implicit val showFriends: cats.Show[Data.Character.Friends] = cats.Show.fromToString
         implicit val jsonDecoderFriends: io.circe.Decoder[Data.Character.Friends] = io.circe.generic.semiauto.deriveDecoder[Data.Character.Friends]
@@ -98,11 +98,13 @@ object StarWarsQuery extends GraphQLOperation[StarWars] {
             s.copy(friends = v)
         }
       }
+      val human: monocle.Prism[Data.Character, Data.Character.Human] = monocle.macros.GenPrism[Data.Character, Data.Character.Human]
+      val droid: monocle.Prism[Data.Character, Data.Character.Droid] = monocle.macros.GenPrism[Data.Character, Data.Character.Droid]
       implicit val eqCharacter: cats.Eq[Data.Character] = cats.Eq.fromUniversalEquals
       implicit val showCharacter: cats.Show[Data.Character] = cats.Show.fromToString
       implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = List[io.circe.Decoder[Data.Character]](io.circe.Decoder[Data.Character.Human].asInstanceOf[io.circe.Decoder[Data.Character]], io.circe.Decoder[Data.Character.Droid].asInstanceOf[io.circe.Decoder[Data.Character]]).reduceLeft(_ or _)
     }
-    val character: monocle.Lens[Data, Option[Data.Character]] = monocle.macros.GenLens[Data](_.character)
+    val character: monocle.Iso[Data, Option[Data.Character]] = monocle.Focus[Data](_.character)
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]

@@ -5,6 +5,7 @@ package clue.gen
 
 import grackle.EnumType
 import grackle.InputObjectType
+import grackle.InputValue
 import grackle.Schema
 
 import scala.meta.*
@@ -47,7 +48,46 @@ trait SchemaGen extends Generator {
         )
     )
 
-  protected def addInputs(schema: Schema, config: GraphQLGenConfig): List[Stat] => List[Stat] =
+  private def buildInputCaseClass(name: String, fields: List[InputValue]): CaseClass =
+    CaseClass(
+      name.capitalize,
+      fields.map(iv =>
+        ClassParam.fromGrackleType(
+          iv.name,
+          iv.tpe,
+          isInput = true,
+          deprecation = Deprecation.fromDirectives(iv.directives)
+        )
+      )
+    )
+
+  private def buildInputSumType(name: String, fields: List[InputValue]): SumClass =
+    SumClass(
+      name.capitalize,
+      Sum(
+        List.empty,
+        List.empty,
+        fields.map(iv =>
+          CaseClass(
+            iv.name.capitalize,
+            List(
+              ClassParam.fromGrackleType(
+                "value",
+                iv.tpe.nonNull,
+                isInput = false,
+                deprecation = Deprecation.fromDirectives(iv.directives)
+              )
+            )
+          )
+        )
+      ),
+      isOneOfInput = true
+    )
+
+  protected def addInputs(schema: Schema, config: GraphQLGenConfig): List[Stat] => List[Stat] = {
+    val scalarTypes: List[String] = schema.baseTypes.collect {
+      case namedType if namedType.isScalar => namedType.name
+    }
     addModuleDefs(
       "Types",
       catsEq = false,
@@ -64,18 +104,9 @@ trait SchemaGen extends Generator {
           ) ++ parentBody
         ) ++
           schema.types
-            .collect { case InputObjectType(name, _, fields, _) =>
-              CaseClass(
-                name.capitalize,
-                fields.map(iv =>
-                  ClassParam.fromGrackleType(
-                    iv.name,
-                    iv.tpe,
-                    isInput = true,
-                    deprecation = Deprecation.fromDirectives(iv.directives)
-                  )
-                )
-              )
+            .collect[Class] { case InputObjectType(name, _, fields, directives) =>
+              if (directives.exists(_.name == "oneOf")) buildInputSumType(name, fields)
+              else buildInputCaseClass(name, fields)
             }
             .map(
               _.addToParentBody(
@@ -83,9 +114,11 @@ trait SchemaGen extends Generator {
                 config.catsShow,
                 config.monocleLenses,
                 scalaJsReactReuse = false,
-                circeEncoder = true
+                circeEncoder = true,
+                scalarTypes = scalarTypes
               )
             )
       )
     )
+  }
 }

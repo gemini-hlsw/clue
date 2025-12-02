@@ -54,18 +54,20 @@ object LucumaQuery extends GraphQLOperation[LucumaODB] {
           object Tracking {
             case class Sidereal(val epoch: EpochString) extends Tracking()
             object Sidereal {
-              val epoch: monocle.Lens[Data.Program.Targets.Nodes.Tracking.Sidereal, EpochString] = monocle.macros.GenLens[Data.Program.Targets.Nodes.Tracking.Sidereal](_.epoch)
+              val epoch: monocle.Iso[Data.Program.Targets.Nodes.Tracking.Sidereal, EpochString] = monocle.Focus[Data.Program.Targets.Nodes.Tracking.Sidereal](_.epoch)
               implicit val eqSidereal: cats.Eq[Data.Program.Targets.Nodes.Tracking.Sidereal] = cats.Eq.fromUniversalEquals
               implicit val showSidereal: cats.Show[Data.Program.Targets.Nodes.Tracking.Sidereal] = cats.Show.fromToString
               implicit val jsonDecoderSidereal: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Sidereal] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets.Nodes.Tracking.Sidereal]
             }
             case class Nonsidereal(val keyType: EphemerisKeyType) extends Tracking()
             object Nonsidereal {
-              val keyType: monocle.Lens[Data.Program.Targets.Nodes.Tracking.Nonsidereal, EphemerisKeyType] = monocle.macros.GenLens[Data.Program.Targets.Nodes.Tracking.Nonsidereal](_.keyType)
+              val keyType: monocle.Iso[Data.Program.Targets.Nodes.Tracking.Nonsidereal, EphemerisKeyType] = monocle.Focus[Data.Program.Targets.Nodes.Tracking.Nonsidereal](_.keyType)
               implicit val eqNonsidereal: cats.Eq[Data.Program.Targets.Nodes.Tracking.Nonsidereal] = cats.Eq.fromUniversalEquals
               implicit val showNonsidereal: cats.Show[Data.Program.Targets.Nodes.Tracking.Nonsidereal] = cats.Show.fromToString
               implicit val jsonDecoderNonsidereal: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Nonsidereal] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets.Nodes.Tracking.Nonsidereal]
             }
+            val sidereal: monocle.Prism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Sidereal] = monocle.macros.GenPrism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Sidereal]
+            val nonsidereal: monocle.Prism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Nonsidereal] = monocle.macros.GenPrism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Nonsidereal]
             implicit val eqTracking: cats.Eq[Data.Program.Targets.Nodes.Tracking] = cats.Eq.fromUniversalEquals
             implicit val showTracking: cats.Show[Data.Program.Targets.Nodes.Tracking] = cats.Show.fromToString
             implicit val jsonDecoderTracking: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking] = List[io.circe.Decoder[Data.Program.Targets.Nodes.Tracking]](io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Sidereal].asInstanceOf[io.circe.Decoder[Data.Program.Targets.Nodes.Tracking]], io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Nonsidereal].asInstanceOf[io.circe.Decoder[Data.Program.Targets.Nodes.Tracking]]).reduceLeft(_ or _)
@@ -77,7 +79,7 @@ object LucumaQuery extends GraphQLOperation[LucumaODB] {
           implicit val showNodes: cats.Show[Data.Program.Targets.Nodes] = cats.Show.fromToString
           implicit val jsonDecoderNodes: io.circe.Decoder[Data.Program.Targets.Nodes] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets.Nodes]
         }
-        val nodes: monocle.Lens[Data.Program.Targets, List[Data.Program.Targets.Nodes]] = monocle.macros.GenLens[Data.Program.Targets](_.nodes)
+        val nodes: monocle.Iso[Data.Program.Targets, List[Data.Program.Targets.Nodes]] = monocle.Focus[Data.Program.Targets](_.nodes)
         implicit val eqTargets: cats.Eq[Data.Program.Targets] = cats.Eq.fromUniversalEquals
         implicit val showTargets: cats.Show[Data.Program.Targets] = cats.Show.fromToString
         implicit val jsonDecoderTargets: io.circe.Decoder[Data.Program.Targets] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets]
@@ -89,7 +91,7 @@ object LucumaQuery extends GraphQLOperation[LucumaODB] {
       implicit val showProgram: cats.Show[Data.Program] = cats.Show.fromToString
       implicit val jsonDecoderProgram: io.circe.Decoder[Data.Program] = io.circe.generic.semiauto.deriveDecoder[Data.Program]
     }
-    val program: monocle.Lens[Data, Option[Data.Program]] = monocle.macros.GenLens[Data](_.program)
+    val program: monocle.Iso[Data, Option[Data.Program]] = monocle.Focus[Data](_.program)
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]

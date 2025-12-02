@@ -22,14 +22,14 @@ object StarWarsQuery4 extends GraphQLOperation[StarWars] {
       """
   case class Variables(val charId: String)
   object Variables {
-    val charId: monocle.Lens[Variables, String] = monocle.macros.GenLens[Variables](_.charId)
+    val charId: monocle.Iso[Variables, String] = monocle.Focus[Variables](_.charId)
     implicit val eqVariables: cats.Eq[Variables] = cats.Eq.fromUniversalEquals
     implicit val showVariables: cats.Show[Variables] = cats.Show.fromToString
     implicit val jsonEncoderVariables: io.circe.Encoder.AsObject[Variables] = io.circe.generic.semiauto.deriveEncoder[Variables].mapJsonObject(clue.data.Input.dropIgnores)
   }
   case class Data(val character: Option[StarWarsNestedSubquery.Data] = None)
   object Data {
-    val character: monocle.Lens[Data, Option[StarWarsNestedSubquery.Data]] = monocle.macros.GenLens[Data](_.character)
+    val character: monocle.Iso[Data, Option[StarWarsNestedSubquery.Data]] = monocle.Focus[Data](_.character)
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]
