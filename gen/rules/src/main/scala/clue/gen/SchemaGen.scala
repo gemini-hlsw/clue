@@ -104,9 +104,11 @@ trait SchemaGen extends Generator {
           ) ++ parentBody
         ) ++
           schema.types
-            .collect[Class] { case InputObjectType(name, _, fields, directives) =>
-              if (directives.exists(_.name == "oneOf")) buildInputSumType(name, fields)
-              else buildInputCaseClass(name, fields)
+            .collect {
+              case iot @ InputObjectType(name, _, fields, _) if iot.isOneOf =>
+                buildInputSumType(name, fields)
+              case InputObjectType(name, _, fields, _)                      =>
+                buildInputCaseClass(name, fields)
             }
             .map(
               _.addToParentBody(
