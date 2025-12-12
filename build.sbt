@@ -187,7 +187,7 @@ lazy val sbtPlugin =
     .enablePlugins(SbtPlugin, BuildInfoPlugin)
     .settings(
       moduleName                              := "sbt-clue",
-      crossScalaVersions                      := List("2.12.20"),
+      crossScalaVersions                      := List("2.12.21"),
       scalacOptions                           := Nil,
       addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % V.scalafixVersion),
       addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
