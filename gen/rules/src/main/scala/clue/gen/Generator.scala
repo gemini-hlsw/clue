@@ -495,7 +495,6 @@ trait Generator {
         case Skip                                =>
           parentBody
         case Define(newParentBody, early, inits) =>
-          val allInits   = inits :+ init"${Type.Name(name)}()"
           val enumValues = values.map(v => EnumValue.fromStringAndDeprecation(v._1, v._2))
           addModuleDefs(
             name,
@@ -509,11 +508,23 @@ trait Generator {
               val mods: List[Mod] = enumValue.deprecation.fold(List.empty[Mod])(dep =>
                 List(mod"@deprecated(${dep.reason})")
               )
+              val allInits        = inits :+ init"${Type.Name(name)}(${Lit.String(enumValue.asString)})"
               q"..$mods case object ${Term.Name(enumValue.className)} ${buildTemplate(early, allInits)}"
-            },
+            } ++ List(
+              q"""val values: List[${Type.Name(name)}] = List(..${enumValues.map(enumValue =>
+                  Term.Name(enumValue.className)
+                )})""",
+              q"""def fromString(s: String): Either[String, ${Type.Name(
+                  name
+                )}] = s match {..case ${enumValues.map(enumValue =>
+                  p"case ${enumValue.asString} => Right(${Term.Name(enumValue.className)})"
+                )} ; case _ => Left(s"Invalid value [$$s] for enum [" + ${Lit.String(
+                  name
+                )} + "]" ) }"""
+            ),
             ignoreDeprecation = enumValues.exists(_.deprecation.isDefined)
           )(
-            newParentBody :+ q"sealed trait ${Type.Name(name)}"
+            newParentBody :+ q"sealed abstract class ${Type.Name(name)}(val asString: String)"
           )
       }
 
@@ -616,12 +627,8 @@ trait Generator {
     val encoderDef = Option.when(circeEncoder)(typeType match {
       case TypeType.CaseClass                         =>
         q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder.AsObject[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJsonObject(clue.data.Input.dropIgnores)"
-      case TypeType.Enum(enumValues)                  =>
-        val cases: List[Case] =
-          enumValues.map(enumValue =>
-            p"case ${Term.Name(enumValue.className)} => ${enumValue.asString}"
-          )
-        q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.Encoder.encodeString.contramap[$n]{..case $cases}"
+      case TypeType.Enum(_)                           =>
+        q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.Encoder.encodeString.contramap[$n](_.asString)"
       case TypeType.Sum(subtypeNames) if isOneOfInput =>
         val subTypesCases =
           subtypeNames.map(subType =>
@@ -650,12 +657,8 @@ trait Generator {
     val decoderDef = Option.when(circeDecoder)(typeType match {
       case TypeType.CaseClass         =>
         q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
-      case TypeType.Enum(enumValues)  =>
-        val cases: List[Case] =
-          enumValues.map(enumValue =>
-            p"case ${enumValue.asString} => Right(${Term.Name(enumValue.className)})"
-          ) :+ p"""case other => Left(s"Invalid value [$$other]")"""
-        q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.Decoder.decodeString.emap(_ match {..case $cases})"
+      case TypeType.Enum(_)           =>
+        q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.Decoder.decodeString.emap(fromString(_))"
       case TypeType.Sum(subtypeNames) =>
         val baseTerm: Term.Ref =
           nestPath.fold[Term.Ref](Term.Name(name))(t => Term.Select(t, Term.Name(name)))
