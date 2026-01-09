@@ -16,39 +16,48 @@ import cats.syntax.all.*
 import clue.data.syntax.*
 import io.circe.*
 import io.circe.syntax.*
+import monocle.Prism
 
 import scala.annotation.tailrec
 
 sealed trait Input[+A] {
   def map[B](f: A => B): Input[B] =
-    this match {
+    this match
       case Ignore    => Ignore
       case Unassign  => Unassign
       case Assign(a) => Assign(f(a))
-    }
 
   def fold[B](fundef: => B, funset: => B, fset: A => B): B =
-    this match {
+    this match
       case Ignore    => fundef
       case Unassign  => funset
       case Assign(a) => fset(a)
-    }
 
   def flatten[B](implicit ev: A <:< Input[B]): Input[B] =
-    this match {
+    this match
       case Ignore    => Ignore
       case Unassign  => Unassign
       case Assign(a) => a
-    }
 
   def flatMap[B](f: A => Input[B]): Input[B] =
     map(f).flatten
 
   def toOption: Option[A] =
-    this match {
+    this match
       case Assign(a) => a.some
       case _         => none
-    }
+
+  def orElse[B >: A](that: => Input[B]): Input[B] =
+    this match
+      case Ignore    => that
+      case Unassign  => that
+      case Assign(a) => Assign(a)
+
+  def orAssign[B >: A](that: => B): Input[B] =
+    orElse(Assign(that))
+
+  inline def isAssigned: Boolean =
+    fold(false, false, _ => true)
 }
 
 case object Ignore                    extends Input[Nothing]
@@ -68,16 +77,17 @@ object Input {
   def ignore[A]: Input[A] = Ignore
 
   def orIgnore[A](opt: Option[A]): Input[A] =
-    opt match {
+    opt match
       case Some(a) => Assign(a)
       case None    => Ignore
-    }
 
   def orUnassign[A](opt: Option[A]): Input[A] =
-    opt match {
+    opt match
       case Some(a) => Assign(a)
       case None    => Unassign
-    }
+
+  def assignValue[A]: Prism[Input[A], A] =
+    optics.pAssign[A, A]
 
   given [A: Eq]: Eq[Input[A]] =
     new Eq[Input[A]]:
@@ -123,12 +133,11 @@ object Input {
 
     @tailrec
     override def tailRecM[A, B](a: A)(f: A => Input[Either[A, B]]): Input[B] =
-      f(a) match {
+      f(a) match
         case Ignore           => Ignore
         case Unassign         => Unassign
         case Assign(Left(a))  => tailRecM(a)(f)
         case Assign(Right(b)) => Assign(b)
-      }
 
     override def flatMap[A, B](fa: Input[A])(f: A => Input[B]): Input[B] =
       fa.flatMap(f)
@@ -136,25 +145,22 @@ object Input {
     override def traverse[F[_], A, B](
       fa: Input[A]
     )(f: A => F[B])(using F: Applicative[F]): F[Input[B]] =
-      fa match {
+      fa match
         case Ignore    => F.pure(Ignore)
         case Unassign  => F.pure(Unassign)
         case Assign(a) => F.map(f(a))(Assign(_))
-      }
 
     override def foldLeft[A, B](fa: Input[A], b: B)(f: (B, A) => B): B =
-      fa match {
+      fa match
         case Ignore    => b
         case Unassign  => b
         case Assign(a) => f(b, a)
-      }
 
     override def foldRight[A, B](fa: Input[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
-      fa match {
+      fa match
         case Ignore    => lb
         case Unassign  => lb
         case Assign(a) => f(a, lb)
-      }
 
     override def functor: Functor[Input] = this
 
