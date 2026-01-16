@@ -21,7 +21,7 @@ abstract class StarWarsNestedSubquery extends GraphQLSubquery[StarWars]("Charact
           ... on Human {
             homePlanet
           }
-          friends $StarWarsSubquery
+          contacts:friends $StarWarsSubquery
           ... on Droid {
             primaryFunction
           }

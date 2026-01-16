@@ -22,17 +22,17 @@ object StarWarsNestedSubquery extends GraphQLSubquery[StarWars]("Character") {
           ... on Human {
             homePlanet
           }
-          friends $StarWarsSubquery
+          contacts:friends $StarWarsSubquery
           ... on Droid {
             primaryFunction
           }
         }
       """
-  case class Data(val id: String, val name: Option[String] = None, val friends: Option[List[StarWarsSubquery.Data]] = None)
+  case class Data(val id: String, val name: Option[String] = None, val contacts: Option[List[StarWarsSubquery.Data]] = None)
   object Data {
     val id: monocle.Lens[Data, String] = monocle.macros.GenLens[Data](_.id)
     val name: monocle.Lens[Data, Option[String]] = monocle.macros.GenLens[Data](_.name)
-    val friends: monocle.Lens[Data, Option[List[StarWarsSubquery.Data]]] = monocle.macros.GenLens[Data](_.friends)
+    val contacts: monocle.Lens[Data, Option[List[StarWarsSubquery.Data]]] = monocle.macros.GenLens[Data](_.contacts)
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
     implicit val showData: cats.Show[Data] = cats.Show.fromToString
     implicit val jsonDecoderData: io.circe.Decoder[Data] = io.circe.generic.semiauto.deriveDecoder[Data]

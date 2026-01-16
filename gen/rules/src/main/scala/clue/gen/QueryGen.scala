@@ -39,7 +39,7 @@ trait QueryGen extends Generator {
     }.headOption
 
   case class InterpolatedGql(parts: List[GqlPart]) {
-    def render = parts
+    def render: String = parts
       .traverse {
         case GqlPart.Literal(value) => State.pure[Int, String](value)
         case _                      =>
@@ -49,9 +49,10 @@ trait QueryGen extends Generator {
       .value
       .mkString
 
-    def subqueries = parts.collect { case GqlPart.Subquery(term) =>
-      term
-    }
+    def subqueries: List[Term] =
+      parts.collect { case GqlPart.Subquery(term) =>
+        term
+      }
   }
 
   sealed abstract class GqlPart
@@ -265,7 +266,7 @@ trait QueryGen extends Generator {
   }
 
   /**
-   * Recurse the query AST and collect the necessary [[CaseClass]] es to hold its results.
+   * Recurse the query AST and collect the necessary [[CaseClass]]es to hold its results.
    */
   protected def resolveData(
     schema:     Schema,
@@ -310,7 +311,7 @@ trait QueryGen extends Generator {
                   throw new Exception(s"Unexpected subquery AST. Should be Term.Ref, was: [$other]")
               }
               ClassParam.fromGrackleType(
-                name,
+                alias.getOrElse(name),
                 nextType.dealias,
                 isInput = false,
                 alias = alias,
@@ -434,8 +435,9 @@ trait QueryGen extends Generator {
           subTypeAccumulators match {
             case Nil                  => baseAccumulator // No subtypes.
             case singleSubType :: Nil =>                 // Treat single subtype as regular group.
-              ClassAccumulator(baseAccumulator.classes ++ singleSubType._2.classes,
-                               singleSubType._2.parAccum
+              ClassAccumulator(
+                baseAccumulator.classes ++ singleSubType._2.classes,
+                singleSubType._2.parAccum
               )
             case _                    =>
               val baseParams = baseAccumulator.parAccum
