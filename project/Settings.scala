@@ -20,7 +20,7 @@ object Settings {
     val monocle                  = "3.3.0"
     val munit                    = "1.2.1"
     val munitCatsEffect          = "2.1.0"
-    val natchez                  = "0.3.8"
+    val natchez                  = "0.3.9"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJsDom               = "2.8.1"
     val scalaJsMacrotaskExecutor = "1.1.1"
