@@ -18,7 +18,7 @@ object Settings {
     val kittens                  = "3.5.0"
     val log4Cats                 = "2.8.0"
     val monocle                  = "3.3.0"
-    val munit                    = "1.2.4"
+    val munit                    = "1.3.0"
     val munitCatsEffect          = "2.2.0"
     val natchez                  = "0.3.9"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
