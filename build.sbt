@@ -2,9 +2,9 @@ lazy val V = _root_.scalafix.sbt.BuildInfo
 
 ThisBuild / tlBaseVersion              := "0.51"
 ThisBuild / tlCiReleaseBranches        := Seq("master")
-ThisBuild / tlJdkRelease               := Some(8)
-ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
-ThisBuild / scalaVersion               := "3.7.4"
+ThisBuild / tlJdkRelease               := Some(17)
+ThisBuild / githubWorkflowJavaVersions := Seq("17").map(JavaSpec.temurin(_))
+ThisBuild / scalaVersion               := "3.8.3"
 Global / onChangedBuildSource          := ReloadOnSourceChanges
 
 lazy val root = tlCrossRootProject
@@ -52,10 +52,13 @@ lazy val core =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
     .in(file("core"))
+    .enablePlugins(BuildInfoPlugin)
     .settings(
       moduleName                              := "clue-core",
       // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
       dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
+      buildInfoPackage                        := "clue",
+      buildInfoKeys                           := Seq[BuildInfoKey](name, version),
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsEffect.value ++
@@ -103,7 +106,7 @@ lazy val http4sJDKDemo =
     .enablePlugins(NoPublishPlugin)
     .settings(
       moduleName           := "clue-http4s-jdk-client-demo",
-      tlJdkRelease         := Some(11),
+      tlJdkRelease         := Some(17),
       Compile / run / fork := true,
       libraryDependencies ++= Seq(
         "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
