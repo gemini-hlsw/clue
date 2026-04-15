@@ -143,8 +143,10 @@ object http4s:
 
     @scala.annotation.targetName("tracedWithFetchClient")
     def tracedWith(
-      spanOptions: natchez.Span.Options,
-      additionalAttributesF: (clue.model.GraphQLQuery, Option[io.circe.JsonObject]) => F[Seq[(String, natchez.TraceValue)]]
+      spanOptions:           natchez.Span.Options,
+      additionalAttributesF: (clue.model.GraphQLQuery, Option[io.circe.JsonObject]) => F[
+        Seq[(String, natchez.TraceValue)]
+      ]
     )(using
       cats.effect.MonadCancelThrow[F],
       natchez.Trace[F],
@@ -164,8 +166,10 @@ object http4s:
 
     @scala.annotation.targetName("tracedWithStreamingClient")
     def tracedWith(
-      spanOptions: natchez.Span.Options,
-      additionalAttributesF: (clue.model.GraphQLQuery, Option[io.circe.JsonObject]) => F[Seq[(String, natchez.TraceValue)]]
+      spanOptions:           natchez.Span.Options,
+      additionalAttributesF: (clue.model.GraphQLQuery, Option[io.circe.JsonObject]) => F[
+        Seq[(String, natchez.TraceValue)]
+      ]
     )(using
       cats.effect.MonadCancelThrow[F],
       natchez.Trace[F],

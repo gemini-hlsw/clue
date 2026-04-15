@@ -224,5 +224,4 @@ class Otel4sStreamingClient[F[_]: Tracer: MonadCancelThrow, S](
         (exitCase match
           case Resource.ExitCase.Errored(e) =>
             span.setStatus(StatusCode.Error, Option(e.getMessage).getOrElse(e.toString))
-          case _                            => Applicative[F].unit
-        )
+          case _                            => Applicative[F].unit)

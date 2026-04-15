@@ -1,11 +1,12 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-ThisBuild / tlBaseVersion              := "0.51"
-ThisBuild / tlCiReleaseBranches        := Seq("master")
-ThisBuild / tlJdkRelease               := Some(17)
-ThisBuild / githubWorkflowJavaVersions := Seq("17").map(JavaSpec.temurin(_))
-ThisBuild / scalaVersion               := "3.8.3"
-Global / onChangedBuildSource          := ReloadOnSourceChanges
+ThisBuild / tlBaseVersion               := "0.51"
+ThisBuild / tlJdkRelease                := Some(17)
+ThisBuild / githubWorkflowJavaVersions  := Seq("17").map(JavaSpec.temurin(_))
+ThisBuild / scalaVersion                := "3.8.3"
+ThisBuild / crossScalaVersions          := Seq("3.8.3")
+ThisBuild / githubWorkflowScalaVersions := Seq("3.8.3")
+Global / onChangedBuildSource           := ReloadOnSourceChanges
 
 lazy val root = tlCrossRootProject
   .aggregate(
@@ -31,7 +32,7 @@ lazy val model =
     .crossType(CrossType.Pure)
     .in(file("model"))
     .settings(
-      moduleName                              := "clue-model",
+      moduleName                         := "clue-model",
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
@@ -43,7 +44,7 @@ lazy val model =
           Settings.Libraries.Monocle.value ++
           Settings.Libraries.MonocleLaw.value ++
           Settings.Libraries.MUnit.value,
-      Test / classLoaderLayeringStrategy      := ClassLoaderLayeringStrategy.Flat // Needed for circe's codec tests
+      Test / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.Flat // Needed for circe's codec tests
     )
 
 lazy val core =
@@ -52,9 +53,9 @@ lazy val core =
     .in(file("core"))
     .enablePlugins(BuildInfoPlugin)
     .settings(
-      moduleName                              := "clue-core",
-      buildInfoPackage                        := "clue",
-      buildInfoKeys                           := Seq[BuildInfoKey](name, version),
+      moduleName       := "clue-core",
+      buildInfoPackage := "clue",
+      buildInfoKeys    := Seq[BuildInfoKey](name, version),
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsEffect.value ++
@@ -71,8 +72,8 @@ lazy val scalaJS =
     .in(file("scalajs"))
     .enablePlugins(ScalaJSPlugin)
     .settings(
-      moduleName                              := "clue-scalajs",
-      coverageEnabled                         := false,
+      moduleName      := "clue-scalajs",
+      coverageEnabled := false,
       libraryDependencies ++=
         Settings.Libraries.ScalaJsDom.value ++
           Settings.Libraries.ScalaJsMacrotaskExecutor.value
@@ -84,7 +85,7 @@ lazy val http4s =
     .crossType(CrossType.Pure)
     .in(file("http4s"))
     .settings(
-      moduleName                              := "clue-http4s",
+      moduleName := "clue-http4s",
       libraryDependencies ++=
         Settings.Libraries.Http4sCirce.value ++
           Settings.Libraries.Http4sClient.value ++
@@ -197,23 +198,23 @@ lazy val sbtPlugin =
     .in(file("sbt-plugin"))
     .enablePlugins(SbtPlugin, BuildInfoPlugin)
     .settings(
-      moduleName                              := "sbt-clue",
-      crossScalaVersions                      := List("2.12.20"),
-      scalacOptions                           := Nil,
+      moduleName         := "sbt-clue",
+      crossScalaVersions := List("2.12.20"),
+      scalacOptions      := Nil,
       addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % V.scalafixVersion),
       addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
       addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
-      buildInfoPackage                        := "clue.sbt",
-      buildInfoKeys                           := Seq[BuildInfoKey](
+      buildInfoPackage   := "clue.sbt",
+      buildInfoKeys      := Seq[BuildInfoKey](
         version,
         organization,
         "rulesModule" -> (genRules / moduleName).value,
         "coreModule"  -> (core.jvm / moduleName).value
       ),
       buildInfoOptions += BuildInfoOption.PackagePrivate,
-      Test / test                             :=
+      Test / test        :=
         scripted.toTask("").value,
-      scripted                                := scripted
+      scripted           := scripted
         .dependsOn(
           genRules / publishLocal,
           model.jvm / publishLocal,
@@ -225,5 +226,5 @@ lazy val sbtPlugin =
         "-Dplugin.version=" + version.value,
         "-Dscala.version=" + (core.jvm / scalaVersion).value
       ),
-      scriptedBufferLog                       := false,
+      scriptedBufferLog  := false
     )
