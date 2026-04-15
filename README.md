@@ -26,11 +26,11 @@ Either:
   EmberClientBuilder
     .default[IO]
     .build
-    .use: client => 
+    .use: client =>
       given Backend[IO] = Http4sHttpBackend[IO](client)
-      val fetchClient: FetchClient[IO, StarWars] = 
+      val fetchClient: FetchClient[IO, StarWars] =
         Http4sHttpClient.of[IO, StarWars]("https://starwars.com/graphql")
-    
+
   // Scala JVM with JDK WS client behind http4s
   import import org.http4s.jdkhttpclient.JdkWSClient
 
@@ -38,7 +38,7 @@ Either:
     .simple[IO]
     .use: client =>
       given StreamingBackend[IO] = Http4sWebSocketBackend[IO](client)
-      val streamingClient: StreamingClient[IO, StarWars] = 
+      val streamingClient: StreamingClient[IO, StarWars] =
         Http4sWebSocketClient.of[IO, StarWars]("wss://starwars.com/graphql")
 
 
@@ -46,12 +46,12 @@ Either:
   import clue.js.*
 
   given Backend[IO] = AjaxJSBackend[IO]
-  val fetchClient: FetchClient[IO, StarWars] = 
+  val fetchClient: FetchClient[IO, StarWars] =
     FetchJsClient.of[IO, StarWars]("https://starwars.com/graphql")
 
   // Streaming doesn't require Apollo, it just follows the Apollo protocol for GraphQL over WS
   given StreamingBackend[IO] = WebSocketJsBackend[IO]
-  val streamingClient: StreamingClient[IO, StarWars] = 
+  val streamingClient: StreamingClient[IO, StarWars] =
     ApolloStreamingClient.of[IO, StarWars]("wss://starwars.com/graphql")
 ```
 
@@ -109,3 +109,31 @@ fetchClient.request(CharacterQuery)(CharacterQuery.Variables("0001"))
 
 # Data(Some(Character("0001", Some("Luke"))))
 ```
+
+### Tracing with otel4s
+
+The `clue-otel4s` module wraps any `FetchClientWithPars` or `StreamingClient` with OpenTelemetry tracing via [otel4s](https://typelevel.org/otel4s/).
+A client-kind span is emitted per request; subscriptions get a single span covering the subscription lifetime.
+
+``` scala
+  import clue.otel4s.Otel4sMiddleware
+  import clue.otel4s.http4s.*
+  import org.typelevel.otel4s.Attribute
+  import org.typelevel.otel4s.trace.Tracer
+
+  given Tracer[IO] = ???  // from your otel4s setup
+
+  val traced: IO[FetchClient[IO, StarWars]] =
+    Http4sHttpClient.of[IO, StarWars]("https://starwars.com/graphql").traced
+
+  // Or with additional attributes / SpanBuilder customization:
+  val tracedWithExtras: IO[FetchClient[IO, StarWars]] =
+    Http4sHttpClient
+      .of[IO, StarWars]("https://starwars.com/graphql")
+      .tracedWith(
+        spanBuilderMod = _.addAttribute(Attribute("deployment.env", "prod")),
+        additionalAttributesF = (_, _) => IO.pure(List(Attribute("tenant", "acme")))
+      )
+```
+
+Span attributes recorded automatically: `clue.version`, `http.request.method`, `graphql.operation.type`, `graphql.operation.name`, `graphql.document`, `clue.response.hasData`, and on errors `clue.response.hasErrors`, `clue.response.errorCount`, `clue.response.errors`. Subscriptions add `clue.exitCase`; failed streams set `StatusCode.Error`.
