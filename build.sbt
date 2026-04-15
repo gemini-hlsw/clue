@@ -32,8 +32,6 @@ lazy val model =
     .in(file("model"))
     .settings(
       moduleName                              := "clue-model",
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
@@ -55,8 +53,6 @@ lazy val core =
     .enablePlugins(BuildInfoPlugin)
     .settings(
       moduleName                              := "clue-core",
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       buildInfoPackage                        := "clue",
       buildInfoKeys                           := Seq[BuildInfoKey](name, version),
       libraryDependencies ++=
@@ -77,8 +73,6 @@ lazy val scalaJS =
     .settings(
       moduleName                              := "clue-scalajs",
       coverageEnabled                         := false,
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       libraryDependencies ++=
         Settings.Libraries.ScalaJsDom.value ++
           Settings.Libraries.ScalaJsMacrotaskExecutor.value
@@ -91,8 +85,6 @@ lazy val http4s =
     .in(file("http4s"))
     .settings(
       moduleName                              := "clue-http4s",
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
       libraryDependencies ++=
         Settings.Libraries.Http4sCirce.value ++
           Settings.Libraries.Http4sClient.value ++
@@ -234,6 +226,4 @@ lazy val sbtPlugin =
         "-Dscala.version=" + (core.jvm / scalaVersion).value
       ),
       scriptedBufferLog                       := false,
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value
     )
