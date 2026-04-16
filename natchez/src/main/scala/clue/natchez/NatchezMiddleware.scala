@@ -7,7 +7,6 @@ import cats.Applicative
 import cats.effect.MonadCancelThrow
 import cats.effect.Resource
 import cats.syntax.all.*
-import clue.BuildInfo
 import clue.FetchClientWithPars
 import clue.StreamingClient
 import clue.model.GraphQLQuery
@@ -117,8 +116,6 @@ class NatchezFetchClient[F[_]: Trace: MonadCancelThrow, P, S](
     MonadCancelThrow[F].uncancelable: poll =>
       Trace[F].span(s"clue-client-request-${document.querySummary}", spanOptions):
         for
-          // Add clue library version
-          _                    <- Trace[F].put("clue.version" -> BuildInfo.version)
           additionalAttributes <- additionalAttributesF(document, variables)
           _                    <- Trace[F].put(additionalAttributes*)
           result               <- poll:
@@ -129,54 +126,6 @@ class NatchezFetchClient[F[_]: Trace: MonadCancelThrow, P, S](
                                     Trace[F].put:
                                       "clue.response.errors" -> errs.toList.mkString("[", ", ", "]")
         yield result
-
-// Extension methods for convenient tracing
-object http4s:
-  extension [F[_], P, S](client: F[FetchClientWithPars[F, P, S]]) {
-    @scala.annotation.targetName("tracedFetchClient")
-    def traced(using
-      cats.effect.MonadCancelThrow[F],
-      natchez.Trace[F],
-      cats.Functor[F]
-    ): F[FetchClientWithPars[F, P, S]] =
-      client.map(NatchezMiddleware(_))
-
-    @scala.annotation.targetName("tracedWithFetchClient")
-    def tracedWith(
-      spanOptions:           natchez.Span.Options,
-      additionalAttributesF: (clue.model.GraphQLQuery, Option[io.circe.JsonObject]) => F[
-        Seq[(String, natchez.TraceValue)]
-      ]
-    )(using
-      cats.effect.MonadCancelThrow[F],
-      natchez.Trace[F],
-      cats.Functor[F]
-    ): F[FetchClientWithPars[F, P, S]] =
-      client.map(NatchezMiddleware(_, spanOptions, additionalAttributesF))
-  }
-
-  extension [F[_], S](client: F[StreamingClient[F, S]]) {
-    @scala.annotation.targetName("tracedStreamingClient")
-    def traced(using
-      cats.effect.MonadCancelThrow[F],
-      natchez.Trace[F],
-      cats.Functor[F]
-    ): F[StreamingClient[F, S]] =
-      client.map(NatchezMiddleware(_))
-
-    @scala.annotation.targetName("tracedWithStreamingClient")
-    def tracedWith(
-      spanOptions:           natchez.Span.Options,
-      additionalAttributesF: (clue.model.GraphQLQuery, Option[io.circe.JsonObject]) => F[
-        Seq[(String, natchez.TraceValue)]
-      ]
-    )(using
-      cats.effect.MonadCancelThrow[F],
-      natchez.Trace[F],
-      cats.Functor[F]
-    ): F[StreamingClient[F, S]] =
-      client.map(NatchezMiddleware(_, spanOptions, additionalAttributesF))
-  }
 
 class NatchezStreamingClient[F[_]: Trace: MonadCancelThrow, S](
   wrapped:               StreamingClient[F, S],
@@ -193,8 +142,6 @@ class NatchezStreamingClient[F[_]: Trace: MonadCancelThrow, S](
       Resource.applyFull: poll =>
         Trace[F].span(s"clue-client-start-${document.querySummary}", spanOptions):
           for
-            // Add clue library version
-            _                    <- Trace[F].put("clue.version" -> BuildInfo.version)
             additionalAttributes <- additionalAttributesF(document, variables)
             _                    <- Trace[F].put(additionalAttributes*)
             result               <- poll:

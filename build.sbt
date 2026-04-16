@@ -125,11 +125,7 @@ lazy val otel4s =
     .in(file("otel4s"))
     .settings(
       moduleName := "clue-otel4s",
-      libraryDependencies ++=
-        Settings.Libraries.Otel4s.value ++
-          Settings.Libraries.Otel4sTestkit.value ++
-          Settings.Libraries.MUnitCatsEffect.value ++
-          Settings.Libraries.MUnit.value
+      libraryDependencies ++= Settings.Libraries.Otel4s.value
     )
     .dependsOn(core)
 

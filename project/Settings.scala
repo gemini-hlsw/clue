@@ -158,7 +158,9 @@ object Settings {
 
     val Otel4s = Def.setting(
       Seq(
-        "org.typelevel" %%% "otel4s-core" % otel4s
+        "org.typelevel" %%% "otel4s-core"                 % otel4s,
+        "org.typelevel" %%% "otel4s-semconv"              % otel4s,
+        "org.typelevel" %%% "otel4s-semconv-experimental" % otel4s
       )
     )
 
