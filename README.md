@@ -112,28 +112,22 @@ fetchClient.request(CharacterQuery)(CharacterQuery.Variables("0001"))
 
 ### Tracing with otel4s
 
-The `clue-otel4s` module wraps any `FetchClientWithPars` or `StreamingClient` with OpenTelemetry tracing via [otel4s](https://typelevel.org/otel4s/).
-A client-kind span is emitted per request; subscriptions get a single span covering the subscription lifetime.
+The `clue-otel4s` module wraps any clue with OpenTelemetry tracing via [otel4s](https://typelevel.org/otel4s/).
 
-``` scala
-  import clue.otel4s.Otel4sMiddleware
-  import clue.otel4s.http4s.*
-  import org.typelevel.otel4s.Attribute
-  import org.typelevel.otel4s.trace.Tracer
+A `SpanKind.Client` span is emitted per HTTP request or subscription.
+W3C trace context is automatically propagated to the server:
 
-  given Tracer[IO] = ???  // from your otel4s setup
+- **HTTP requests** — the current span's `traceparent` (and `tracestate`) is injected into outgoing request headers, thus client spans can propagate to the server
+- **WebSocket requests** — `traceparent` is included in the `extensions` field, so the server can create child reading `extensions.traceparent`.
 
-  val traced: IO[FetchClient[IO, StarWars]] =
-    Http4sHttpClient.of[IO, StarWars]("https://starwars.com/graphql").traced
+Some span attributes recorded automatically:
+* `clue.version`
+* `http.request.method`
+* `graphql.operation.type`
+* `graphql.operation.name`
+* `graphql.document`
+* `clue.response.hasData`
 
-  // Or with additional attributes / SpanBuilder customization:
-  val tracedWithExtras: IO[FetchClient[IO, StarWars]] =
-    Http4sHttpClient
-      .of[IO, StarWars]("https://starwars.com/graphql")
-      .tracedWith(
-        spanBuilderMod = _.addAttribute(Attribute("deployment.env", "prod")),
-        additionalAttributesF = (_, _) => IO.pure(List(Attribute("tenant", "acme")))
-      )
-```
+And on errors `clue.response.hasErrors`, `clue.response.errorCount`, `clue.response.errors`.
 
-Span attributes recorded automatically: `clue.version`, `http.request.method`, `graphql.operation.type`, `graphql.operation.name`, `graphql.document`, `clue.response.hasData`, and on errors `clue.response.hasErrors`, `clue.response.errorCount`, `clue.response.errors`. Subscriptions add `clue.exitCase`; failed streams set `StatusCode.Error`.
+W3C propagation requires the SDK to be configured with `W3CTraceContextPropagator`.

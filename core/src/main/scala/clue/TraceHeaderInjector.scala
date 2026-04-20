@@ -3,11 +3,12 @@
 
 package clue
 
-trait TraceHeaderInjector[P]:
-  def addHeaders(params: P, headers: Map[String, String]): P
+// Typeclass to abstract over injecting header for different transports, http, ws ...
+trait TraceHeaderInjector[A]:
+  def addHeaders(params: A, headers: Map[String, String]): A
 
 object TraceHeaderInjector:
-  def apply[P](using ev: TraceHeaderInjector[P]): TraceHeaderInjector[P] = ev
+  def apply[A](using ev: TraceHeaderInjector[A]): TraceHeaderInjector[A] = ev
 
   given TraceHeaderInjector[Unit] with
     def addHeaders(params: Unit, headers: Map[String, String]): Unit = ()
