@@ -91,7 +91,8 @@ trait StreamingClient[F[_], S] extends FetchClientWithPars[F, Unit, S] {
   protected[clue] def subscribeInternal[D: Decoder](
     document:      GraphQLQuery,
     operationName: Option[String] = none,
-    variables:     Option[JsonObject] = none
+    variables:     Option[JsonObject] = none,
+    extensions:    Option[JsonObject] = none
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]]
 }
 
@@ -109,11 +110,12 @@ case class SubscriptionApplied[
     client.subscribeInternal(
       GraphQLQuery(subscription.document),
       operationName,
-      variables.asJsonObject.some
+      variables.asJsonObject.some,
+      none
     )
 
   def apply: Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
-    client.subscribeInternal(GraphQLQuery(subscription.document), operationName, none)
+    client.subscribeInternal(GraphQLQuery(subscription.document), operationName, none, none)
 }
 
 object SubscriptionApplied {

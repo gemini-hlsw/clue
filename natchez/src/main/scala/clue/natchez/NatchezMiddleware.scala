@@ -136,7 +136,8 @@ class NatchezStreamingClient[F[_]: Trace: MonadCancelThrow, S](
   protected[clue] def subscribeInternal[D: Decoder](
     document:      GraphQLQuery,
     operationName: Option[String] = none,
-    variables:     Option[JsonObject] = none
+    variables:     Option[JsonObject] = none,
+    extensions:    Option[JsonObject] = none
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     val resource: Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
       Resource.applyFull: poll =>
@@ -146,7 +147,7 @@ class NatchezStreamingClient[F[_]: Trace: MonadCancelThrow, S](
             _                    <- Trace[F].put(additionalAttributes*)
             result               <- poll:
                                       wrapped
-                                        .subscribeInternal[D](document, operationName, variables)
+                                        .subscribeInternal[D](document, operationName, variables, extensions)
                                         .allocatedCase
           yield result
     resource.onFinalizeCase: exitCase =>
