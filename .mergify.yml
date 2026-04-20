@@ -57,14 +57,6 @@ pull_request_rules:
       add:
       - model
       remove: []
-- name: Label natchez PRs
-  conditions:
-  - files~=^natchez/
-  actions:
-    label:
-      add:
-      - natchez
-      remove: []
 - name: Label otel4s PRs
   conditions:
   - files~=^otel4s/

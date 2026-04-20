@@ -18,8 +18,8 @@ import clue.model.GraphQLQuery
 import clue.model.GraphQLResponse
 import io.circe.Decoder
 import io.circe.Encoder
-import io.circe.JsonObject
 import io.circe.Json
+import io.circe.JsonObject
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.context.propagation.TextMapUpdater
 import org.typelevel.otel4s.semconv.attributes.HttpAttributes

@@ -3,11 +3,11 @@
 
 package clue.http4s
 
+import clue.FetchClientWithPars
+import clue.TraceHeaderInjector
 import org.http4s.Header
 import org.http4s.Request
 import org.typelevel.ci.CIString
-import clue.FetchClientWithPars
-import clue.TraceHeaderInjector
 
 type Http4sHttpClient[F[_], S] = FetchClientWithPars[F, Request[F], S]
 

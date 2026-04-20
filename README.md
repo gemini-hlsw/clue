@@ -117,8 +117,10 @@ The `clue-otel4s` module wraps any clue with OpenTelemetry tracing via [otel4s](
 A `SpanKind.Client` span is emitted per HTTP request or subscription.
 W3C trace context is automatically propagated to the server:
 
-- **HTTP requests** — the current span's `traceparent` (and `tracestate`) is injected into outgoing request headers, thus client spans can propagate to the server
-- **WebSocket requests** — `traceparent` is included in the `extensions` field, so the server can create child reading `extensions.traceparent`.
+- **HTTP requests**: the current span's `traceparent` (and `tracestate`) is injected into outgoing
+request headers, thus client spans can propagate to the server
+- **WebSocket requests**: `traceparent` is included in the `extensions` field, so the server can
+create child reading `extensions.traceparent`.
 
 Some span attributes recorded automatically:
 * `clue.version`
@@ -131,3 +133,4 @@ Some span attributes recorded automatically:
 And on errors `clue.response.hasErrors`, `clue.response.errorCount`, `clue.response.errors`.
 
 W3C propagation requires the SDK to be configured with `W3CTraceContextPropagator`.
+See https://ochenashko.com/practical-observability-distributed-tracing/#6-cross-service-propagation
