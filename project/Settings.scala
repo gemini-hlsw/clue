@@ -20,7 +20,6 @@ object Settings {
     val monocle                  = "3.3.0"
     val munit                    = "1.3.0"
     val munitCatsEffect          = "2.2.0"
-    val natchez                  = "0.3.10"
     val otel4s                   = "0.16.0"
     val http4sOtel4sMiddleware   = "0.17.0"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
@@ -147,12 +146,6 @@ object Settings {
     val MUnitCatsEffect = Def.setting(
       Seq[ModuleID](
         "org.typelevel" %%% "munit-cats-effect" % munitCatsEffect % "test"
-      )
-    )
-
-    val Natchez = Def.setting(
-      Seq(
-        "org.tpolecat" %%% "natchez-core" % natchez
       )
     )
 

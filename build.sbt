@@ -15,7 +15,6 @@ lazy val root = tlCrossRootProject
     scalaJS,
     http4s,
     http4sJDKDemo,
-    natchez,
     otel4s,
     genRules,
     genInput,
@@ -91,7 +90,7 @@ lazy val http4s =
           Settings.Libraries.Http4sClient.value ++
           Settings.Libraries.Http4sOtel4sMiddleware.value
     )
-    .dependsOn(core, natchez)
+    .dependsOn(core)
 
 lazy val http4sJDKDemo =
   project
@@ -108,16 +107,6 @@ lazy val http4sJDKDemo =
       scalacOptions += "-language:implicitConversions"
     )
     .dependsOn(http4s.jvm)
-
-lazy val natchez =
-  crossProject(JVMPlatform, JSPlatform)
-    .crossType(CrossType.Pure)
-    .in(file("natchez"))
-    .settings(
-      moduleName := "clue-natchez",
-      libraryDependencies ++= Settings.Libraries.Natchez.value
-    )
-    .dependsOn(core)
 
 lazy val otel4s =
   crossProject(JVMPlatform, JSPlatform)
