@@ -155,19 +155,20 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
         .addAttribute(HttpAttributes.HttpRequestMethod("POST"))
         .build
         .use: span =>
-        for
-          additional   <- additionalAttributesF(document, variables)
-          _            <- span.addAttributes(additional*)
-          traceHeaders <- T.propagate(Map.empty)
-          mergedExt     = mergeOtelExtension(extensions, traceHeaders)
-          modWithTrace  = modParams.andThen(p => TraceHeaderInjector[P].addHeaders(p, traceHeaders))
-          result       <-
-            poll(
-              wrapped
-                .requestInternal[D](document, operationName, variables, mergedExt, modWithTrace)
-            )
-          _            <- Otel4sMiddleware.responseAttributes(span, result)
-        yield result
+          for
+            additional   <- additionalAttributesF(document, variables)
+            _            <- span.addAttributes(additional*)
+            traceHeaders <- T.propagate(Map.empty)
+            mergedExt     = mergeOtelExtension(extensions, traceHeaders)
+            modWithTrace  =
+              modParams.andThen(p => TraceHeaderInjector[P].addHeaders(p, traceHeaders))
+            result       <-
+              poll(
+                wrapped
+                  .requestInternal[D](document, operationName, variables, mergedExt, modWithTrace)
+              )
+            _            <- Otel4sMiddleware.responseAttributes(span, result)
+          yield result
 
 class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
   wrapped:               StreamingClient[F, S],
