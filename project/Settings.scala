@@ -11,16 +11,17 @@ object Settings {
     val disciplineMUnit          = "2.0.0"
     val fs2                      = "3.13.0"
     val grackle                  = "0.26.0"
-    val http4s                   = "0.23.33"
+    val http4s                   = "0.23.34"
     val http4sDom                = "0.2.7"
     val http4sJDKClient          = "0.10.0"
     val jawn                     = "1.3.2"
     val kittens                  = "3.5.0"
     val log4Cats                 = "2.8.0"
     val monocle                  = "3.3.0"
-    val munit                    = "1.2.4"
+    val munit                    = "1.3.0"
     val munitCatsEffect          = "2.2.0"
-    val natchez                  = "0.3.10"
+    val otel4s                   = "0.16.0"
+    val http4sOtel4sMiddleware   = "0.17.0"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJsDom               = "2.8.1"
     val scalaJsMacrotaskExecutor = "1.1.1"
@@ -148,9 +149,23 @@ object Settings {
       )
     )
 
-    val Natchez = Def.setting(
+    val Otel4s = Def.setting(
       Seq(
-        "org.tpolecat" %%% "natchez-core" % natchez
+        "org.typelevel" %%% "otel4s-core"                 % otel4s,
+        "org.typelevel" %%% "otel4s-semconv"              % otel4s,
+        "org.typelevel" %%% "otel4s-semconv-experimental" % otel4s
+      )
+    )
+
+    val Otel4sTestkit = Def.setting(
+      Seq(
+        "org.typelevel" %%% "otel4s-sdk-testkit" % otel4s % "test"
+      )
+    )
+
+    val Http4sOtel4sMiddleware = Def.setting(
+      Seq(
+        "org.http4s" %%% "http4s-otel4s-middleware-trace-client" % http4sOtel4sMiddleware
       )
     )
 

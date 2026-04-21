@@ -1,11 +1,12 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-ThisBuild / tlBaseVersion              := "0.51"
-ThisBuild / tlCiReleaseBranches        := Seq("master")
-ThisBuild / tlJdkRelease               := Some(8)
-ThisBuild / githubWorkflowJavaVersions := Seq("11", "17").map(JavaSpec.temurin(_))
-ThisBuild / scalaVersion               := "3.7.4"
-Global / onChangedBuildSource          := ReloadOnSourceChanges
+ThisBuild / tlBaseVersion               := "0.52"
+ThisBuild / tlJdkRelease                := Some(17)
+ThisBuild / githubWorkflowJavaVersions  := Seq("17").map(JavaSpec.temurin(_))
+ThisBuild / scalaVersion                := "3.8.3"
+ThisBuild / crossScalaVersions          := Seq("3.8.3")
+ThisBuild / githubWorkflowScalaVersions := Seq("3.8.3")
+Global / onChangedBuildSource           := ReloadOnSourceChanges
 
 lazy val root = tlCrossRootProject
   .aggregate(
@@ -14,7 +15,7 @@ lazy val root = tlCrossRootProject
     scalaJS,
     http4s,
     http4sJDKDemo,
-    natchez,
+    otel4s,
     genRules,
     genInput,
     genOutput,
@@ -30,9 +31,7 @@ lazy val model =
     .crossType(CrossType.Pure)
     .in(file("model"))
     .settings(
-      moduleName                              := "clue-model",
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
+      moduleName                         := "clue-model",
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsTestkit.value ++
@@ -44,17 +43,18 @@ lazy val model =
           Settings.Libraries.Monocle.value ++
           Settings.Libraries.MonocleLaw.value ++
           Settings.Libraries.MUnit.value,
-      Test / classLoaderLayeringStrategy      := ClassLoaderLayeringStrategy.Flat // Needed for circe's codec tests
+      Test / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.Flat // Needed for circe's codec tests
     )
 
 lazy val core =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
     .in(file("core"))
+    .enablePlugins(BuildInfoPlugin)
     .settings(
-      moduleName                              := "clue-core",
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
+      moduleName       := "clue-core",
+      buildInfoPackage := "clue",
+      buildInfoKeys    := Seq[BuildInfoKey](name, version),
       libraryDependencies ++=
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsEffect.value ++
@@ -71,10 +71,8 @@ lazy val scalaJS =
     .in(file("scalajs"))
     .enablePlugins(ScalaJSPlugin)
     .settings(
-      moduleName                              := "clue-scalajs",
-      coverageEnabled                         := false,
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
+      moduleName      := "clue-scalajs",
+      coverageEnabled := false,
       libraryDependencies ++=
         Settings.Libraries.ScalaJsDom.value ++
           Settings.Libraries.ScalaJsMacrotaskExecutor.value
@@ -86,12 +84,11 @@ lazy val http4s =
     .crossType(CrossType.Pure)
     .in(file("http4s"))
     .settings(
-      moduleName                              := "clue-http4s",
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value,
+      moduleName := "clue-http4s",
       libraryDependencies ++=
         Settings.Libraries.Http4sCirce.value ++
-          Settings.Libraries.Http4sClient.value
+          Settings.Libraries.Http4sClient.value ++
+          Settings.Libraries.Http4sOtel4sMiddleware.value
     )
     .dependsOn(core)
 
@@ -101,7 +98,7 @@ lazy val http4sJDKDemo =
     .enablePlugins(NoPublishPlugin)
     .settings(
       moduleName           := "clue-http4s-jdk-client-demo",
-      tlJdkRelease         := Some(11),
+      tlJdkRelease         := Some(17),
       Compile / run / fork := true,
       libraryDependencies ++= Seq(
         "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
@@ -111,13 +108,13 @@ lazy val http4sJDKDemo =
     )
     .dependsOn(http4s.jvm)
 
-lazy val natchez =
+lazy val otel4s =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
-    .in(file("natchez"))
+    .in(file("otel4s"))
     .settings(
-      moduleName := "clue-natchez",
-      libraryDependencies ++= Settings.Libraries.Natchez.value
+      moduleName := "clue-otel4s",
+      libraryDependencies ++= Settings.Libraries.Otel4s.value
     )
     .dependsOn(core)
 
@@ -186,23 +183,23 @@ lazy val sbtPlugin =
     .in(file("sbt-plugin"))
     .enablePlugins(SbtPlugin, BuildInfoPlugin)
     .settings(
-      moduleName                              := "sbt-clue",
-      crossScalaVersions                      := List("2.12.20"),
-      scalacOptions                           := Nil,
+      moduleName         := "sbt-clue",
+      crossScalaVersions := List("2.12.20"),
+      scalacOptions      := Nil,
       addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % V.scalafixVersion),
       addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
       addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
-      buildInfoPackage                        := "clue.sbt",
-      buildInfoKeys                           := Seq[BuildInfoKey](
+      buildInfoPackage   := "clue.sbt",
+      buildInfoKeys      := Seq[BuildInfoKey](
         version,
         organization,
         "rulesModule" -> (genRules / moduleName).value,
         "coreModule"  -> (core.jvm / moduleName).value
       ),
       buildInfoOptions += BuildInfoOption.PackagePrivate,
-      Test / test                             :=
+      Test / test        :=
         scripted.toTask("").value,
-      scripted                                := scripted
+      scripted           := scripted
         .dependsOn(
           genRules / publishLocal,
           model.jvm / publishLocal,
@@ -214,7 +211,5 @@ lazy val sbtPlugin =
         "-Dplugin.version=" + version.value,
         "-Dscala.version=" + (core.jvm / scalaVersion).value
       ),
-      scriptedBufferLog                       := false,
-      // temporary? fix for upgrading to Scala 3.7: https://github.com/scala/scala3/issues/22890
-      dependencyOverrides += "org.scala-lang" %% "scala3-library" % scalaVersion.value
+      scriptedBufferLog  := false
     )

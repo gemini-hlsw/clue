@@ -26,10 +26,14 @@ class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(using
     document:      GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject],
+    extensions:    Option[JsonObject],
     modParams:     P => P = identity
   ): F[GraphQLResponse[D]] =
     backend
-      .request(GraphQLRequest(document, operationName, variables), modParams(requestParams))
+      .request(
+        GraphQLRequest(document, operationName, variables, extensions),
+        modParams(requestParams)
+      )
       .map(decode[GraphQLResponse[D]])
       .rethrow
       .onError(_.warnF("Error executing query:"))

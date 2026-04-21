@@ -30,6 +30,7 @@ trait FetchClientWithPars[F[_], P, S] {
     document:      GraphQLQuery,
     operationName: Option[String] = none,
     variables:     Option[JsonObject] = none,
+    extensions:    Option[JsonObject] = none,
     modParams:     P => P = identity
   ): F[GraphQLResponse[D]]
 }
@@ -53,14 +54,15 @@ case class RequestApplied[
       GraphQLQuery(operation.document),
       operationName,
       variables.asJsonObject.some,
+      none,
       modParams
     )
 
   def withModParams(modParams: P => P): F[GraphQLResponse[D]] =
-    client.requestInternal(GraphQLQuery(operation.document), operationName, none, modParams)
+    client.requestInternal(GraphQLQuery(operation.document), operationName, none, none, modParams)
 
   def apply: F[GraphQLResponse[D]] =
-    client.requestInternal(GraphQLQuery(operation.document), operationName, none, identity)
+    client.requestInternal(GraphQLQuery(operation.document), operationName, none, none, identity)
 }
 
 object RequestApplied {
@@ -91,7 +93,8 @@ trait StreamingClient[F[_], S] extends FetchClientWithPars[F, Unit, S] {
   protected[clue] def subscribeInternal[D: Decoder](
     document:      GraphQLQuery,
     operationName: Option[String] = none,
-    variables:     Option[JsonObject] = none
+    variables:     Option[JsonObject] = none,
+    extensions:    Option[JsonObject] = none
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]]
 }
 
@@ -109,11 +112,12 @@ case class SubscriptionApplied[
     client.subscribeInternal(
       GraphQLQuery(subscription.document),
       operationName,
-      variables.asJsonObject.some
+      variables.asJsonObject.some,
+      none
     )
 
   def apply: Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
-    client.subscribeInternal(GraphQLQuery(subscription.document), operationName, none)
+    client.subscribeInternal(GraphQLQuery(subscription.document), operationName, none, none)
 }
 
 object SubscriptionApplied {

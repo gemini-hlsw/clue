@@ -115,19 +115,21 @@ class ApolloClient[F[_], P, S](
   override protected[clue] def subscribeInternal[D: Decoder](
     subscription:  GraphQLQuery,
     operationName: Option[String],
-    variables:     Option[JsonObject]
+    variables:     Option[JsonObject],
+    extensions:    Option[JsonObject]
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
-    subscriptionResource(subscription, operationName, variables)
+    subscriptionResource(subscription, operationName, variables, extensions)
 
   // <FetchClient>
   override protected[clue] def requestInternal[D: Decoder](
     document:      GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject],
+    extensions:    Option[JsonObject],
     modParams:     Unit => Unit // This is ignored here.
   ): F[GraphQLResponse[D]] =
     F.async(cb =>
-      startSubscription[D](document, operationName, variables)
+      startSubscription[D](document, operationName, variables, extensions)
         .flatMap(subscription =>
           subscription.stream.attempt.head.compile.onlyOrError.attempt
             .map(onlyOrError => cb(onlyOrError.flatten))
@@ -450,10 +452,11 @@ class ApolloClient[F[_], P, S](
   private def subscriptionResource[D: Decoder, R](
     subscription:  GraphQLQuery,
     operationName: Option[String],
-    variables:     Option[JsonObject]
+    variables:     Option[JsonObject],
+    extensions:    Option[JsonObject]
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     Resource
-      .make(startSubscription[D](subscription, operationName, variables))(
+      .make(startSubscription[D](subscription, operationName, variables, extensions))(
         _.stop()
           .handleErrorWith(_.logF("Error stopping subscription"))
       )
@@ -462,11 +465,12 @@ class ApolloClient[F[_], P, S](
   private def startSubscription[D: Decoder](
     subscription:  GraphQLQuery,
     operationName: Option[String],
-    variables:     Option[JsonObject]
+    variables:     Option[JsonObject],
+    extensions:    Option[JsonObject]
   ): F[GraphQLSubscription[F, GraphQLResponse[D]]] =
     state.get.flatMap {
       case Connected(_, _, _, _)         =>
-        val request = GraphQLRequest(subscription, operationName, variables)
+        val request = GraphQLRequest(subscription, operationName, variables, extensions)
 
         buildQueue[D](request).flatMap { case (id, emitter) =>
           def acquire: F[Unit] =
@@ -522,7 +526,7 @@ class ApolloClient[F[_], P, S](
         }
       case Connecting(_, _, _, _, latch) =>
         latch.resolve >>
-          startSubscription(subscription, operationName, variables)
+          startSubscription(subscription, operationName, variables, extensions)
       case _                             =>
         ConnectionNotInitializedException.logAndRaiseF_
     }
