@@ -125,10 +125,11 @@ class ApolloClient[F[_], P, S](
     document:      GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject],
+    extensions:    Option[JsonObject],
     modParams:     Unit => Unit // This is ignored here.
   ): F[GraphQLResponse[D]] =
     F.async(cb =>
-      startSubscription[D](document, operationName, variables, none)
+      startSubscription[D](document, operationName, variables, extensions)
         .flatMap(subscription =>
           subscription.stream.attempt.head.compile.onlyOrError.attempt
             .map(onlyOrError => cb(onlyOrError.flatten))

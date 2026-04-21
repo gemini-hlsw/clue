@@ -30,6 +30,7 @@ trait FetchClientWithPars[F[_], P, S] {
     document:      GraphQLQuery,
     operationName: Option[String] = none,
     variables:     Option[JsonObject] = none,
+    extensions:    Option[JsonObject] = none,
     modParams:     P => P = identity
   ): F[GraphQLResponse[D]]
 }
@@ -53,14 +54,15 @@ case class RequestApplied[
       GraphQLQuery(operation.document),
       operationName,
       variables.asJsonObject.some,
+      none,
       modParams
     )
 
   def withModParams(modParams: P => P): F[GraphQLResponse[D]] =
-    client.requestInternal(GraphQLQuery(operation.document), operationName, none, modParams)
+    client.requestInternal(GraphQLQuery(operation.document), operationName, none, none, modParams)
 
   def apply: F[GraphQLResponse[D]] =
-    client.requestInternal(GraphQLQuery(operation.document), operationName, none, identity)
+    client.requestInternal(GraphQLQuery(operation.document), operationName, none, none, identity)
 }
 
 object RequestApplied {
