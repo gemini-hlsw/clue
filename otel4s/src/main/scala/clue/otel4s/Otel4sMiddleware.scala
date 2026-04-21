@@ -92,7 +92,6 @@ object Otel4sMiddleware:
   ): List[Attribute[?]] =
     val base = List(
       Attribute("clue.version", BuildInfo.version),
-      HttpAttributes.HttpRequestMethod("POST"),
       GraphqlExperimentalAttributes.GraphqlDocument(document.value)
     )
 
@@ -152,7 +151,10 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
     modParams:     P => P
   ): F[GraphQLResponse[D]] =
     MonadCancelThrow[F].uncancelable: poll =>
-      traceSpan("request", document, operationName).build.use: span =>
+      traceSpan("request", document, operationName)
+        .addAttribute(HttpAttributes.HttpRequestMethod("POST"))
+        .build
+        .use: span =>
         for
           additional   <- additionalAttributesF(document, variables)
           _            <- span.addAttributes(additional*)
