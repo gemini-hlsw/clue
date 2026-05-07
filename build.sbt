@@ -88,7 +88,9 @@ lazy val http4s =
       libraryDependencies ++=
         Settings.Libraries.Http4sCirce.value ++
           Settings.Libraries.Http4sClient.value ++
-          Settings.Libraries.Http4sOtel4sMiddleware.value
+          Settings.Libraries.Http4sOtel4sMiddleware.value ++
+          Settings.Libraries.MUnitCatsEffect.value ++
+          Settings.Libraries.MUnit.value
     )
     .dependsOn(core)
 
