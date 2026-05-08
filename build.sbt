@@ -1,8 +1,8 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-ThisBuild / tlBaseVersion               := "0.52"
+ThisBuild / tlBaseVersion               := "0.53"
 ThisBuild / tlJdkRelease                := Some(17)
-ThisBuild / githubWorkflowJavaVersions  := Seq("17").map(JavaSpec.temurin(_))
+ThisBuild / githubWorkflowJavaVersions  := Seq("25", "17").map(JavaSpec.temurin(_))
 ThisBuild / scalaVersion                := "3.8.3"
 ThisBuild / crossScalaVersions          := Seq("3.8.3")
 ThisBuild / githubWorkflowScalaVersions := Seq("3.8.3")
@@ -88,7 +88,9 @@ lazy val http4s =
       libraryDependencies ++=
         Settings.Libraries.Http4sCirce.value ++
           Settings.Libraries.Http4sClient.value ++
-          Settings.Libraries.Http4sOtel4sMiddleware.value
+          Settings.Libraries.Http4sOtel4sMiddleware.value ++
+          Settings.Libraries.MUnitCatsEffect.value ++
+          Settings.Libraries.MUnit.value
     )
     .dependsOn(core)
 
