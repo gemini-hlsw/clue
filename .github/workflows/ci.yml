@@ -29,8 +29,11 @@ jobs:
       matrix:
         os: [ubuntu-22.04]
         scala: [3.8.3]
-        java: [temurin@17]
+        java: [temurin@25, temurin@17]
         project: [rootJS, rootJVM]
+        exclude:
+          - project: rootJS
+            java: temurin@17
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -41,6 +44,19 @@ jobs:
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
+
+      - name: Setup Java (temurin@25)
+        id: setup-java-temurin-25
+        if: matrix.java == 'temurin@25'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: sbt
+
+      - name: sbt update
+        if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
+        run: sbt +update
 
       - name: Setup Java (temurin@17)
         id: setup-java-temurin-17
@@ -59,11 +75,11 @@ jobs:
         run: sbt githubWorkflowCheck
 
       - name: Check headers and formatting
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04'
+        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck
 
       - name: Check scalafix lints
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04'
+        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' 'scalafixAll --check'
 
       - name: scalaJSLink
@@ -74,11 +90,11 @@ jobs:
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' test
 
       - name: Check binary compatibility
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04'
+        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' mimaReportBinaryIssues
 
       - name: Generate API documentation
-        if: matrix.java == 'temurin@17' && matrix.os == 'ubuntu-22.04'
+        if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' doc
 
       - name: Aggregate coverage reports
@@ -94,7 +110,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04]
-        java: [temurin@17]
+        java: [temurin@25]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout current branch (full)
@@ -104,6 +120,19 @@ jobs:
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
+
+      - name: Setup Java (temurin@25)
+        id: setup-java-temurin-25
+        if: matrix.java == 'temurin@25'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: sbt
+
+      - name: sbt update
+        if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
+        run: sbt +update
 
       - name: Setup Java (temurin@17)
         id: setup-java-temurin-17

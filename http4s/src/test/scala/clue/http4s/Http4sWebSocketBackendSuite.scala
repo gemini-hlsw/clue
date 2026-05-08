@@ -11,8 +11,7 @@ import clue.websocket.*
 import munit.CatsEffectSuite
 import org.http4s.Uri
 import org.http4s.client.websocket.*
-
-import scala.concurrent.duration.*
+import org.http4s.syntax.literals.*
 
 class Http4sWebSocketBackendSuite extends CatsEffectSuite:
 
@@ -41,13 +40,13 @@ class Http4sWebSocketBackendSuite extends CatsEffectSuite:
                       override def onClose(connectionId: ConnectionId, event: CloseEvent): IO[Unit] =
                         closes.update(_ + 1)
       connection <- Http4sWebSocketBackend[IO](wsClient).connect(
-                      Uri.unsafeFromString("ws://example.test/ws"),
+                      uri"ws://127.0.0.1/ws",
                       handler,
                       ConnectionId.Zero
                     )
       _          <- connection.close()
       _          <- connection.close()
-      _          <- IO.sleep(100.millis)
+      _          <- IO.cede
       releaseN   <- releases.get
       closeN     <- closes.get
     } yield {

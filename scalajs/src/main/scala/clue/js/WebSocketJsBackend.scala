@@ -101,7 +101,7 @@ object WebSocketJsBackend {
 final class WebSocketJsConnection[F[_]: Sync: Logger](private val ws: WebSocket)
     extends WebSocketConnection[F] {
   override def send(msg: StreamingMessage.FromClient): F[Unit] =
-    Sync[F].delay(ws.send(msg.asJson.toString))
+    Sync[F].delay(ws.send(msg.asJson.noSpaces))
 
   override def closeInternal(closeParameters: Option[CloseParams]): F[Unit] =
     "Disconnecting WebSocket...".traceF >>

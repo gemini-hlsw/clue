@@ -46,7 +46,7 @@ final class FetchJsBackend[F[_]: Async](fetchMethod: FetchMethod)
               baseRequest.uri.toString,
               new RequestInit {
                 method = HttpMethod.POST
-                body = request.asJson.toString
+                body = request.asJson.noSpaces
                 headers = _headers
                 signal = _signal
               }
