@@ -20,7 +20,7 @@ object Settings {
     val monocle                  = "3.3.0"
     val munit                    = "1.3.0"
     val munitCatsEffect          = "2.2.0"
-    val otel4s                   = "0.16.0"
+    val otel4s                   = "1.0.0"
     val http4sOtel4sMiddleware   = "0.18.0"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJsDom               = "2.8.1"
