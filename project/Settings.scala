@@ -21,7 +21,7 @@ object Settings {
     val munit                    = "1.3.0"
     val munitCatsEffect          = "2.2.0"
     val otel4s                   = "1.0.0"
-    val http4sOtel4sMiddleware   = "0.17.0"
+    val http4sOtel4sMiddleware   = "0.18.0"
     val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJsDom               = "2.8.1"
     val scalaJsMacrotaskExecutor = "1.1.1"
