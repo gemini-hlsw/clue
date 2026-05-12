@@ -104,7 +104,7 @@ lazy val http4sJDKDemo =
       Compile / run / fork := true,
       libraryDependencies ++= Seq(
         "org.typelevel" %% "log4cats-slf4j" % Settings.LibraryVersions.log4Cats,
-        "org.slf4j"      % "slf4j-simple"   % "2.0.17"
+        "org.slf4j"      % "slf4j-simple"   % "2.0.18"
       ) ++ Settings.Libraries.Http4sJDKClient.value,
       scalacOptions += "-language:implicitConversions"
     )
