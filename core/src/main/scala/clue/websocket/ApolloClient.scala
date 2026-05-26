@@ -205,7 +205,7 @@ class ApolloClient[F[_], P, S](
         state.get.flatMap:
           case Connected(_, connection, _, _) =>
             connection.send(StreamingMessage.FromClient.Pong(payload)) // Respond the same payload.
-          case _                              => F.unit
+          case _ => F.unit
       case _                                                                       => s"Unexpected message received from server: [$msg]".warnF
     }
 
