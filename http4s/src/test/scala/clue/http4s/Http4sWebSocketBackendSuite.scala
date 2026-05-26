@@ -32,7 +32,7 @@ class Http4sWebSocketBackendSuite extends CatsEffectSuite:
                         Resource.eval(IO.raiseError(new RuntimeException("unused")))
                       override def connectHighLevel(
                         request: WSRequest
-                      ): Resource[IO, WSConnectionHighLevel[IO]] =
+                      ): Resource[IO, WSConnectionHighLevel[IO]]                               =
                         Resource.make(IO.pure(wsConn))(_ => releases.update(_ + 1))
       handler     = new WebSocketHandler[IO]:
                       override def onMessage(connectionId: ConnectionId, msg: String): IO[Unit]     =

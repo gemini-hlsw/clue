@@ -26,7 +26,7 @@ trait AccumulatorImplicits {
       override def combine(
         x: Accumulator[C, CP, S],
         y: Accumulator[C, CP, S]
-      ): Accumulator[C, CP, S] =
+      ): Accumulator[C, CP, S]                  =
         Accumulator[C, CP, S](x.classes ++ y.classes, x.parAccum ++ y.parAccum, x.sum.orElse(y.sum))
     }
 }

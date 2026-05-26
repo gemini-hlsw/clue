@@ -307,7 +307,7 @@ trait Generator {
             else
               q"..$mod val ${Pat.Var(Term.Name(param.name))}:  monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term
                   .Name(param.name)})"
-          // q"val ${Term.Name(param.name)}: monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term.Name(param.name)})"
+            // q"val ${Term.Name(param.name)}: monocle.Lens[$thisType, $childType] = monocle.macros.GenLens[$thisType](_.${Term.Name(param.name)})"
           }
           moduleBody ++ lensesDef
         }
