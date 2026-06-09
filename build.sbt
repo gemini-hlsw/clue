@@ -3,9 +3,9 @@ lazy val V = _root_.scalafix.sbt.BuildInfo
 ThisBuild / tlBaseVersion               := "0.53"
 ThisBuild / tlJdkRelease                := Some(17)
 ThisBuild / githubWorkflowJavaVersions  := Seq("25", "17").map(JavaSpec.temurin(_))
-ThisBuild / scalaVersion                := "3.8.3"
-ThisBuild / crossScalaVersions          := Seq("3.8.3")
-ThisBuild / githubWorkflowScalaVersions := Seq("3.8.3")
+ThisBuild / scalaVersion                := "3.8.4"
+ThisBuild / crossScalaVersions          := Seq("3.8.4")
+ThisBuild / githubWorkflowScalaVersions := Seq("3.8.4")
 Global / onChangedBuildSource           := ReloadOnSourceChanges
 
 lazy val root = tlCrossRootProject

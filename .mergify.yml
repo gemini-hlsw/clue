@@ -13,9 +13,9 @@ pull_request_rules:
     - body~=labels:.*early-semver-patch
     - body~=labels:.*early-semver-minor
     - 'title=flake.lock: Update'
-  - status-success=Test (ubuntu-22.04, 3.8.3, temurin@25, rootJS)
-  - status-success=Test (ubuntu-22.04, 3.8.3, temurin@25, rootJVM)
-  - status-success=Test (ubuntu-22.04, 3.8.3, temurin@17, rootJVM)
+  - status-success=Test (ubuntu-22.04, 3.8.4, temurin@25, rootJS)
+  - status-success=Test (ubuntu-22.04, 3.8.4, temurin@25, rootJVM)
+  - status-success=Test (ubuntu-22.04, 3.8.4, temurin@17, rootJVM)
   actions:
     merge: {}
 - name: Label core PRs
