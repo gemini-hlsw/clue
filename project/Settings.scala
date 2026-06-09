@@ -18,7 +18,7 @@ object Settings {
     val kittens                  = "3.5.0"
     val log4Cats                 = "2.8.0"
     val monocle                  = "3.3.0"
-    val munit                    = "1.3.2"
+    val munit                    = "1.3.3"
     val munitCatsEffect          = "2.2.0"
     val otel4s                   = "1.0.0"
     val http4sOtel4sMiddleware   = "0.18.0"
