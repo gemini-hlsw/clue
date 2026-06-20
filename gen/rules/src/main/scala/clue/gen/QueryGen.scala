@@ -169,6 +169,11 @@ trait QueryGen extends Generator {
           )(parentBody)
       }
 
+  // `@include(if:)` and `@skip(if:)` make a field conditionally present in the response,
+  // so such a field must be generated as optional even if it's non-nullable in the schema.
+  private def hasConditionalDirective(directives: List[Directive]): Boolean =
+    directives.exists(d => d.name == "include" || d.name == "skip")
+
   protected type ClassAccumulator = Accumulator[Class, ClassParam, Sum]
 
   protected object ClassAccumulator {
@@ -292,8 +297,10 @@ trait QueryGen extends Generator {
       currentType:    Option[GType]
     ): ClassAccumulator =
       currentAlgebra match {
-        case UntypedSelect(name, alias, _, _, UntypedSelect(fieldName, _, _, _, _))
+        case UntypedSelect(name, alias, _, directives, UntypedSelect(fieldName, _, _, _, _))
             if fieldName.startsWith("subquery") =>
+          val isConditional: Boolean = hasConditionalDirective(directives)
+
           val param = MetaTypes
             .get(name)
             .orElse(currentType.flatMap(_.field(name)))
@@ -315,13 +322,18 @@ trait QueryGen extends Generator {
                 nextType.dealias,
                 isInput = false,
                 alias = alias,
-                typeOverride = Some(Type.Select(subquery, Type.Name("Data")))
+                typeOverride = Some(Type.Select(subquery, Type.Name("Data"))),
+                forceOptional = isConditional
               )
             }
 
           ClassAccumulator(parAccum = List(param))
-        case UntypedSelect(name, alias, bindings, _, child) =>
+        case UntypedSelect(name, alias, bindings, directives, child) =>
           val paramName: String = alias.getOrElse(name)
+
+          // A field with an @include or @skip directive may be absent from the response, so it
+          // must be generated as an Option (unless it's already optional in the schema).
+          val isConditional: Boolean = hasConditionalDirective(directives)
 
           MetaTypes
             .get(name)
@@ -364,18 +376,19 @@ trait QueryGen extends Generator {
                     nextType.dealias,
                     isInput = false,
                     paramTypeNameOverride,
-                    deprecation = deprecation
+                    deprecation = deprecation,
+                    forceOptional = isConditional
                   )
                 )
               )
             }
-        case UntypedInlineFragment(typeName, _, child)      =>
+        case UntypedInlineFragment(typeName, _, child)               =>
           // Single element in inline fragment
           go(child, typeName.map(getType).orElse(currentType))
-        case UntypedFragmentSpread(name, _)                 =>
+        case UntypedFragmentSpread(name, _)                          =>
           val fragment: UntypedFragment = fragmentsMap(name)
           go(fragment.child, getType(fragment.tpnme).some)
-        case Group(selections)                              =>
+        case Group(selections)                                       =>
           // A Group in an inline fragment "... on X" will be represented as Group(List(UntypedInlineFragment(X, ...), UntypedInlineFragment(X, ...))).
           // We fix that to UntypedInlineFragment(X, Group(List(..., ...)))
           val fixedSelections = selections.map(_ match {
@@ -452,8 +465,8 @@ trait QueryGen extends Generator {
                 Sum(baseParams, baseAccumulator.classes, subTypes).some
               )
           }
-        case Empty                                          => ClassAccumulator()
-        case _                                              =>
+        case Empty                                                   => ClassAccumulator()
+        case _                                                       =>
           throw new Exception(
             s"Unhandled Algebra: [$currentAlgebra] - Current Type: [$currentType]"
           )

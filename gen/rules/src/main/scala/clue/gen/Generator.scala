@@ -137,12 +137,13 @@ trait Generator {
 
   protected object ClassParam {
     def fromGrackleType(
-      name:         String,
-      tpe:          grackle.Type,
-      isInput:      Boolean,
-      alias:        Option[String] = None,
-      typeOverride: Option[Type] = None,
-      deprecation:  Option[Deprecation] = None
+      name:          String,
+      tpe:           grackle.Type,
+      isInput:       Boolean,
+      alias:         Option[String] = None,
+      typeOverride:  Option[Type] = None,
+      deprecation:   Option[Deprecation] = None,
+      forceOptional: Boolean = false
     ): ClassParam = {
       def resolveType(tpe: grackle.Type): Type =
         tpe match {
@@ -159,7 +160,14 @@ trait Generator {
             )
         }
 
-      ClassParam(name, resolveType(tpe), deprecation = deprecation)
+      // A field annotated with @include or @skip may be absent from the response, so it must be
+      // optional. If the schema type is already nullable it's resolved as an `Option` anyway,
+      // so we only wrap a non-nullable type.
+      val resolvedType: Type =
+        if (forceOptional && !tpe.isNullable) t"Option[${resolveType(tpe)}]"
+        else resolveType(tpe)
+
+      ClassParam(name, resolvedType, deprecation = deprecation)
     }
   }
 
