@@ -202,8 +202,12 @@ class ApolloClient[F[_], P, S](
             s"UNEXPECTED Complete RECEIVED for subscription [$subscriptionId].".warnF >>
               s"  \\-- State Is: [$s]".traceF
       case Right(StreamingMessage.FromServer.Ping(payload))                        =>
+        // Ping/Pong may be exchanged any time the socket is open, including before the
+        // connection is acknowledged. Respond with a Pong whenever we have a live connection.
         state.get.flatMap:
           case Connected(_, connection, _, _) =>
+            connection.send(StreamingMessage.FromClient.Pong(payload)) // Respond the same payload.
+          case Connecting(_, Some(connection), _, _, _) =>
             connection.send(StreamingMessage.FromClient.Pong(payload)) // Respond the same payload.
           case _ => F.unit
       case _                                                                       => s"Unexpected message received from server: [$msg]".warnF
