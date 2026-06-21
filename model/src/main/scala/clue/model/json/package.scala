@@ -161,10 +161,16 @@ package object json {
 
   given Decoder[GraphQLError.PathElement] =
     Decoder.instance: c =>
-      if (c.value.isNumber)
-        c.as[Int].map(GraphQLError.PathElement.int)
-      else
-        c.as[String].map(GraphQLError.PathElement.string)
+      c.value.asNumber match
+        case Some(num) =>
+          // A numeric path element is normally a (non-negative) list index, so it fits in an Int.
+          // If it doesn't (e.g. it's larger than Int or a float), fall back to its string form
+          // rather than failing the whole error -- and therefore the whole response -- decode.
+          num.toInt
+            .fold(GraphQLError.PathElement.string(num.toString))(GraphQLError.PathElement.int)
+            .asRight
+        case None      =>
+          c.as[String].map(GraphQLError.PathElement.string)
 
   given Encoder[GraphQLError.Location] =
     Encoder.instance: a =>
