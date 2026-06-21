@@ -25,13 +25,15 @@ class FetchJsBackendSuite extends munit.FunSuite {
   }
 
   test("buildGetUri collapses whitespace and trims the query") {
-    val uri = FetchJsBackend.buildGetUri("https://example.com/gql", "  query   Foo {  id }  ", none, none)
+    val uri =
+      FetchJsBackend.buildGetUri("https://example.com/gql", "  query   Foo {  id }  ", none, none)
     assertEquals(parseParams(uri)("query"), "query Foo { id }")
   }
 
   test("buildGetUri does not leak '&' from variable values into extra query params") {
     val variables = """{"name":"a&evil=injected"}"""
-    val uri       = FetchJsBackend.buildGetUri("https://example.com/gql", "query { id }", variables.some, none)
+    val uri       =
+      FetchJsBackend.buildGetUri("https://example.com/gql", "query { id }", variables.some, none)
 
     val params = parseParams(uri)
     // The malicious '&'/'=' must stay inside the single decoded `variables` value...
@@ -43,14 +45,16 @@ class FetchJsBackendSuite extends munit.FunSuite {
 
   test("buildGetUri does not let '#' truncate the request as a fragment") {
     val variables = """{"note":"a#b"}"""
-    val uri       = FetchJsBackend.buildGetUri("https://example.com/gql", "query { id }", variables.some, none)
+    val uri       =
+      FetchJsBackend.buildGetUri("https://example.com/gql", "query { id }", variables.some, none)
 
     assert(!uri.contains("#"), s"Unescaped '#' present in: $uri")
     assertEquals(parseParams(uri)("variables"), variables)
   }
 
   test("buildGetUri encodes the operationName") {
-    val uri    = FetchJsBackend.buildGetUri("https://example.com/gql", "query { id }", none, "Op&x=1".some)
+    val uri    =
+      FetchJsBackend.buildGetUri("https://example.com/gql", "query { id }", none, "Op&x=1".some)
     val params = parseParams(uri)
     assertEquals(params("operationName"), "Op&x=1")
     assertEquals(params.keySet, Set("query", "operationName"))

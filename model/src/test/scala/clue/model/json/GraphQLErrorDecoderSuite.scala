@@ -25,7 +25,7 @@ final class GraphQLErrorDecoderSuite extends munit.FunSuite:
     assertEquals(decode[PathElement]("1.5"), Right(PathElement.string("1.5")))
 
   test("A GraphQLError with an out-of-range numeric path element still decodes"):
-    val json =
+    val json     =
       """{ "message": "boom", "path": ["users", 99999999999999, "name"] }"""
     val expected = GraphQLError(
       "boom",
