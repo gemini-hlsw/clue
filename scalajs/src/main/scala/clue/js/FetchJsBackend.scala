@@ -52,12 +52,13 @@ final class FetchJsBackend[F[_]: Async](fetchMethod: FetchMethod)
               }
             )
         case FetchMethod.GET  =>
-          val variables = request.variables.foldMap(v => s"&variables=${v.asJson.noSpaces}")
-          val op        = request.operationName.foldMap(o => s"&operationName=$o")
           Fetch
             .fetch(
-              URIUtils.encodeURI(
-                s"${baseRequest.uri}?query=${request.query.value.trim.replaceAll(" +", " ")}$variables$op"
+              FetchJsBackend.buildGetUri(
+                baseRequest.uri.toString,
+                request.query.value,
+                request.variables.map(_.asJson.noSpaces),
+                request.operationName
               ),
               new RequestInit {
                 method = HttpMethod.GET
@@ -83,4 +84,25 @@ final class FetchJsBackend[F[_]: Async](fetchMethod: FetchMethod)
 object FetchJsBackend {
   def apply[F[_]: Async](method: FetchMethod = FetchMethod.POST): FetchJsBackend[F] =
     new FetchJsBackend[F](method)
+
+  /**
+   * Build the URL for a GraphQL GET request.
+   *
+   * Each query-string component is individually encoded with `encodeURIComponent`. Encoding the
+   * whole URL with `encodeURI` (as was previously done) is unsafe: `encodeURI` leaves
+   * URL-structural characters such as `&`, `=` and `#` untouched, so a value (e.g. inside the
+   * serialized `variables` JSON) containing those characters could inject extra query parameters or
+   * truncate the request at a `#` fragment.
+   */
+  private[js] def buildGetUri(
+    baseUri:       String,
+    query:         String,
+    variables:     Option[String],
+    operationName: Option[String]
+  ): String = {
+    val q    = URIUtils.encodeURIComponent(query.trim.replaceAll(" +", " "))
+    val vars = variables.foldMap(v => s"&variables=${URIUtils.encodeURIComponent(v)}")
+    val op   = operationName.foldMap(o => s"&operationName=${URIUtils.encodeURIComponent(o)}")
+    s"$baseUri?query=$q$vars$op"
+  }
 }

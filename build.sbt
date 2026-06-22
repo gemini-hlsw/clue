@@ -75,7 +75,8 @@ lazy val scalaJS =
       coverageEnabled := false,
       libraryDependencies ++=
         Settings.Libraries.ScalaJsDom.value ++
-          Settings.Libraries.ScalaJsMacrotaskExecutor.value
+          Settings.Libraries.ScalaJsMacrotaskExecutor.value ++
+          Settings.Libraries.MUnit.value
     )
     .dependsOn(core.js)
 
