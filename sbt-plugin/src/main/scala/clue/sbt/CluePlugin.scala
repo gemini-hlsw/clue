@@ -18,10 +18,10 @@ object CluePlugin extends AutoPlugin {
   override def requires: Plugins = ScalafixPlugin
 
   object autoImport {
-    lazy val clueSourceDirectory  = settingKey[File]("Clue input schemas and sources")
-    lazy val clueSourceGenerators = settingKey[Seq[Task[Seq[File]]]]("Clue source generators")
-    lazy val clueClean            = taskKey[Unit]("Clue clean task")
-    lazy val clueCheck            =
+    lazy val clueSourceDirectory   = settingKey[File]("Clue input schemas and sources")
+    lazy val clueSourceGenerators  = settingKey[Seq[Task[Seq[File]]]]("Clue source generators")
+    lazy val clueClean             = taskKey[Unit]("Clue clean task")
+    lazy val clueCheck             =
       taskKey[Unit](
         "Validate hand-written clue operations/subqueries in this project's own sources " +
           "(those not produced by the generator) against the schema."
@@ -54,10 +54,10 @@ object CluePlugin extends AutoPlugin {
     // Validation of hand-written operations/subqueries living in this project's own sources. The
     // generator only scans `clueSourceDirectory`; the validation rule covers the rest.
     // semanticdb is required by the rule.
-    semanticdbEnabled      := true,
-    semanticdbVersion      := scalafixSemanticdb.revision,
-    clueCheck              := (Compile / scalafix).toTask(" GraphQLValidate --check").value,
-    clueValidateOnCompile  := true
+    semanticdbEnabled     := true,
+    semanticdbVersion     := scalafixSemanticdb.revision,
+    clueCheck             := (Compile / scalafix).toTask(" GraphQLValidate --check").value,
+    clueValidateOnCompile := true
   ) ++
     // Run validation on every compile. We decorate `compile` to run the real compilation first
     // (producing fresh semanticdb) and then the validation rule over it — the same ordering as
