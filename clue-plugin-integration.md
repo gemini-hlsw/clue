@@ -40,16 +40,14 @@
 
 The generator validates the annotated operations/subqueries under `src/clue/scala`. Hand-written ones
 elsewhere in the project (e.g. `@GraphQLType("Type") object Foo extends GraphQLSubquery.Typed[Schema, T]`
-in `src/main`) are validated **automatically on every compile**: the plugin enables scalafix's
-on-compile hook for the `GraphQLValidate` rule (via a generated config that includes your
-`.scalafix.conf` and adds `triggered.rules = [GraphQLValidate]`), so an invalid query fails the
-build. `<project>/clueCheck` runs the same validation on demand (e.g. in CI).
+in `src/main`) are validated **automatically on every compile**: the plugin decorates the `compile`
+task to run the real compilation first and then invoke the `GraphQLValidate` rule over it, so an
+invalid query fails the build. `<project>/clueCheck` runs the same validation on demand (e.g. in CI).
+On-compile validation can be turned off with `clueValidateOnCompile := false`.
 
 A misplaced `@GraphQL`/`@GraphQLSchema`/`@GraphQLStub` annotation outside `src/clue/scala` is reported
 as a warning (those are only processed by the generator). Do not add `rules = [GraphQLGen]` to
 `.scalafix.conf`: a plain `scalafixAll` would then expand the annotated generator inputs in place.
-
-> Note: on-compile validation assumes your config is the standard `.scalafix.conf` at the build root.
 
 ## Common Issues
 

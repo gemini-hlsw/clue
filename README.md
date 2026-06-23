@@ -130,9 +130,10 @@ The schema location is configured (once) in `.scalafix.conf`:
 Clue.schemaDirs = ["path/to/schemas"]
 ```
 
-**With `sbt-clue`:** validation runs automatically **on every compile** — the plugin enables
-scalafix's on-compile hook for the validation rule, so an invalid hand-written operation/subquery
-fails the build. `<project>/clueCheck` runs the same check on demand (e.g. in CI). The generator
+**With `sbt-clue`:** validation runs automatically **on every compile** — the plugin decorates the
+`compile` task to run the validation rule after compilation (disable with
+`clueValidateOnCompile := false`), so an invalid hand-written operation/subquery fails the build.
+`<project>/clueCheck` runs the same check on demand (e.g. in CI). The generator
 separately validates the annotated sources under `src/clue/scala` during generation. A
 `@GraphQL`/`@GraphQLSchema`/`@GraphQLStub` annotation found outside the clue source directory is
 reported as a **warning** (those are only processed by the generator, so the annotation has no effect
