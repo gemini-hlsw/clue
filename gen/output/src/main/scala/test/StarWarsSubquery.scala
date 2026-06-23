@@ -6,9 +6,10 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.annotation.GraphQLType
 
 
-object StarWarsSubquery extends GraphQLSubquery[StarWars]("Character") {
+@GraphQLType("Character") object StarWarsSubquery extends GraphQLSubquery[StarWars] {
   import StarWars.Scalars._
   ignoreUnusedImportScalars()
   import StarWars.Enums._

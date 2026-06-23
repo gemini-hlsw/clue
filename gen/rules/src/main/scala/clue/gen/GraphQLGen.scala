@@ -8,7 +8,6 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all.*
 import grackle.InputValue
-import grackle.Query.UntypedFragment
 import grackle.Result
 import grackle.UntypedOperation
 import metaconfig.Configured
@@ -16,15 +15,15 @@ import scalafix.v1.*
 
 import scala.meta.*
 
-class GraphQLGen(config: GraphQLGenConfig)
+class GraphQLGen(val config: GraphQLGenConfig)
     extends SemanticRule("GraphQLGen")
     with SchemaGen
-    with QueryGen {
+    with GraphQLValidation {
   def this() = this(GraphQLGenConfig())
 
   override def withConfiguration(config: Configuration): Configured[Rule] =
     config.conf
-      .getOrElse("GraphQLGen")(this.config)
+      .getOrElse("Clue")(this.config)
       .map(newConfig => new GraphQLGen(newConfig))
 
   private def indented(asTree: Tree)(lines: String): String = {
@@ -47,17 +46,23 @@ class GraphQLGen(config: GraphQLGenConfig)
       doc.tree
         .collect {
           case obj @ Defn.Object(
-                GraphQLAnnotation(_),
+                mods @ GraphQLAnnotation(_),
                 name,
-                template
-              ) => // Annotated objects are copied as-is
-            // TODO: We should be able to validate the query!
-            IO.pure(
+                Template.Initial(early, inits, self, stats)
+              ) =>
+            // Annotated objects already supply their own Variables/Data (e.g. via
+            // GraphQLOperation.Typed or GraphQLSubquery.Typed), so there's nothing to generate. We
+            // still validate the document/subquery, then copy the object stripping the @GraphQL
+            // annotation (keeping any others, such as @GraphQLType).
+            val newMods = GraphQLAnnotation.removeFrom(mods)
+            val copied  =
               Patch.replaceTree(
                 obj,
-                indented(obj)(q"object $name $template".toString)
+                indented(obj)(
+                  q"..$newMods object $name ${buildTemplate(early, inits, (self.some, stats))}".toString
+                )
               ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
-            )
+            validateGraphQLDefn(mods, inits, stats, obj.pos, generating = true).map(_ + copied)
           case obj @ Defn.Object(
                 GraphQLStubAnnotation(_),
                 _,
@@ -72,7 +77,7 @@ class GraphQLGen(config: GraphQLGenConfig)
                 Template.Initial(early, inits, self, stats)
               ) =>
             val objName = templateName.value
-            config.getSchema(objName).map { schema =>
+            withSchema(objName, obj.pos) { schema =>
               val modObjDefs = scala.Function.chain(
                 List(addScalars, addEnums(schema, config), addInputs(schema, config))
               )
@@ -110,76 +115,79 @@ class GraphQLGen(config: GraphQLGenConfig)
             val objName = templateName.value
 
             extractSchemaType(inits) match {
-              case None             =>
-                abort(
-                  "Invalid annotation target: must be a trait extending GraphQLOperation[Schema]"
+              case None                                       =>
+                IO.pure(
+                  errorDiagnostic(
+                    "Invalid annotation target: must be a trait extending GraphQLOperation[Schema]",
+                    obj.pos
+                  )
                 )
-              case Some(schemaType) =>
+              case Some(_) if extractRootTypes(mods).nonEmpty =>
+                IO.pure(
+                  errorDiagnostic(
+                    "@GraphQLType is only valid on a GraphQLSubquery, not on a GraphQLOperation.",
+                    obj.pos
+                  )
+                )
+              case Some(schemaType)                           =>
                 extractDocument(stats) match {
                   case None           =>
-                    abort(
-                      "The GraphQLOperation must define a 'val document: String' with a literal value."
+                    IO.pure(
+                      errorDiagnostic(
+                        "The GraphQLOperation must define a 'val document: String' with a literal value.",
+                        obj.pos
+                      )
                     )
                   case Some(document) =>
-                    config.getSchema(schemaType.value).flatMap { schema =>
-                      // Parse the operation.
-                      val queryResult: Result[(List[UntypedOperation], List[UntypedFragment])] =
-                        GQLParser.parseText(document.render)
-
-                      if (!queryResult.hasValue)
-                        abort(
-                          s"Could not parse document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
+                    withSchema(schemaType.value, obj.pos) { schema =>
+                      // Validate the document against the schema first, reporting all problems as
+                      // diagnostics (errors at the document, warnings at the definition).
+                      val validation: Result[Unit] = validateDocument(schema, document.render)
+                      val diagnostics: Patch       =
+                        lintResult(
+                          validation,
+                          gqlValuePos("document", stats).getOrElse(obj.pos),
+                          obj.pos
                         )
+
+                      // Only generate from a valid document. On errors we emit the diagnostics and
+                      // leave the source untouched (a downstream compile error makes it obvious).
+                      if (!validation.hasValue) diagnostics
                       else {
-                        IO.whenA(queryResult.hasProblems)(
-                          log(
-                            s"Warning parsing document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
+                        // Validation passed, so parsing and variable-type resolution below succeed.
+                        val (operations, fragments) =
+                          GQLParser.parseText(document.render).toOption.get
+
+                        // TODO Support multi-operation queries?
+                        val operation: UntypedOperation = operations.head
+
+                        val inputs: List[InputValue] = computeVarDefs(schema, operation.variables)
+
+                        // Modifications to add the missing definitions.
+                        val modObjDefs: Endo[List[Stat]] =
+                          scala.Function.chain(
+                            List(
+                              addImports(schemaType.value),
+                              addVars(inputs, config),
+                              addData(schema, operation, config, document.subqueries, fragments),
+                              addVarEncoder,
+                              addDataDecoder,
+                              addConvenienceMethod(schemaType, operation, objName)
+                            )
                           )
-                        ) >> IO {
-                          val (operations, fragments)
-                            : (List[UntypedOperation], List[UntypedFragment]) =
-                            queryResult.toOption.get
 
-                          // TODO Support multi-operation queries?
-                          val operation: UntypedOperation = operations.head
+                        val newMods: List[Mod] = GraphQLAnnotation.removeFrom(mods)
 
-                          val inputs: List[InputValue] = computeVarDefs(schema, operation.variables)
-
-                          // Modifications to add the missing definitions.
-                          val modObjDefs: Endo[List[Stat]] =
-                            scala.Function.chain(
-                              List(
-                                addImports(schemaType.value),
-                                addVars(inputs, config),
-                                addData(
-                                  schema,
-                                  operation,
-                                  inputs,
-                                  config,
-                                  document.subqueries,
-                                  fragments
-                                ),
-                                addVarEncoder,
-                                addDataDecoder,
-                                addConvenienceMethod(schemaType, operation, objName)
-                              )
-                            )
-
-                          val newMods: List[Mod] = GraphQLAnnotation.removeFrom(mods)
-
-                          // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
-                          Patch.replaceTree(
-                            obj,
-                            indented(obj)(
-                              List(
-                                q"..$newMods object ${Term
-                                    .Name(
-                                      objName
-                                    )} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
-                              ).mkString("\n")
-                            )
-                          ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
-                        }
+                        // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
+                        diagnostics + Patch.replaceTree(
+                          obj,
+                          indented(obj)(
+                            q"..$newMods object ${Term
+                                .Name(
+                                  objName
+                                )} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
+                          )
+                        ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
                       }
                     }
                 }
@@ -201,79 +209,104 @@ class GraphQLGen(config: GraphQLGenConfig)
               } =>
             val objName = templateName.value
 
-            extractSchemaAndRootTypes(inits) match {
-              case None                             =>
-                abort(
-                  "Invalid annotation target: must be a trait extending GraphQLOperation[Schema](rootType) where 'rootType` is a literal String value."
+            (extractSubquerySchemaType(inits), extractRootTypes(mods)) match {
+              case (None, _)                                    =>
+                IO.pure(
+                  errorDiagnostic(
+                    "Invalid annotation target: must be a class extending GraphQLSubquery[Schema].",
+                    obj.pos
+                  )
                 )
-              case Some((schemaType, rootTypeName)) =>
+              case (Some(_), Nil)                               =>
+                IO.pure(
+                  errorDiagnostic(
+                    "A GraphQLSubquery must declare its root type with a `@GraphQLType(\"...\")` annotation.",
+                    obj.pos
+                  )
+                )
+              case (Some(_), rootTypes) if rootTypes.sizeIs > 1 =>
+                IO.pure(
+                  errorDiagnostic(
+                    "A subquery processed by the generator (@GraphQL) must declare exactly one " +
+                      "@GraphQLType; multiple types are only supported on hand-written subqueries.",
+                    obj.pos
+                  )
+                )
+              case (Some(schemaType), rootTypeName :: _)        =>
                 extractSubquery(stats) match {
                   case None           =>
-                    abort(
-                      "The GraphQLOperation must define a 'val subquery' with a literal String value."
+                    IO.pure(
+                      errorDiagnostic(
+                        "The GraphQLOperation must define a 'val subquery' with a literal String value.",
+                        obj.pos
+                      )
                     )
                   case Some(subquery) =>
-                    config.getSchema(schemaType.value).flatMap { schema =>
-                      // Parse the operation.
-                      val queryResult: Result[(List[UntypedOperation], List[UntypedFragment])] =
-                        GQLParser.parseText(s"query ${subquery.render}")
-
-                      if (!queryResult.hasValue)
-                        abort(
-                          s"Could not parse document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
+                    withSchema(schemaType.value, obj.pos) { schema =>
+                      // Validate the subquery against its root type first, reporting all problems
+                      // as diagnostics (errors at the subquery, warnings at the definition).
+                      val validation: Result[Unit] =
+                        validateSubquery(schema, rootTypeName, subquery.render)
+                      val diagnostics: Patch       =
+                        lintResult(
+                          validation,
+                          gqlValuePos("subquery", stats).getOrElse(obj.pos),
+                          obj.pos
                         )
+
+                      if (!validation.hasValue) diagnostics
                       else {
-                        IO.whenA(queryResult.hasProblems)(
-                          log(
-                            s"Warning parsing document: ${queryResult.toProblems.map(_.toString).toList.mkString("\n")}"
+                        // Validation passed, so parsing and variable-type resolution below succeed.
+                        val (operations, fragments) =
+                          GQLParser.parseText(s"query ${subquery.render}").toOption.get
+                        // TODO Support multi-operation queries?
+                        val operation               = operations.head
+
+                        // Modifications to add the missing definitions.
+                        val modObjDefs = scala.Function.chain(
+                          List(
+                            addImports(schemaType.value),
+                            addData(
+                              schema,
+                              operation,
+                              config,
+                              subquery.subqueries,
+                              fragments,
+                              schema.types.find(_.name == rootTypeName)
+                            ),
+                            addDataDecoder,
+                            addConvenienceMethod(schemaType, operation, objName)
                           )
-                        ) >> IO {
-                          val (operations, fragments) = queryResult.toOption.get
-                          // TODO Support multi-operation queries?
-                          val operation               = operations.head
+                        )
 
-                          val inputs: List[InputValue] = computeVarDefs(schema, operation.variables)
-
-                          // Modifications to add the missing definitions.
-                          val modObjDefs = scala.Function.chain(
-                            List(
-                              addImports(schemaType.value),
-                              addData(
-                                schema,
-                                operation,
-                                inputs,
-                                config,
-                                subquery.subqueries,
-                                fragments,
-                                schema.types.find(_.name == rootTypeName)
-                              ),
-                              addDataDecoder,
-                              addConvenienceMethod(schemaType, operation, objName)
-                            )
-                          )
-
-                          val newMods = GraphQLAnnotation.removeFrom(mods).filterNot {
-                            case Mod.Abstract() => true
-                            case _              => false
-                          }
-
-                          // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
-                          Patch.replaceTree(
-                            obj,
-                            indented(obj)(
-                              List(
-                                q"..$newMods object ${Term
-                                    .Name(
-                                      objName
-                                    )} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
-                              ).mkString("\n")
-                            )
-                          ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
+                        val newMods = GraphQLAnnotation.removeFrom(mods).filterNot {
+                          case Mod.Abstract() => true
+                          case _              => false
                         }
+
+                        // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
+                        diagnostics + Patch.replaceTree(
+                          obj,
+                          indented(obj)(
+                            q"..$newMods object ${Term
+                                .Name(
+                                  objName
+                                )} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
+                          )
+                        ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
                       }
                     }
                 }
             }
+          // Hand-written operations/subqueries: the generator is not used (no @GraphQL annotation),
+          // but the document/subquery is still validated against the schema. Annotated definitions
+          // are handled by the cases above, so they are excluded here to avoid validating twice.
+          // Covers `GraphQLOperation[S]`/`GraphQLOperation.Typed[S, ...]` and the `GraphQLSubquery`
+          // equivalents.
+          case obj @ GraphQLOperationDefn(mods, inits, stats)
+              if !hasGraphQLAnnotation(mods) &&
+                (isGraphQLOperationDefn(inits, stats) || isGraphQLSubqueryDefn(inits, stats)) =>
+            validateGraphQLDefn(mods, inits, stats, obj.pos, generating = false)
         }
 
     (importPatch ++ genPatch).sequence

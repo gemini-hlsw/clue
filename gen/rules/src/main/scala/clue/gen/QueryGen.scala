@@ -4,9 +4,7 @@
 package clue.gen
 
 import cats.data.State
-import cats.effect.unsafe.implicits.global
 import cats.syntax.all.*
-import grackle.Query.Binding
 import grackle.Query.UntypedFragment
 import grackle.UntypedOperation.*
 import grackle.Value.ListValue
@@ -18,32 +16,66 @@ import scala.meta.*
 trait QueryGen extends Generator {
 
   // TODO This could be more sophisticated.
+  // Matches both `GraphQLOperation[S]` and `GraphQLOperation.Typed[S, ...]`, extracting `S`.
   protected def extractSchemaType(list: List[Init]): Option[Type.Name] =
-    list.collect {
+    list.collectFirst {
       case Init.Initial(
-            Type.Apply.Initial(Type.Name("GraphQLOperation"), List(tpe @ Type.Name(_))),
+            Type.Apply.Initial(Type.Name("GraphQLOperation"), (tpe @ Type.Name(_)) :: _),
             _,
-            Nil
+            _
           ) =>
         tpe
-    }.headOption
-
-  protected def extractSchemaAndRootTypes(list: List[Init]): Option[(Type.Name, String)] =
-    list.collect {
       case Init.Initial(
-            Type.Apply.Initial(Type.Name("GraphQLSubquery"), List(tpe @ Type.Name(_))),
+            Type.Apply.Initial(
+              Type.Select(Term.Name("GraphQLOperation"), Type.Name("Typed")),
+              (tpe @ Type.Name(_)) :: _
+            ),
             _,
-            List(List(Lit.String(rootType)))
+            _
           ) =>
-        (tpe, rootType)
-    }.headOption
+        tpe
+    }
+
+  // The GraphQL root type(s) declared via `@GraphQLType("A", "B", ...)`. Empty if the annotation is
+  // absent. Non-literal arguments are ignored.
+  protected def extractRootTypes(mods: List[Mod]): List[String] =
+    GraphQLTypeAnnotation
+      .unapply(mods)
+      .toList
+      .flatten
+      .collect { case Lit.String(rootType) => rootType }
+
+  // Matches `GraphQLSubquery[S]` / `GraphQLSubquery.Typed[S, ...]`, extracting `S`. Used to
+  // recognize subqueries (their root type comes from the `@GraphQLType` annotation, not here).
+  protected def extractSubquerySchemaType(list: List[Init]): Option[Type.Name] =
+    list.collectFirst {
+      case Init.Initial(
+            Type.Apply.Initial(Type.Name("GraphQLSubquery"), (tpe @ Type.Name(_)) :: _),
+            _,
+            _
+          ) =>
+        tpe
+      case Init.Initial(
+            Type.Apply.Initial(
+              Type.Select(Term.Name("GraphQLSubquery"), Type.Name("Typed")),
+              (tpe @ Type.Name(_)) :: _
+            ),
+            _,
+            _
+          ) =>
+        tpe
+    }
 
   case class InterpolatedGql(parts: List[GqlPart]) {
     def render: String = parts
       .traverse {
         case GqlPart.Literal(value) => State.pure[Int, String](value)
         case _                      =>
-          State.inspect[Int, String](i => s"{ subquery$i }") <* State.modify(_ + 1)
+          // Render each spliced subquery as an aliased `__typename` selection. The alias carries
+          // the index (so codegen can map it back to `subqueries(i)`), while `__typename` is a
+          // valid selection on any object/interface/union, so the host document also typechecks
+          // against the schema. The spliced subquery itself is validated at its definition site.
+          State.inspect[Int, String](i => s"{ subquery$i: __typename }") <* State.modify(_ + 1)
       }
       .runA(0)
       .value
@@ -113,30 +145,240 @@ trait QueryGen extends Generator {
     }
 
   /**
-   * Resolve the types of the operation's variable arguments.
+   * Resolve the types of the operation's variable definitions.
+   *
+   * Assumes the operation has already been validated (see [[validateParsed]]), so variable type
+   * resolution is known to succeed; any problems were already reported as diagnostics.
    */
   def computeVarDefs(
     schema: Schema,
     vars:   List[Query.UntypedVarDef]
-  ): List[InputValue] = {
-    val compiler: QueryCompiler          = new QueryCompiler(GQLParser, schema, List.empty)
-    val inputs: Result[List[InputValue]] = compiler.compileVarDefs(vars)
+  ): List[InputValue] =
+    new QueryCompiler(GQLParser, schema, List.empty).compileVarDefs(vars).toOption.get
 
-    if (!inputs.hasValue)
-      abort(
-        s"Error resolving operation input variables types [${vars
-            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.toProblems.toList.mkString("; ")}]]"
-      )
-        .unsafeRunSync()
-    if (inputs.hasProblems)
-      log(
-        s"Warning resolving operation input variables types [${vars
-            .map(v => s"${v.name}: ${v.tpe.name}")}]: [${inputs.toProblems.toList.mkString("; ")}]]"
-      )
-        .unsafeRunSync()
+  // A `SelectElaborator` that performs grackle's standard schema typechecking and, additionally,
+  // emits a warning whenever a selected field is `@deprecated`. This is how deprecation surfaces
+  // as a scalafix diagnostic (instead of being printed to stderr during generation).
+  private val deprecationWarningElaborator: QueryCompiler.SelectElaborator =
+    QueryCompiler.SelectElaborator { case (parentType, fieldName, _) =>
+      parentType
+        .fieldInfo(fieldName)
+        .flatMap(field => Deprecation.fromDirectives(field.directives))
+        .fold(QueryCompiler.Elab.unit) { deprecation =>
+          QueryCompiler.Elab.warning(
+            s"Field [$fieldName] in [${parentType.name}] is deprecated (${deprecation.reason})"
+          )
+        }
+    }
 
-    inputs.toOption.get
+  /**
+   * Validate already-parsed `operations` (and `fragments`) against the `schema`, rooting each
+   * operation's selection set at the type returned by `rootTypeOf`.
+   *
+   * This mirrors grackle's `QueryCompiler.compile` pipeline (variable/fragment checks, field
+   * mergeability, then per-operation elaboration via [[deprecationWarningElaborator]]), with two
+   * adaptations needed to validate without executing:
+   *   - elaboration runs with *dummy* variable values (see [[createDummyVars]]), so argument
+   *     elaboration can resolve variable references even though no runtime values are available;
+   *   - the root type is supplied explicitly, so this also works for subqueries (selection sets on
+   *     an arbitrary type), which `compile` can't root directly.
+   *
+   * All errors and warnings are accumulated into the [[Result]] (nothing is thrown).
+   */
+  private def validateParsed(
+    schema:         Schema,
+    rootTypeOf:     UntypedOperation => Result[NamedType],
+    operations:     List[UntypedOperation],
+    fragments:      List[UntypedFragment],
+    extraVars:      Query.Vars = Map.empty,
+    checkVariables: Boolean = true
+  ): Result[Unit] = {
+    val compiler = new QueryCompiler(GQLParser, schema, List.empty)
+    val phases   =
+      QueryCompiler.IntrospectionElaborator(QueryCompiler.IntrospectionLevel.Full).toList ++
+        List(
+          QueryCompiler.VariablesSkipAndFragmentElaborator,
+          QueryCompiler.MergeFields,
+          deprecationWarningElaborator
+        )
+    val fragMap  = fragments.map(f => f.name -> f).toMap
+
+    for {
+      // The variable/fragment checks are skipped for subqueries (see [[validateSubquery]]): they
+      // reference variables they don't declare, which this check would wrongly report as undefined.
+      // `reportUnused = false` regardless: grackle's unused detection is unreliable — its
+      // `collectValueRefs` overwrites instead of accumulating variable refs (`loop(values,
+      // Set(nme))`), so when one value holds several variables (e.g. an input object with multiple
+      // `$var` fields) all but the last are falsely reported as unused.
+      // TODO Re-enable unused detection when grackle releases the bug fix for `collectValueRefs`.
+      _ <- if (checkVariables)
+             Result.fromProblems(
+               compiler.validateVariablesAndFragments(operations, fragments, reportUnused = false)
+             )
+           else Result.success(())
+      _ <- Result.fromProblems(compiler.validateFieldMergeability(operations, fragments))
+      _ <- operations.traverse_ { op =>
+             for {
+               rootType <- rootTypeOf(op)
+               varDefs  <- compiler.compileVarDefs(op.variables)
+               _        <- phases
+                             .foldLeftM(op.query)((acc, phase) =>
+                               phase.transformFragments *> phase.transform(acc)
+                             )
+                             .runA(
+                               QueryCompiler.ElabState(
+                                 None,
+                                 schema,
+                                 Context(rootType),
+                                 createDummyVars(varDefs) ++ extraVars,
+                                 fragMap,
+                                 op.query,
+                                 Env.empty,
+                                 List.empty,
+                                 QueryCompiler.Elab.pure(_: Query)
+                               )
+                             )
+             } yield ()
+           }
+    } yield ()
   }
+
+  /**
+   * Validate the operation `document` against the `schema`, accumulating all problems. This is the
+   * validation entry point for hand-written operations, where the code generator is not used.
+   */
+  protected def validateDocument(schema: Schema, document: String): Result[Unit] =
+    GQLParser.parseText(document).flatMap { case (operations, fragments) =>
+      validateParsed(schema, _.rootTpe(schema), operations, fragments)
+    }
+
+  /**
+   * Infers types for the variables a query references, from where they are used, pairing each with
+   * a dummy value. A subquery is validated in isolation, so it declares none of the variables it
+   * references (they belong to the enclosing operation); supplying inferred dummy values lets the
+   * subquery still be validated (fields, arguments, deprecation, ...) without spuriously reporting
+   * those variables as undefined.
+   */
+  private def inferVariableVars(
+    schema:    Schema,
+    rootType:  GType,
+    query:     Query,
+    fragments: List[UntypedFragment]
+  ): Query.Vars = {
+    val fragMap: Map[String, UntypedFragment] = fragments.map(f => f.name -> f).toMap
+
+    def fromValue(value: Value, tpe: GType): Query.Vars =
+      value match {
+        case Value.VariableRef(name) => Map(name -> ((tpe, createDummyValue(tpe))))
+        case ObjectValue(fields)     =>
+          tpe.dealias match {
+            case NullableType(inner)           => fromValue(value, inner)
+            case InputObjectType(_, _, ivs, _) =>
+              fields.foldLeft(Map.empty[String, (GType, Value)]) { case (acc, (fname, fvalue)) =>
+                ivs.find(_.name == fname).fold(acc)(iv => acc ++ fromValue(fvalue, iv.tpe))
+              }
+            case _                             => Map.empty
+          }
+        case ListValue(elems)        =>
+          tpe.dealias match {
+            case NullableType(inner) => fromValue(value, inner)
+            case ListType(elem)      =>
+              elems.foldLeft(Map.empty[String, (GType, Value)])((acc, e) =>
+                acc ++ fromValue(e, elem)
+              )
+            case _                   => Map.empty
+          }
+        case _                       => Map.empty
+      }
+
+    // `@skip`/`@include` take a single boolean `if` argument.
+    def fromDirectives(directives: List[Directive]): Query.Vars =
+      directives
+        .filter(d => d.name == "skip" || d.name == "include")
+        .foldLeft(Map.empty[String, (GType, Value)]) { (acc, d) =>
+          d.args.foldLeft(acc) {
+            case (a, Query.Binding("if", Value.VariableRef(name))) =>
+              a + (name -> ((ScalarType.BooleanType, Value.BooleanValue(true))))
+            case (a, _)                                            => a
+          }
+        }
+
+    def go(q: Query, currentType: Option[GType]): Query.Vars =
+      q match {
+        case Query.UntypedSelect(name, _, args, directives, child) =>
+          val fieldArgs: List[InputValue] =
+            currentType.flatMap(_.fieldInfo(name)).map(_.args).getOrElse(Nil)
+          val argVars: Query.Vars         =
+            args.foldLeft(Map.empty[String, (GType, Value)]) { (acc, b) =>
+              fieldArgs.find(_.name == b.name).fold(acc)(iv => acc ++ fromValue(b.value, iv.tpe))
+            }
+          val next: Option[GType]         = currentType.flatMap(_.field(name)).flatMap(_.underlyingObject)
+          argVars ++ fromDirectives(directives) ++ go(child, next)
+        case Query.UntypedInlineFragment(tpnme, directives, child) =>
+          fromDirectives(directives) ++ go(child,
+                                           tpnme.flatMap(schema.definition).orElse(currentType)
+          )
+        case Query.UntypedFragmentSpread(name, directives)         =>
+          fromDirectives(directives) ++
+            fragMap
+              .get(name)
+              .fold(Map.empty[String, (GType, Value)])(f => go(f.child, schema.definition(f.tpnme)))
+        case Query.Group(queries)                                  =>
+          queries.foldLeft(Map.empty[String, (GType, Value)])((acc, c) => acc ++ go(c, currentType))
+        case _                                                     =>
+          Map.empty
+      }
+
+    go(query, rootType.some)
+  }
+
+  /**
+   * Validate a subquery (a selection set on `rootTypeName`) against the `schema`. Grackle's
+   * `compile` always roots a document at the schema's operation types, so the root type is supplied
+   * explicitly here.
+   */
+  protected def validateSubquery(
+    schema:       Schema,
+    rootTypeName: String,
+    subquery:     String
+  ): Result[Unit] =
+    Result
+      .fromOption(
+        schema.definition(rootTypeName),
+        s"Undefined root type [$rootTypeName] for subquery"
+      )
+      .flatMap { rootType =>
+        GQLParser.parseText(s"query $subquery").flatMap { case (operations, fragments) =>
+          // A subquery references variables declared by the enclosing operation, not itself. We
+          // infer dummy values for them from their usage so the subquery is still validated without
+          // reporting them as undefined, and skip the variable-declaration check for the same reason.
+          // TODO Replace with real variable propagation through subqueries.
+          val inferredVars: Query.Vars =
+            operations.foldLeft(Map.empty[String, (GType, Value)]) { (acc, op) =>
+              acc ++ inferVariableVars(schema, rootType, op.query, fragments)
+            }
+
+          validateParsed(
+            schema,
+            _ => Result.success(rootType),
+            operations,
+            fragments,
+            inferredVars,
+            checkVariables = false
+          )
+        }
+      }
+
+  /**
+   * Validate a subquery against each of `rootTypeNames`, accumulating all problems (grackle's
+   * messages already name the offending type). The selection must be valid against every type.
+   */
+  protected def validateSubqueryTypes(
+    schema:        Schema,
+    rootTypeNames: List[String],
+    subquery:      String
+  ): Result[Unit] =
+    rootTypeNames.parTraverse_(validateSubquery(schema, _, subquery))
 
   import DefineType._
   protected def addVars(
@@ -216,67 +458,16 @@ trait QueryGen extends Generator {
   private def createDummyVars(inputs: List[InputValue]): Query.Vars =
     inputs.map(iv => iv.name -> (iv.tpe, createDummyValue(iv.tpe))).toMap
 
-  private def validateArguments(
-    currentType: Option[GType],
-    fieldName:   String,
-    fieldArgs:   List[InputValue],
-    bindings:    List[Binding],
-    inputs:      List[InputValue]
-  ): Unit = {
-    // Grackle doesn't have a way to check just argument types, but it has a way to resolve values.
-    // So we trick it with dummy values to check the types.
-    val dummyVals: Query.Vars = createDummyVars(inputs)
-
-    def go(
-      parentName:  String,
-      currentType: Option[GType],
-      fieldArgs:   List[InputValue],
-      bindings:    List[Binding]
-    ): List[String] = {
-      val requiredArgs: List[InputValue] =
-        fieldArgs
-          .filter { arg =>
-            arg.tpe match { // Required and no default
-              case NullableType(_) => false
-              case _               => arg.defaultValue.isEmpty
-            }
-          }
-
-      requiredArgs
-        .filter(arg => !bindings.exists(_.name == arg.name))
-        .map { arg =>
-          s"Missing required argument [${arg.name}] for field [$parentName: ${currentType.getOrElse("root")}]"
-        } ++
-        bindings.foldLeft(List.empty[String]) { (acc, b) =>
-          fieldArgs
-            .find(_.name == b.name)
-            .fold(
-              acc :+ s"Unknown argument [${b.name}] for field [$parentName: ${currentType.getOrElse("root")}]"
-            ) { arg =>
-              Value
-                .elaborateValue(b.value, dummyVals)
-                .flatMap(value => Value.checkValue(arg, value.some, s"[$parentName]"))
-                .fold(
-                  failure = problems => acc ++ problems.toList.map(_.message),
-                  success = _ => acc,
-                  warning = (_, _) => acc,
-                  error = t => acc :+ t.getMessage
-                )
-            }
-        }
-    }
-
-    val problems: List[String] = go(fieldName, currentType, fieldArgs, bindings)
-    if (problems.nonEmpty) throw new Exception(problems.mkString("; "))
-  }
-
   /**
    * Recurse the query AST and collect the necessary [[CaseClass]]es to hold its results.
+   *
+   * This assumes the query has already been validated against the schema (see [[validateParsed]]),
+   * which the caller runs first. As a result it does not re-check field existence or arguments:
+   * lookups that "can't fail" on a valid query are treated as defensive internal errors.
    */
   protected def resolveData(
     schema:     Schema,
     algebra:    Query,
-    inputs:     List[InputValue],
     subqueries: List[Term],
     fragments:  List[UntypedFragment],
     rootType:   Option[GType]
@@ -289,7 +480,8 @@ trait QueryGen extends Generator {
       schema
         .definition(typeName)
         .getOrElse(
-          abort(s"Undefined type [$typeName] in inline fragment").unsafeRunSync()
+          // Unreachable: validateParsed already verified inline-fragment/fragment type conditions.
+          throw new Exception(s"Undefined type [$typeName] in validated inline fragment")
         )
 
     def go(
@@ -297,19 +489,18 @@ trait QueryGen extends Generator {
       currentType:    Option[GType]
     ): ClassAccumulator =
       currentAlgebra match {
-        case UntypedSelect(name, alias, _, directives, UntypedSelect(fieldName, _, _, _, _))
-            if fieldName.startsWith("subquery") =>
+        case UntypedSelect(name, alias, _, directives, UntypedSelect(_, Some(subAlias), _, _, _))
+            if subAlias.startsWith("subquery") =>
           val isConditional: Boolean = hasConditionalDirective(directives)
 
           val param = MetaTypes
             .get(name)
             .orElse(currentType.flatMap(_.field(name)))
             .fold(
-              throw new Exception(
-                s"Could not resolve type for field [$name] - Is this a valid field present in the schema?"
-              )
+              // Unreachable: validateParsed already verified this field exists on the schema.
+              throw new Exception(s"Could not resolve type for validated field [$name]")
             ) { nextType =>
-              val i = fieldName.substring("subquery".length).toInt
+              val i = subAlias.substring("subquery".length).toInt
 
               val subquery: Term.Ref = subqueries(i) match {
                 case Term.Block((q: Term.Ref) :: Nil) => q
@@ -328,7 +519,7 @@ trait QueryGen extends Generator {
             }
 
           ClassAccumulator(parAccum = List(param))
-        case UntypedSelect(name, alias, bindings, directives, child) =>
+        case UntypedSelect(name, alias, _, directives, child) =>
           val paramName: String = alias.getOrElse(name)
 
           // A field with an @include or @skip directive may be absent from the response, so it
@@ -339,24 +530,15 @@ trait QueryGen extends Generator {
             .get(name)
             .orElse(currentType.flatMap(_.field(name)))
             .fold(
-              throw new Exception(
-                s"Could not resolve type for field [$name] - Is this a valid field present in the schema?"
-              )
+              // Unreachable: validateParsed already verified this field exists on the schema.
+              throw new Exception(s"Could not resolve type for validated field [$name]")
             ) { nextType =>
+              // Deprecation is reported as a warning during validation (see validateParsed); here
+              // we only need it to annotate the generated field.
               val deprecation: Option[Deprecation] =
                 currentType
                   .flatMap(_.fieldInfo(name))
                   .flatMap(info => Deprecation.fromDirectives(info.directives))
-
-              deprecation.foreach { d =>
-                System.err.println(
-                  s"WARNING: Field [$name] in [${currentType.getOrElse("root")}] is deprecated (${d.reason})."
-                )
-              }
-
-              currentType
-                .flatMap(_.fieldInfo(name).map(_.args))
-                .foreach(args => validateArguments(currentType, name, args, bindings, inputs))
 
               val accumulatorOpt: Option[ClassAccumulator] =
                 nextType.underlyingObject.map(baseType => go(child, baseType.some))
@@ -382,13 +564,13 @@ trait QueryGen extends Generator {
                 )
               )
             }
-        case UntypedInlineFragment(typeName, _, child)               =>
+        case UntypedInlineFragment(typeName, _, child)        =>
           // Single element in inline fragment
           go(child, typeName.map(getType).orElse(currentType))
-        case UntypedFragmentSpread(name, _)                          =>
+        case UntypedFragmentSpread(name, _)                   =>
           val fragment: UntypedFragment = fragmentsMap(name)
           go(fragment.child, getType(fragment.tpnme).some)
-        case Group(selections)                                       =>
+        case Group(selections)                                =>
           // A Group in an inline fragment "... on X" will be represented as Group(List(UntypedInlineFragment(X, ...), UntypedInlineFragment(X, ...))).
           // We fix that to UntypedInlineFragment(X, Group(List(..., ...)))
           val fixedSelections = selections.map(_ match {
@@ -465,8 +647,8 @@ trait QueryGen extends Generator {
                 Sum(baseParams, baseAccumulator.classes, subTypes).some
               )
           }
-        case Empty                                                   => ClassAccumulator()
-        case _                                                       =>
+        case Empty                                            => ClassAccumulator()
+        case _                                                =>
           throw new Exception(
             s"Unhandled Algebra: [$currentAlgebra] - Current Type: [$currentType]"
           )
@@ -480,7 +662,6 @@ trait QueryGen extends Generator {
   protected def addData(
     schema:           Schema,
     operation:        UntypedOperation,
-    inputs:           List[InputValue],
     config:           GraphQLGenConfig,
     subqueries:       List[Term],
     fragments:        List[UntypedFragment],
@@ -519,7 +700,6 @@ trait QueryGen extends Generator {
           resolveData(
             schema,
             operation.query,
-            inputs,
             subqueries,
             fragments,
             rootTypeOverride.orElse(rootType)

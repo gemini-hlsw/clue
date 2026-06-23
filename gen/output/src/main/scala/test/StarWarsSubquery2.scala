@@ -6,10 +6,11 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.annotation.GraphQLType
 import io.circe.Json
 
 
-object StarWarsSubquery2 extends GraphQLSubquery.Typed[StarWars, Json]("Character") {
+@GraphQLType("Character") object StarWarsSubquery2 extends GraphQLSubquery.Typed[StarWars, Json] {
   override val subquery: String = """
         {
           name

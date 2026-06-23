@@ -4,7 +4,7 @@
 // format: off
 /*
   rules = [GraphQLGen]
-  GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
+  Clue.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
  */
 package test
 

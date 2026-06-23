@@ -20,7 +20,7 @@
           typelevelShell = {
             nodejs.enable = true;
             nodejs.package = pkgs.nodejs_24;
-            jdk.package = pkgs.jdk17;
+            jdk.package = pkgs.jdk25;
           };
         };
       }

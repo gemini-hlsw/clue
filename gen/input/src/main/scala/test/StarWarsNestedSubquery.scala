@@ -4,15 +4,17 @@
 // format: off
 /*
   rules = [GraphQLGen]
-  GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
+  Clue.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
  */
 package test
 
 import clue.GraphQLSubquery
 import clue.annotation.GraphQL
+import clue.annotation.GraphQLType
 
-@GraphQL
-abstract class StarWarsNestedSubquery extends GraphQLSubquery[StarWars]("Character") {
+@GraphQL // assert: GraphQLGen
+@GraphQLType("Character")
+abstract class StarWarsNestedSubquery extends GraphQLSubquery[StarWars] {
 
   override val subquery: String = s"""
         {

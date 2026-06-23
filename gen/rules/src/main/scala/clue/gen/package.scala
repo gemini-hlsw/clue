@@ -3,16 +3,10 @@
 
 package clue
 
-import cats.effect.IO
 import grackle.GraphQLParser
 import grackle.QueryParser
 
 package object gen {
-  def abort(msg: String): IO[Nothing] =
-    IO.raiseError(new Exception(msg))
-
-  def log(msg: String): IO[Unit] = IO(println(msg))
-
   private val config = GraphQLParser.defaultConfig.copy(maxInputValueDepth = 16)
 
   val GQLParser: QueryParser = QueryParser(GraphQLParser(config))

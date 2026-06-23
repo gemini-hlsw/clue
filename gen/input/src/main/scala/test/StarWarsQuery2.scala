@@ -4,8 +4,8 @@
 // format: off
 /*
   rules = [GraphQLGen]
-  GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
-  GraphQLGen.scalaJsReactReuse = true
+  Clue.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
+  Clue.scalaJsReactReuse = true
  */
 package test
 
@@ -14,7 +14,7 @@ import clue.annotation.GraphQL
 // gql: import japgolly.scalajs.react.Dummy._
 
 object Wrapper /* gql: extends Something */ {
-  @GraphQL
+  @GraphQL // assert: GraphQLGen
   trait StarWarsQuery2 extends GraphQLOperation[StarWars] {
   override val document: String = """
         fragment fields on Character {
