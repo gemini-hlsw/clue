@@ -14,10 +14,22 @@ import ScalafixPlugin.autoImport.*
 
 object CluePlugin extends AutoPlugin {
 
+  // Pulls in ScalafixPlugin so this project gets the `scalafix` task (used by `clueCheck`).
+  override def requires: Plugins = ScalafixPlugin
+
   object autoImport {
     lazy val clueSourceDirectory  = settingKey[File]("Clue input schemas and sources")
     lazy val clueSourceGenerators = settingKey[Seq[Task[Seq[File]]]]("Clue source generators")
     lazy val clueClean            = taskKey[Unit]("Clue clean task")
+    lazy val clueCheck            =
+      taskKey[Unit](
+        "Validate hand-written clue operations/subqueries in this project's own sources " +
+          "(those not produced by the generator) against the schema."
+      )
+    lazy val clueValidateOnCompile =
+      settingKey[Boolean](
+        "Whether to validate hand-written clue operations/subqueries on every compile (default true)."
+      )
   }
   import autoImport._
 
@@ -37,8 +49,37 @@ object CluePlugin extends AutoPlugin {
     Compile / sourceGenerators ++= (Compile / clueSourceGenerators).value, // workaround for sbt/sbt#7173
     libraryDependencies += BuildInfo.organization %%% BuildInfo.coreModule % BuildInfo.version,
     // another workaround
-    clean                                          := clean.dependsOn(clueClean).value
-  )
+    clean                                          := clean.dependsOn(clueClean).value,
+
+    // Validation of hand-written operations/subqueries living in this project's own sources. The
+    // generator only scans `clueSourceDirectory`; the validation rule covers the rest.
+    // semanticdb is required by the rule.
+    semanticdbEnabled      := true,
+    semanticdbVersion      := scalafixSemanticdb.revision,
+    clueCheck              := (Compile / scalafix).toTask(" GraphQLValidate --check").value,
+    clueValidateOnCompile  := true
+  ) ++
+    // Run validation on every compile. We decorate `compile` to run the real compilation first
+    // (producing fresh semanticdb) and then the validation rule over it — the same ordering as
+    // scalafix's own on-compile hook, but invoking `GraphQLValidate` explicitly so no extra
+    // `.scalafix.conf` `triggered` section (and thus no generated config file) is needed.
+    //
+    // The `--triggered` flag is essential: without it, the `scalafix` task `dependsOn(compile)`
+    // (to refresh semanticdb), which here would mean `compile` depends on `scalafix` depends on
+    // `compile` — a self-dependency that deadlocks in larger build graphs. `--triggered` drops that
+    // compile dependency (we've already compiled), breaking the cycle, while the explicitly named
+    // rule still runs.
+    Seq(Compile, Test).map { config =>
+      config / compile := Def.taskDyn {
+        val analysis = (config / compile).value
+        if (clueValidateOnCompile.value)
+          Def.task {
+            val _ = (config / scalafix).toTask(" GraphQLValidate --check --triggered").value
+            analysis
+          }
+        else Def.task(analysis)
+      }.value
+    }
 
   override def derivedProjects(proj: ProjectDefinition[_]): Seq[Project] = Seq(
     Project(

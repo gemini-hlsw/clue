@@ -18,7 +18,7 @@
 3. **Schema Reference Configuration**:
    - Create or update `.scalafix.conf` to reference GraphQL schemas:
      ```
-     GraphQLGen.schemaDirs=["/lucuma/schemas"]  # /lucuma/schemas is in lucuma-schemas
+     Clue.schemaDirs=["/lucuma/schemas"]  # /lucuma/schemas is in lucuma-schemas
      ```
      In this example the graphql schema is in a library
      Multiple directories can be specified:
@@ -35,6 +35,21 @@
 1. The Clue plugin generates source code in `target/scala-[version]/src_managed`
 2. These generated sources are compiled along with regular code
 3. Generated classes can be imported, like `import [package].SomeQueriesGQL`
+
+## Validating hand-written operations
+
+The generator validates the annotated operations/subqueries under `src/clue/scala`. Hand-written ones
+elsewhere in the project (e.g. `@GraphQLType("Type") object Foo extends GraphQLSubquery.Typed[Schema, T]`
+in `src/main`) are validated **automatically on every compile**: the plugin enables scalafix's
+on-compile hook for the `GraphQLValidate` rule (via a generated config that includes your
+`.scalafix.conf` and adds `triggered.rules = [GraphQLValidate]`), so an invalid query fails the
+build. `<project>/clueCheck` runs the same validation on demand (e.g. in CI).
+
+A misplaced `@GraphQL`/`@GraphQLSchema`/`@GraphQLStub` annotation outside `src/clue/scala` is reported
+as a warning (those are only processed by the generator). Do not add `rules = [GraphQLGen]` to
+`.scalafix.conf`: a plain `scalafixAll` would then expand the annotated generator inputs in place.
+
+> Note: on-compile validation assumes your config is the standard `.scalafix.conf` at the build root.
 
 ## Common Issues
 

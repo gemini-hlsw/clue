@@ -99,6 +99,57 @@ They must extend `GraphQLOperation[S]`, defining the following members:
   }
 ```
 
+#### Validating operations against the schema
+
+Hand-written operations and subqueries (those defined manually, without the code generator) are
+validated against the schema by the `GraphQLValidate` rule, which reuses the same checks as the
+generator — no code generation involved. Any definition extending `GraphQLOperation[S]` /
+`GraphQLOperation.Typed[S, ...]` (checked via its `document`) or `GraphQLSubquery[S]` /
+`GraphQLSubquery.Typed[S, ...]` (checked via its `subquery`) is validated; fields, arguments,
+variables and deprecations that don't typecheck against schema `S` are reported as scalafix
+diagnostics. Operations that *are* generated (annotated with `@GraphQL`) are validated during
+generation.
+
+A subquery declares the GraphQL root type(s) its selection applies to with a
+`@clue.annotation.GraphQLType` annotation:
+
+```scala
+@GraphQLType("Character")
+abstract class FriendFields extends GraphQLSubquery.Typed[StarWars, Json] {
+  val subquery = "{ id name }"
+}
+```
+
+Hand-written subqueries may declare **multiple** types (the selection is validated against each:
+`@GraphQLType("Human", "Droid")`). A subquery processed by the generator (`@GraphQL`) must declare
+**exactly one** type. `@GraphQLType` is only valid on a subquery, not on a `GraphQLOperation`.
+
+The schema location is configured (once) in `.scalafix.conf`:
+
+```hocon
+Clue.schemaDirs = ["path/to/schemas"]
+```
+
+**With `sbt-clue`:** validation runs automatically **on every compile** — the plugin enables
+scalafix's on-compile hook for the validation rule, so an invalid hand-written operation/subquery
+fails the build. `<project>/clueCheck` runs the same check on demand (e.g. in CI). The generator
+separately validates the annotated sources under `src/clue/scala` during generation. A
+`@GraphQL`/`@GraphQLSchema`/`@GraphQLStub` annotation found outside the clue source directory is
+reported as a **warning** (those are only processed by the generator, so the annotation has no effect
+there). (Don't add `rules = [GraphQLGen]` to `.scalafix.conf` — a plain `scalafixAll` would then
+expand the annotated generator inputs in place.)
+
+**Without the plugin** (running scalafix directly), use the validation-only `GraphQLValidate` rule
+(it reads the same `Clue` config) and run `scalafixAll` / `scalafixCheckAll`:
+
+```hocon
+rules = [GraphQLValidate]
+Clue.schemaDirs = ["path/to/schemas"]
+```
+
+A subquery with no `@GraphQLType` annotation has no declared root type, so it can't be validated —
+this is reported as a warning rather than silently skipped.
+
 ### 3) Invoke operations
 
 #### Example

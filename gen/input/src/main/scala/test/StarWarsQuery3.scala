@@ -4,14 +4,14 @@
 // format: off
 /*
   rules = [GraphQLGen]
-  GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
+  Clue.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
  */
 package test
 
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
-@GraphQL
+@GraphQL // assert: GraphQLGen
 trait StarWarsQuery3 extends GraphQLOperation[StarWars] {
   override val document: String = s"""
         query ($$charId: ID!) {

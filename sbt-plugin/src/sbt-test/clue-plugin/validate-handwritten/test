@@ -1,0 +1,13 @@
+# A valid hand-written subquery: compiles and passes clueCheck.
+> app/compile
+> app/clueCheck
+
+# An invalid field: validation runs on compile (scalafixOnCompile + triggered rule) and fails it.
+$ copy-file changes/Invalid.scala app/src/main/scala/Handwritten.scala
+-> app/compile
+-> app/clueCheck
+
+# A misplaced @GraphQL annotation is only a warning: compile and clueCheck still succeed.
+$ copy-file changes/Annotated.scala app/src/main/scala/Handwritten.scala
+> app/compile
+> app/clueCheck

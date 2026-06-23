@@ -4,16 +4,18 @@
 // format: off
 /*
   rules = [GraphQLGen]
-  GraphQLGen.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
+  Clue.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
  */
 package test
 
 import clue.GraphQLSubquery
 import clue.annotation.GraphQL
+import clue.annotation.GraphQLType
 import io.circe.Json
 
 @GraphQL
-object StarWarsSubquery2 extends GraphQLSubquery.Typed[StarWars, Json]("Character") {
+@GraphQLType("Character")
+object StarWarsSubquery2 extends GraphQLSubquery.Typed[StarWars, Json] {
 
   override val subquery: String = """
         {
