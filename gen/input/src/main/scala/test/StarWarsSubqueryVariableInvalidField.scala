@@ -11,11 +11,12 @@ package test
 import clue.GraphQLSubquery
 import clue.annotation.GraphQLType
 
-// A subquery that references a variable (`$ep`) AND has a genuine error (`invalidField` doesn't
-// exist on `Character`). The variable must not be reported as undefined, but field validation must
-// still run and report the invalid field.
+// A subquery that declares `$ep` via `type Variables` AND has a genuine error (`invalidField`
+// doesn't exist on `Character`). The declared variable is fine; field validation must still run and
+// report the invalid field (the only diagnostic).
 @GraphQLType("Query")
 abstract class StarWarsSubqueryVariableInvalidField extends GraphQLSubquery[StarWars] {
+  type Variables = "($ep: Episode!)"
   override val subquery: String = "{ hero(episode: $ep) { invalidField } }" // assert: GraphQLGen
 }
 // format: on

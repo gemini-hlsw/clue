@@ -39,3 +39,6 @@ node_modules
 # direnv
 .direnv/
 .pi/
+
+#Claude
+*PLAN.md

@@ -243,11 +243,18 @@ class GraphQLGen(val config: GraphQLGenConfig)
                     )
                   case Some(subquery) =>
                     withSchema(schemaType.value, obj.pos) { schema =>
+                      val explicitVariables: Option[String] = extractVariables(stats)
+                      // For @GraphQL subqueries, infer the referenced variables from usage when the
+                      // author didn't declare them; the inferred set is emitted as `type Variables`.
+                      val variables: String                 =
+                        explicitVariables.getOrElse(
+                          inferSubqueryVariables(schema, rootTypeName, subquery.render)
+                        )
                       // Validate the subquery against its root type first, reporting all problems
                       // as diagnostics (errors at the subquery, warnings at the definition).
-                      val validation: Result[Unit] =
-                        validateSubquery(schema, rootTypeName, subquery.render)
-                      val diagnostics: Patch       =
+                      val validation: Result[Unit]          =
+                        validateSubquery(schema, rootTypeName, variables, subquery.render)
+                      val diagnostics: Patch                =
                         lintResult(
                           validation,
                           gqlValuePos("subquery", stats).getOrElse(obj.pos),
@@ -258,13 +265,14 @@ class GraphQLGen(val config: GraphQLGenConfig)
                       else {
                         // Validation passed, so parsing and variable-type resolution below succeed.
                         val (operations, fragments) =
-                          GQLParser.parseText(s"query ${subquery.render}").toOption.get
+                          GQLParser.parseText(s"query $variables ${subquery.render}").toOption.get
                         // TODO Support multi-operation queries?
                         val operation               = operations.head
 
                         // Modifications to add the missing definitions.
                         val modObjDefs = scala.Function.chain(
                           List(
+                            addVariablesTypeAlias(explicitVariables, variables),
                             addImports(schemaType.value),
                             addData(
                               schema,

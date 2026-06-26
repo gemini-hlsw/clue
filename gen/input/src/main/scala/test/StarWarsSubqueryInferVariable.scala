@@ -9,14 +9,17 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.annotation.GraphQL
 import clue.annotation.GraphQLType
 
-// A subquery that references a variable (`$ep`), declared via `type Variables`. The declaration is
-// checked against usage (`$ep` feeds `hero(episode: Episode!)`) and the selection is valid, so this
-// must NOT report any diagnostic.
+// A generated subquery that references `$ep` without declaring it: the generator infers the variable
+// from usage (`hero(episode: Episode!)`) and emits `type Variables = "($ep: Episode!)"`.
+@GraphQL
 @GraphQLType("Query")
-abstract class StarWarsSubqueryWithVariable extends GraphQLSubquery[StarWars] {
-  type Variables = "($ep: Episode!)"
+abstract class StarWarsSubqueryInferVariable extends GraphQLSubquery[StarWars] {
   override val subquery: String = "{ hero(episode: $ep) { name } }"
 }
+
+@clue.annotation.GraphQLStub
+object StarWarsSubqueryInferVariable
 // format: on
