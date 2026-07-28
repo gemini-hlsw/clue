@@ -116,7 +116,8 @@ class ApolloClient[F[_], P, S](
     subscription:  GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject],
-    extensions:    Option[JsonObject]
+    extensions:    Option[JsonObject],
+    descriptor:    Option[String] = none
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     subscriptionResource(subscription, operationName, variables, extensions)
 
@@ -126,7 +127,8 @@ class ApolloClient[F[_], P, S](
     operationName: Option[String],
     variables:     Option[JsonObject],
     extensions:    Option[JsonObject],
-    modParams:     Unit => Unit // This is ignored here.
+    modParams:     Unit => Unit, // This is ignored here.
+    descriptor:    Option[String] = none
   ): F[GraphQLResponse[D]] =
     F.async(cb =>
       startSubscription[D](document, operationName, variables, extensions)

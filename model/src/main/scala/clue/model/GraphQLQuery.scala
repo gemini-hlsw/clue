@@ -4,24 +4,36 @@
 package clue.model
 
 import cats.Eq
-import cats.syntax.option.*
 
 opaque type GraphQLQuery = String
 
 object GraphQLQuery:
   def apply(query: String): GraphQLQuery = query
 
-  private val QueryTypeAndName = "(\\w+).*\\{(?:.|\\s)*?(\\w+)".r.unanchored
+  // The operation type keyword at the start of the document (query/mutation/subscription).
+  private val OperationType = """^\s*(\w+)""".r
+
+  // An explicitly-named operation
+  private val NamedOperation = """^\s*\w+\s+(\w+)(?=\s*[({])""".r
+
+  // Fallback for anonymous operations: the first word after the first '{'.
+  private val FirstField = """\{(?:.|\s)*?(\w+)""".r
 
   private def queryTypeAndName(query: GraphQLQuery): Option[(String, String)] =
-    query match
-      case QueryTypeAndName(queryType, queryName) => (queryType, queryName).some
-      case _                                      => none
+    val doc  = query.trim
+    val tpe  = OperationType.findFirstMatchIn(doc).map(_.group(1))
+    val name =
+      NamedOperation
+        .findFirstMatchIn(doc)
+        .map(_.group(1))
+        .orElse(FirstField.findFirstMatchIn(doc).map(_.group(1)))
+    tpe.map((_, name.getOrElse("<queryName?>")))
 
   extension (query: GraphQLQuery)
     def value: String        = query
     def querySummary: String =
-      val typeAndName: Option[(String, String)] = queryTypeAndName(query)
-      s"${typeAndName.map(_._1).getOrElse("<queryType?>")}-${typeAndName.map(_._2).getOrElse("<queryName?>")}"
+      queryTypeAndName(query) match
+        case Some((tpe, name)) => s"$tpe-$name"
+        case None              => "<queryType?>-<queryName?>"
 
   inline given Eq[GraphQLQuery] = Eq.catsKernelInstancesForString

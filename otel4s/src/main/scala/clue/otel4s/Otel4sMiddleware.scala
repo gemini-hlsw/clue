@@ -88,7 +88,8 @@ object Otel4sMiddleware:
 
   private[otel4s] def commonAttributes(
     document:      GraphQLQuery,
-    operationName: Option[String]
+    operationName: Option[String],
+    descriptor:    Option[String]
   ): List[Attribute[?]] =
     val base = List(
       Attribute("clue.version", BuildInfo.version),
@@ -103,7 +104,9 @@ object Otel4sMiddleware:
       .map(n => GraphqlExperimentalAttributes.GraphqlOperationName(n))
       .toList
 
-    base ++ opType ++ opName
+    val descr = descriptor.map(d => Attribute("clue.descriptor", d)).toList
+
+    base ++ opType ++ opName ++ descr
 
   private[otel4s] def responseAttributes[F[_]: Applicative as F, D](
     span:   Span[F],
@@ -128,11 +131,12 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
   protected def traceSpan(
     operation:     String,
     document:      GraphQLQuery,
-    operationName: Option[String]
+    operationName: Option[String],
+    descriptor:    Option[String]
   ) = spanMod(
-    T.spanBuilder(s"clue-$operation-${document.querySummary}")
+    T.spanBuilder(s"clue-$operation-${descriptor.getOrElse(document.querySummary)}")
       .withSpanKind(SpanKind.Client)
-      .addAttributes(Otel4sMiddleware.commonAttributes(document, operationName)*)
+      .addAttributes(Otel4sMiddleware.commonAttributes(document, operationName, descriptor)*)
   )
 
   // Merge existing extensions with otel trace parent headers.
@@ -148,10 +152,11 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
     operationName: Option[String],
     variables:     Option[JsonObject],
     extensions:    Option[JsonObject],
-    modParams:     P => P
+    modParams:     P => P,
+    descriptor:    Option[String] = none
   ): F[GraphQLResponse[D]] =
     MonadCancelThrow[F].uncancelable: poll =>
-      traceSpan("request", document, operationName)
+      traceSpan("request", document, operationName, descriptor)
         .addAttribute(HttpAttributes.HttpRequestMethod("POST"))
         .build
         .use: span =>
@@ -165,7 +170,14 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
             result       <-
               poll(
                 wrapped
-                  .requestInternal[D](document, operationName, variables, mergedExt, modWithTrace)
+                  .requestInternal[D](
+                    document,
+                    operationName,
+                    variables,
+                    mergedExt,
+                    modWithTrace,
+                    descriptor
+                  )
               )
             _            <- Otel4sMiddleware.responseAttributes(span, result)
           yield result
@@ -180,17 +192,24 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
     document:      GraphQLQuery,
     operationName: Option[String] = none,
     variables:     Option[JsonObject] = none,
-    extensions:    Option[JsonObject] = none
+    extensions:    Option[JsonObject] = none,
+    descriptor:    Option[String] = none
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     for
-      res          <- traceSpan("subscribe", document, operationName).build.resource
+      res          <- traceSpan("subscribe", document, operationName, descriptor).build.resource
       span          = res.span
       _            <- Resource.eval:
                         additionalAttributesF(document, variables).flatMap: attrs =>
                           span.addAttributes(attrs*)
       traceHeaders <- Resource.eval(T.propagate(Map.empty))
       mergedExt     = mergeOtelExtension(extensions, traceHeaders)
-      stream       <- wrapped.subscribeInternal[D](document, operationName, variables, mergedExt)
+      stream       <- wrapped.subscribeInternal[D](
+                        document,
+                        operationName,
+                        variables,
+                        mergedExt,
+                        descriptor
+                      )
     yield stream.onFinalizeCase: exitCase =>
       span.addAttribute(Attribute("clue.exitCase", exitCase.toOutcome.toString)) *>
         (exitCase match
