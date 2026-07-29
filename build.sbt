@@ -8,6 +8,32 @@ ThisBuild / crossScalaVersions          := Seq("3.8.4")
 ThisBuild / githubWorkflowScalaVersions := Seq("3.8.4")
 Global / onChangedBuildSource           := ReloadOnSourceChanges
 
+// sbt-typelevel-ci hardcodes Java 11 (both the job's `javas` matrix and the baked-in
+// `matrix.java == 'temurin@11'` cond on its Setup Java step) for its auto-added
+// "validate-steward" job, but the scala-steward binary that coursier/setup-action
+// installs is now built for a newer JVM (class file version 61 = Java 17), so that job
+// fails with UnsupportedClassVersionError. Rebuild the job on Java 17 until the plugin
+// catches up.
+ThisBuild / githubWorkflowAddedJobs ~= { jobs =>
+  jobs.map { job =>
+    if (job.id == "validate-steward")
+      WorkflowJob(
+        "validate-steward",
+        "Validate Steward Config",
+        WorkflowStep.Checkout ::
+          WorkflowStep.SetupJava(List(JavaSpec.temurin("17")), false) :::
+          WorkflowStep.Use(
+            UseRef.Public("coursier", "setup-action", "v1"),
+            Map("apps" -> "scala-steward")
+          ) ::
+          WorkflowStep.Run(List("scala-steward validate-repo-config .scala-steward.conf")) :: Nil,
+        scalas = List.empty,
+        javas  = List(JavaSpec.temurin("17"))
+      )
+    else job
+  }
+}
+
 lazy val root = tlCrossRootProject
   .aggregate(
     model,
