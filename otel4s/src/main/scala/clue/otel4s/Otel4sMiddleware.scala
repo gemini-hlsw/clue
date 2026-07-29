@@ -39,13 +39,19 @@ object Otel4sMiddleware:
   private def emptyAttrs[F[_]: Applicative]
     : (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]] = (_, _) => List.empty.pure
 
+  // Transport-specific attributes for the one-shot HTTP clients, supplied at construction rather
+  // than baked into `Otel4sFetchClient`. The streaming clients extend it but speak WebSocket, and
+  // must not describe their requests as HTTP.
+  private val httpAttributes: List[Attribute[?]] =
+    List(HttpAttributes.HttpRequestMethod("POST"))
+
   // Fetch client
   def apply[F[_]: Tracer: MonadCancelThrow, P: TraceHeaderInjector, S](
     client:                FetchClientWithPars[F, P, S],
     spanMod:               SpanMod[F],
     additionalAttributesF: (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]]
   ): FetchClientWithPars[F, P, S] =
-    Otel4sFetchClient[F, P, S](client, spanMod, additionalAttributesF)
+    Otel4sFetchClient[F, P, S](client, spanMod, additionalAttributesF, httpAttributes)
 
   def apply[F[_]: Tracer: MonadCancelThrow, P: TraceHeaderInjector, S](
     client: FetchClientWithPars[F, P, S]
@@ -116,9 +122,13 @@ object Otel4sMiddleware:
         .getOrElse(F.unit)
 
 class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInjector, S](
-  wrapped:               FetchClientWithPars[F, P, S],
-  spanMod:               Otel4sMiddleware.SpanMod[F],
-  additionalAttributesF: (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]]
+  wrapped:                                 FetchClientWithPars[F, P, S],
+  spanMod:                                 Otel4sMiddleware.SpanMod[F],
+  additionalAttributesF:                   (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]],
+  // Attributes describing the transport, added to the `request` span. Empty unless the
+  // construction site can vouch for one, so that a client speaking a protocol it doesn't know
+  // about stays silent rather than inheriting someone else's claim.
+  private[otel4s] val transportAttributes: List[Attribute[?]] = Nil
 ) extends FetchClientWithPars[F, P, S]:
   protected def traceSpan(
     operation:     String,
@@ -139,13 +149,6 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
     val traceExt = JsonObject.fromMap(traceHeaders.map((k, v) => k -> Json.fromString(v)))
     extensions.map(_.deepMerge(traceExt)).orElse(Some(traceExt)).filterNot(_.isEmpty)
 
-  /**
-   * Transport-specific attributes applied to the `request` span. The HTTP fetch client reports
-   * `http.request.method: POST`.
-   */
-  protected[otel4s] def requestTransportAttributes: List[Attribute[?]] =
-    List(HttpAttributes.HttpRequestMethod("POST"))
-
   override protected[clue] def requestInternal[D: Decoder](
     document:      GraphQLQuery,
     operationName: Option[String],
@@ -156,7 +159,7 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
   ): F[GraphQLResponse[D]] =
     MonadCancelThrow[F].uncancelable: poll =>
       traceSpan("request", document, operationName, descriptor)
-        .addAttributes(requestTransportAttributes*)
+        .addAttributes(transportAttributes*)
         .build
         .use: span =>
           for
@@ -187,9 +190,6 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
   additionalAttributesF: (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]]
 ) extends Otel4sFetchClient[F, Unit, S](wrapped, spanMod, additionalAttributesF)
     with StreamingClient[F, S]:
-  // Streaming clients run over a persistent transport (typically WebSocket), not HTTP
-  override protected[otel4s] def requestTransportAttributes: List[Attribute[?]] = Nil
-
   protected[clue] def subscribeInternal[D: Decoder](
     document:      GraphQLQuery,
     operationName: Option[String],

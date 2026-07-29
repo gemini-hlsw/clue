@@ -19,12 +19,13 @@ import org.typelevel.otel4s.trace.Tracer
  * Regression coverage for the transport-specific attributes on the `request` span.
  *
  * `Otel4sStreamingClient extends Otel4sFetchClient`, so it used to inherit `requestInternal`
- * wholesale — including the hardcoded `http.request.method: POST` attribute. That mislabelled
- * queries/mutations sent as WebSocket `Subscribe` frames as HTTP POST. These tests pin the fix: the
- * HTTP client reports the method, the streaming client does not.
+ * wholesale — including a hardcoded `http.request.method: POST`. That mislabelled queries and
+ * mutations sent as WebSocket `Subscribe` frames as HTTP POST. The attribute is now supplied at
+ * construction, and only the fetch factory supplies it.
  *
- * Only the pure attribute lists are inspected, so a noop tracer suffices and no request is ever
- * actually run (the wrapped clients' methods are never called).
+ * Only the wiring is inspected, so a noop tracer suffices and no request is ever run. Asserting on
+ * the emitted span instead would need an in-memory SDK, and otel4s publishes none for the 1.0 API
+ * (`otel4s-sdk-testkit` stops at 0.19.0).
  */
 class Otel4sRequestSpanSpec extends FunSuite:
 
@@ -67,17 +68,19 @@ class Otel4sRequestSpanSpec extends FunSuite:
       ): Resource[IO, Stream[IO, GraphQLResponse[D]]] =
         Resource.eval(IO.never)
 
-  private def httpMethodKeys[S](client: Otel4sFetchClient[IO, Unit, S]): List[String] =
-    client.requestTransportAttributes.map(_.key.name)
+  private def transportKeys(client: Any): List[String] =
+    client match
+      case c: Otel4sFetchClient[?, ?, ?] => c.transportAttributes.map(_.key.name)
+      case other                         => fail(s"expected an Otel4sFetchClient, got [$other]")
 
-  test("the HTTP fetch client tags requests with http.request.method: POST"):
-    val client = new Otel4sFetchClient[IO, Unit, Unit](stubFetch, noMod, noAttrs)
-    assert(httpMethodKeys(client).contains("http.request.method"))
+  test("the HTTP fetch client tags requests with http.request.method"):
+    assert(transportKeys(Otel4sMiddleware(stubFetch)).contains("http.request.method"))
 
   test("the streaming (WebSocket) client does NOT tag requests with http.request.method"):
-    // Regression: Otel4sStreamingClient extends Otel4sFetchClient and used to inherit the POST
-    // attribute, mislabeling WebSocket Subscribe frames as HTTP POST.
-    val client = new Otel4sStreamingClient[IO, Unit](stubStream, noMod, noAttrs)
-    assert(!httpMethodKeys(client).contains("http.request.method"))
+    assert(!transportKeys(Otel4sMiddleware(stubStream)).contains("http.request.method"))
+
+  test("a directly constructed client claims no transport by default"):
+    val client = new Otel4sFetchClient[IO, Unit, Unit](stubFetch, noMod, noAttrs)
+    assertEquals(client.transportAttributes, Nil)
 
 end Otel4sRequestSpanSpec
