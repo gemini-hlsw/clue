@@ -152,7 +152,7 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
     variables:     Option[JsonObject],
     extensions:    Option[JsonObject],
     modParams:     P => P,
-    descriptor:    Option[String] = none
+    descriptor:    Option[String]
   ): F[GraphQLResponse[D]] =
     MonadCancelThrow[F].uncancelable: poll =>
       traceSpan("request", document, operationName, descriptor)
@@ -192,10 +192,10 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
 
   protected[clue] def subscribeInternal[D: Decoder](
     document:      GraphQLQuery,
-    operationName: Option[String] = none,
-    variables:     Option[JsonObject] = none,
-    extensions:    Option[JsonObject] = none,
-    descriptor:    Option[String] = none
+    operationName: Option[String],
+    variables:     Option[JsonObject],
+    extensions:    Option[JsonObject],
+    descriptor:    Option[String]
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     for
       res          <- traceSpan("subscribe", document, operationName, descriptor).build.resource

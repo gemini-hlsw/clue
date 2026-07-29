@@ -27,8 +27,8 @@ class FetchClientImpl[F[_]: MonadThrow: Logger, P, S](requestParams: P)(using
     operationName: Option[String],
     variables:     Option[JsonObject],
     extensions:    Option[JsonObject],
-    modParams:     P => P = identity,
-    descriptor:    Option[String] = none
+    modParams:     P => P,
+    descriptor:    Option[String] // This is ignored here.
   ): F[GraphQLResponse[D]] =
     backend
       .request(

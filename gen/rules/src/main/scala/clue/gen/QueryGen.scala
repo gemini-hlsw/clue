@@ -808,12 +808,12 @@ trait QueryGen extends Generator {
                   }"""
           // When descriptor generation is enabled, tag the request/subscription with the
           // object name so otel4s can name the span `clue-<op>-<ObjectName>`.
-          val opName         = Term.Name(objName)
+          val objTerm        = Term.Name(objName)
           val afterRequest   =
             if (config.descriptor)
-              q"client.request($opName).withDescriptor(${Lit.String(objName)})"
+              q"client.request($objTerm).withDescriptor(${Lit.String(objName)})"
             else
-              q"client.request($opName)"
+              q"client.request($objTerm)"
           val afterSubscribe =
             if (config.descriptor)
               q"client.subscribe(this).withDescriptor(${Lit.String(objName)})"
