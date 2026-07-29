@@ -802,10 +802,14 @@ trait QueryGen extends Generator {
             })
             .toList
           val applied        =
-            q"""def apply[F[_]]: clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] =
-                  new clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] {
-                    def applyP[P](client: clue.FetchClientWithPars[F, P, $schemaType]) = new ClientAppliedFP(client)
+            q"""def apply[F[_]]: ClientAppliedF[F, $schemaType, ClientAppliedFP] =
+                  new ClientAppliedF[F, $schemaType, ClientAppliedFP] {
+                    def applyP[P](client: FetchClientWithPars[F, P, $schemaType]) = new ClientAppliedFP(client)
                   }"""
+          // `ClientAppliedF` and `FetchClientWithPars` are only referenced by query/mutation
+          // operations, so import them here rather than for every operation kind.
+          val clientImports  =
+            List(q"import clue.ClientAppliedF", q"import clue.FetchClientWithPars")
           // When descriptor generation is enabled, tag the request/subscription with the
           // object name so otel4s can name the span `clue-<op>-<ObjectName>`.
           val objTerm        = Term.Name(objName)
@@ -822,9 +826,9 @@ trait QueryGen extends Generator {
           parentBody ++
             (operation match {
               case _: UntypedQuery =>
-                List(
+                clientImports ++ List(
                   applied,
-                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
+                  q"""class ClientAppliedFP[F[_], P](val client: FetchClientWithPars[F, P, $schemaType]) {
                       def query(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail}) =
                         $afterRequest.withInput(Variables(...$variablesNames), modParams)
                     }
@@ -832,9 +836,9 @@ trait QueryGen extends Generator {
                 )
 
               case _: UntypedMutation     =>
-                List(
+                clientImports ++ List(
                   applied,
-                  q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
+                  q"""class ClientAppliedFP[F[_], P](val client: FetchClientWithPars[F, P, $schemaType]) {
                       def execute(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail}) =
                         $afterRequest.withInput(Variables(...$variablesNames), modParams)
                     }

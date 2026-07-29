@@ -4,6 +4,8 @@
 package clue.otel4s
 
 import clue.model.GraphQLQuery
+import io.circe.Json
+import io.circe.JsonObject
 import munit.FunSuite
 
 class Otel4sMiddlewareSpec extends FunSuite:
@@ -30,6 +32,21 @@ class Otel4sMiddlewareSpec extends FunSuite:
   test("commonAttributes still emits the graphql document regardless of descriptor") {
     val attrs = Otel4sMiddleware.commonAttributes(doc, None, Some("X"))
     assert(attrs.exists(_.key.name == "graphql.document"), "expected a graphql.document attribute")
+  }
+
+  test("requestBodySize reflects the serialized payload and grows with variables") {
+    // The serialized request is JSON wrapping the document, so its length must at least contain
+    // the document text …
+    val base     = Otel4sMiddleware.requestBodySize(doc, Some("ObservationVisits"), None, None)
+    assert(base >= doc.value.length.toLong)
+    // … and adding variables can only make it larger.
+    val withVars = Otel4sMiddleware.requestBodySize(
+      doc,
+      Some("ObservationVisits"),
+      Some(JsonObject("id" -> Json.fromString("o-1"))),
+      None
+    )
+    assert(withVars > base)
   }
 
 end Otel4sMiddlewareSpec

@@ -15,11 +15,14 @@ import clue.PersistentStreamingClient
 import clue.StreamingClient
 import clue.TraceHeaderInjector
 import clue.model.GraphQLQuery
+import clue.model.GraphQLRequest
 import clue.model.GraphQLResponse
+import clue.model.json.given
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.JsonObject
+import io.circe.syntax.*
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.context.propagation.TextMapUpdater
 import org.typelevel.otel4s.semconv.attributes.HttpAttributes
@@ -121,6 +124,17 @@ object Otel4sMiddleware:
           ) *> span.setStatus(StatusCode.Error, "GraphQL request returned errors")
         .getOrElse(F.unit)
 
+  /**
+   * Inculde the requested query size as an attribute
+   */
+  private[otel4s] def requestBodySize(
+    document:      GraphQLQuery,
+    operationName: Option[String],
+    variables:     Option[JsonObject],
+    extensions:    Option[JsonObject]
+  ): Long =
+    GraphQLRequest(document, operationName, variables, extensions).asJson.noSpaces.length.toLong
+
 class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInjector, S](
   wrapped:                                 FetchClientWithPars[F, P, S],
   spanMod:                                 Otel4sMiddleware.SpanMod[F],
@@ -167,6 +181,13 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
             _            <- span.addAttributes(additional*)
             traceHeaders <- T.propagate(Map.empty)
             mergedExt     = mergeOtelExtension(extensions, traceHeaders)
+            // Measure the payload after trace headers are merged in
+            _            <- span.addAttribute(
+                              Attribute(
+                                "clue.request.body.size",
+                                Otel4sMiddleware.requestBodySize(document, operationName, variables, mergedExt)
+                              )
+                            )
             modWithTrace  =
               modParams.andThen(p => TraceHeaderInjector[P].addHeaders(p, traceHeaders))
             result       <-
@@ -205,6 +226,13 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
                           span.addAttributes(attrs*)
       traceHeaders <- Resource.eval(T.propagate(Map.empty))
       mergedExt     = mergeOtelExtension(extensions, traceHeaders)
+      _            <- Resource.eval:
+                        span.addAttribute(
+                          Attribute(
+                            "clue.request.body.size",
+                            Otel4sMiddleware.requestBodySize(document, operationName, variables, mergedExt)
+                          )
+                        )
       stream       <- wrapped.subscribeInternal[D](
                         document,
                         operationName,
