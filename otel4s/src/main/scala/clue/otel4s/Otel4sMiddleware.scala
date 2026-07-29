@@ -87,6 +87,20 @@ object Otel4sMiddleware:
   ): PersistentStreamingClient[F, S, CP, CE] =
     apply(client, identityMod[F], emptyAttrs[F])
 
+  /**
+   * The span name: `clue-<operation>-<descriptor, else the document's own summary>`.
+   *
+   * The descriptor wins when present precisely because it is the one name the call site chose; the
+   * document summary (`<type>-<name>`) is the fallback, and it degrades to placeholders rather than
+   * failing when the document cannot be parsed.
+   */
+  private[otel4s] def spanName(
+    operation:  String,
+    document:   GraphQLQuery,
+    descriptor: Option[String]
+  ): String =
+    s"clue-$operation-${descriptor.getOrElse(document.querySummary)}"
+
   private[otel4s] def commonAttributes(
     document:      GraphQLQuery,
     operationName: Option[String],
@@ -150,7 +164,7 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
     operationName: Option[String],
     descriptor:    Option[String]
   ) = spanMod(
-    T.spanBuilder(s"clue-$operation-${descriptor.getOrElse(document.querySummary)}")
+    T.spanBuilder(Otel4sMiddleware.spanName(operation, document, descriptor))
       .withSpanKind(SpanKind.Client)
       .addAttributes(Otel4sMiddleware.commonAttributes(document, operationName, descriptor)*)
   )

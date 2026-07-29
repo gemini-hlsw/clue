@@ -25,7 +25,9 @@ import org.typelevel.otel4s.trace.Tracer
  *
  * Only the wiring is inspected, so a noop tracer suffices and no request is ever run. Asserting on
  * the emitted span instead would need an in-memory SDK, and otel4s publishes none for the 1.0 API
- * (`otel4s-sdk-testkit` stops at 0.19.0).
+ * (`otel4s-sdk-testkit` stops at 0.19.0). For the same reason, span names and attributes are
+ * asserted against `Otel4sMiddleware.spanName` / `commonAttributes` directly in
+ * [[Otel4sMiddlewareSpec]] rather than against what a collector would see.
  */
 class Otel4sRequestSpanSpec extends FunSuite:
 
