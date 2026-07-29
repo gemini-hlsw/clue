@@ -28,7 +28,7 @@ ThisBuild / githubWorkflowAddedJobs ~= { jobs =>
           ) ::
           WorkflowStep.Run(List("scala-steward validate-repo-config .scala-steward.conf")) :: Nil,
         scalas = List.empty,
-        javas  = List(JavaSpec.temurin("17"))
+        javas = List(JavaSpec.temurin("17"))
       )
     else job
   }
