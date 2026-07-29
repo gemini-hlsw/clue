@@ -11,8 +11,10 @@ object GraphQLQuery:
   def apply(query: String): GraphQLQuery = query
 
   // The operation type keyword, matched at the start of a line so that leading comments and
-  // fragment definitions are skipped.
-  private val OperationType = """(?m)^[ \t]*(query|mutation|subscription)\b""".r
+  // fragment definitions are skipped. We spell "start of a line" as `(?:^|\n)` rather than the
+  // `(?m)` flag because the latter is unsupported by Scala.js unless the linker targets ES2018+
+  // (and `model` cross-compiles to JS), whereas this form uses only ES5 regex features.
+  private val OperationType = """(?:^|\n)[ \t]*(query|mutation|subscription)\b""".r
 
   // The name of an explicitly named operation: the word right after the operation type keyword,
   // followed by variable definitions, a directive or the selection set.
