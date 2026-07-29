@@ -26,7 +26,7 @@ final case class GraphQLGenConfig(
   scalaJsReactReuse: Boolean = false,
   circeEncoder:      Boolean = true,
   circeDecoder:      Boolean = true,
-  descriptor:        Boolean = false
+  descriptor:        Boolean = true
 ) {
   // We memoize the [[Result]] of loading each schema. The Result carries everything: a failure
   // (missing or unparseable schema), warnings (a schema that parses with problems), or success.

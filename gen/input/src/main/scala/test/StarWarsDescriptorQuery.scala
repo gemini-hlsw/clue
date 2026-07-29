@@ -5,7 +5,8 @@
 /*
   rules = [GraphQLGen]
   Clue.schemaDirs = ["gen/input/src/main/resources/graphql/schemas"]
-  Clue.descriptor = true
+  // Opt-out fixture: the default is `true`
+  Clue.descriptor = false
  */
 package test
 
