@@ -24,7 +24,6 @@ import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.context.propagation.TextMapUpdater
 import org.typelevel.otel4s.semconv.attributes.HttpAttributes
 import org.typelevel.otel4s.semconv.experimental.attributes.GraphqlExperimentalAttributes
-import org.typelevel.otel4s.semconv.experimental.attributes.GraphqlExperimentalAttributes.GraphqlOperationTypeValue
 import org.typelevel.otel4s.trace.Span
 import org.typelevel.otel4s.trace.SpanBuilder
 import org.typelevel.otel4s.trace.SpanKind
@@ -32,13 +31,6 @@ import org.typelevel.otel4s.trace.StatusCode
 import org.typelevel.otel4s.trace.Tracer
 
 object Otel4sMiddleware:
-
-  private[otel4s] def extractOperation(query: String): Option[GraphqlOperationTypeValue] =
-    val trimmed = query.trim.toLowerCase
-    if trimmed.startsWith("query") then GraphqlOperationTypeValue.Query.some
-    else if trimmed.startsWith("mutation") then GraphqlOperationTypeValue.Mutation.some
-    else if trimmed.startsWith("subscription") then GraphqlOperationTypeValue.Subscription.some
-    else none
 
   private[otel4s] type SpanMod[F[_]] = SpanBuilder[F] => SpanBuilder[F]
 
@@ -96,8 +88,8 @@ object Otel4sMiddleware:
       GraphqlExperimentalAttributes.GraphqlDocument(document.value)
     )
 
-    val opType = extractOperation(document.value)
-      .map(t => GraphqlExperimentalAttributes.GraphqlOperationType(t.value))
+    val opType = document.operationType
+      .map(GraphqlExperimentalAttributes.GraphqlOperationType(_))
       .toList
 
     val opName = operationName

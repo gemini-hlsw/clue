@@ -3,6 +3,7 @@
 
 package clue.model
 
+import cats.syntax.option.*
 import munit.FunSuite
 
 final class GraphQLQuerySpec extends FunSuite:
@@ -63,5 +64,74 @@ final class GraphQLQuerySpec extends FunSuite:
 
   test("querySummary is robust to a name immediately followed by the selection set") {
     check("query Program{ program { id } }", "query-Program")
+  }
+
+  test("querySummary skips leading comments") {
+    check(
+      """
+        # Everything we need about a program.
+        query Program {
+          program(programId: "p-2") { id }
+        }
+      """,
+      "query-Program"
+    )
+  }
+
+  test("querySummary skips leading fragment definitions") {
+    check(
+      """
+        fragment programFields on Program {
+          id
+          name
+        }
+
+        query Program {
+          program(programId: "p-2") { ...programFields }
+        }
+      """,
+      "query-Program"
+    )
+  }
+
+  test("querySummary picks the operation's root field, not a leading fragment's") {
+    check(
+      """
+        fragment programFields on Program {
+          id
+        }
+
+        query {
+          program(programId: "p-2") { ...programFields }
+        }
+      """,
+      "query-program"
+    )
+  }
+
+  test("querySummary handles a directive between the name and the selection set") {
+    check("query Program @cached { program { id } }", "query-Program")
+  }
+
+  test("querySummary treats a bare selection set as an anonymous query") {
+    check("{ character { id } }", "query-character")
+  }
+
+  test("querySummary reports both parts as unknown when nothing parses") {
+    check("not a graphql document", "<queryType?>-<queryName?>")
+  }
+
+  test("operationType reports the keyword") {
+    assertEquals(GraphQLQuery("query Program { program }").operationType, "query".some)
+    assertEquals(GraphQLQuery("mutation AddFoo { addFoo }").operationType, "mutation".some)
+    assertEquals(GraphQLQuery("subscription Sub { x }").operationType, "subscription".some)
+  }
+
+  test("operationType defaults a bare selection set to query") {
+    assertEquals(GraphQLQuery("{ character { id } }").operationType, "query".some)
+  }
+
+  test("operationType is empty when no operation can be found") {
+    assertEquals(GraphQLQuery("not a graphql document").operationType, none)
   }
 end GraphQLQuerySpec
