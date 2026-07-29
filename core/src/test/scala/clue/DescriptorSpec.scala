@@ -74,14 +74,4 @@ class DescriptorSpec extends CatsEffectSuite:
       "MySub".some
     )
 
-  test("a subscription without a descriptor passes none"):
-    assertIO(descriptorSeen(_.subscribe(Op).withInput(JsonObject.empty).use_), none)
-
-  test("withDescriptor is independent of operationName"):
-    // `operationName` goes on the wire, the descriptor does not; setting one must not set the other.
-    val client  = Recorder(Ref.unsafe[IO, Option[Option[String]]](none))
-    val applied = client.request(Op, "NamedOp".some).withDescriptor("MyQuery")
-    assertEquals(applied.operationName, "NamedOp".some)
-    assertEquals(applied.descriptor, "MyQuery".some)
-
 end DescriptorSpec

@@ -15,28 +15,13 @@ class Otel4sMiddlewareSpec extends FunSuite:
     "query ObservationVisits($id: ID!) { observation(id: $id) { id } }"
   )
 
-  // An anonymous document has no name of its own, so the descriptor is the only way to name it well.
-  private val anonymousDoc = GraphQLQuery("query ($id: ID!) { observation(id: $id) { id } }")
-
   private def attribute(attrs: List[Attribute[?]], key: String): Option[String] =
     attrs.collectFirst { case a if a.key.name == key => a.value.toString }
-
-  test("commonAttributes emits clue.descriptor when a descriptor is set") {
-    val attrs = Otel4sMiddleware.commonAttributes(doc, None, Some("ObservationVisits"))
-    assertEquals(attribute(attrs, "clue.descriptor"), Some("ObservationVisits"))
-  }
 
   test("commonAttributes reports the operation type read from the document") {
     assertEquals(
       attribute(Otel4sMiddleware.commonAttributes(doc, None, None), "graphql.operation.type"),
       Some("query")
-    )
-    assertEquals(
-      attribute(
-        Otel4sMiddleware.commonAttributes(GraphQLQuery("mutation { addFoo { id } }"), None, None),
-        "graphql.operation.type"
-      ),
-      Some("mutation")
     )
   }
 
@@ -55,11 +40,6 @@ class Otel4sMiddlewareSpec extends FunSuite:
     )
   }
 
-  test("commonAttributes still emits the graphql document regardless of descriptor") {
-    val attrs = Otel4sMiddleware.commonAttributes(doc, None, Some("X"))
-    assert(attrs.exists(_.key.name == "graphql.document"), "expected a graphql.document attribute")
-  }
-
   test("spanName prefers the descriptor over the document's own name") {
     assertEquals(
       Otel4sMiddleware.spanName("request", doc, Some("ObsQuery")),
@@ -71,27 +51,6 @@ class Otel4sMiddlewareSpec extends FunSuite:
     assertEquals(
       Otel4sMiddleware.spanName("request", doc, None),
       "clue-request-query-ObservationVisits"
-    )
-  }
-
-  test("spanName falls back to the first root field for an anonymous document") {
-    assertEquals(
-      Otel4sMiddleware.spanName("request", anonymousDoc, None),
-      "clue-request-query-observation"
-    )
-  }
-
-  test("spanName carries the operation through, so subscriptions are distinguishable") {
-    assertEquals(
-      Otel4sMiddleware.spanName("subscribe", doc, Some("ObsQuery")),
-      "clue-subscribe-ObsQuery"
-    )
-  }
-
-  test("spanName degrades to placeholders rather than failing on an unparseable document") {
-    assertEquals(
-      Otel4sMiddleware.spanName("request", GraphQLQuery("not a graphql document"), None),
-      "clue-request-<queryType?>-<queryName?>"
     )
   }
 

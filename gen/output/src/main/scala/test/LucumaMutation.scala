@@ -46,9 +46,7 @@ object LucumaMutation extends GraphQLOperation[LucumaODB] {
   }
   val varEncoder: io.circe.Encoder.AsObject[Variables] = Variables.jsonEncoderVariables
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-  import clue.ClientAppliedF
-  import clue.FetchClientWithPars
-  def apply[F[_]]: ClientAppliedF[F, LucumaODB, ClientAppliedFP] = new ClientAppliedF[F, LucumaODB, ClientAppliedFP] { def applyP[P](client: FetchClientWithPars[F, P, LucumaODB]) = new ClientAppliedFP(client) }
-  class ClientAppliedFP[F[_], P](val client: FetchClientWithPars[F, P, LucumaODB]) { def execute(asterismId: AsterismId, modParams: P => P = identity) = client.request(LucumaMutation).withDescriptor("LucumaMutation").withInput(Variables(asterismId), modParams) }
+  def apply[F[_]]: clue.ClientAppliedF[F, LucumaODB, ClientAppliedFP] = new clue.ClientAppliedF[F, LucumaODB, ClientAppliedFP] { def applyP[P](client: clue.FetchClientWithPars[F, P, LucumaODB]) = new ClientAppliedFP(client) }
+  class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, LucumaODB]) { def execute(asterismId: AsterismId, modParams: P => P = identity) = client.request(LucumaMutation).withDescriptor("LucumaMutation").withInput(Variables(asterismId), modParams) }
 }
 // format: on

@@ -51,9 +51,7 @@ object StarWarsInclude extends GraphQLOperation[StarWars] {
   }
   val varEncoder: io.circe.Encoder.AsObject[Variables] = Variables.jsonEncoderVariables
   val dataDecoder: io.circe.Decoder[Data] = Data.jsonDecoderData
-  import clue.ClientAppliedF
-  import clue.FetchClientWithPars
-  def apply[F[_]]: ClientAppliedF[F, StarWars, ClientAppliedFP] = new ClientAppliedF[F, StarWars, ClientAppliedFP] { def applyP[P](client: FetchClientWithPars[F, P, StarWars]) = new ClientAppliedFP(client) }
-  class ClientAppliedFP[F[_], P](val client: FetchClientWithPars[F, P, StarWars]) { def query(humanId: String, skipId: Boolean, withName: Boolean, modParams: P => P = identity) = client.request(StarWarsInclude).withDescriptor("StarWarsInclude").withInput(Variables(humanId, skipId, withName), modParams) }
+  def apply[F[_]]: clue.ClientAppliedF[F, StarWars, ClientAppliedFP] = new clue.ClientAppliedF[F, StarWars, ClientAppliedFP] { def applyP[P](client: clue.FetchClientWithPars[F, P, StarWars]) = new ClientAppliedFP(client) }
+  class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, StarWars]) { def query(humanId: String, skipId: Boolean, withName: Boolean, modParams: P => P = identity) = client.request(StarWarsInclude).withDescriptor("StarWarsInclude").withInput(Variables(humanId, skipId, withName), modParams) }
 }
 // format: on

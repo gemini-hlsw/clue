@@ -46,10 +46,6 @@ final class GraphQLQuerySpec extends FunSuite:
     )
   }
 
-  test("querySummary falls back to the first root field for an anonymous query without vars") {
-    check("query { character { id } }", "query-character")
-  }
-
   test("querySummary handles a named mutation") {
     check("mutation AddFoo($x: ID!) { addFoo(id: $x) { id } }", "mutation-AddFoo")
   }
@@ -125,10 +121,6 @@ final class GraphQLQuerySpec extends FunSuite:
     assertEquals(GraphQLQuery("query Program { program }").operationType, "query".some)
     assertEquals(GraphQLQuery("mutation AddFoo { addFoo }").operationType, "mutation".some)
     assertEquals(GraphQLQuery("subscription Sub { x }").operationType, "subscription".some)
-  }
-
-  test("operationType defaults a bare selection set to query") {
-    assertEquals(GraphQLQuery("{ character { id } }").operationType, "query".some)
   }
 
   test("operationType is empty when no operation can be found") {

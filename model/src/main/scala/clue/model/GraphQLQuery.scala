@@ -10,22 +10,16 @@ opaque type GraphQLQuery = String
 object GraphQLQuery:
   def apply(query: String): GraphQLQuery = query
 
-  // The operation type keyword, matched at the start of a line so that leading comments and
-  // fragment definitions are skipped. We spell "start of a line" as `(?:^|\n)` rather than the
-  // `(?m)` flag because the latter is unsupported by Scala.js unless the linker targets ES2018+
-  // (and `model` cross-compiles to JS), whereas this form uses only ES5 regex features.
+  // Matched at a line start, so leading comments and fragment definitions are skipped. Spelled
+  // `(?:^|\n)` rather than `(?m)^`, which Scala.js rejects unless the linker targets ES2018+.
   private val OperationType = """(?:^|\n)[ \t]*(query|mutation|subscription)\b""".r
 
-  // The name of an explicitly named operation: the word right after the operation type keyword,
-  // followed by variable definitions, a directive or the selection set.
   private val NamedOperation = """^(?:query|mutation|subscription)\s+(\w+)(?=\s*[({@])""".r
 
-  // Fallback for anonymous operations: the first word after the first '{'.
   private val FirstField = """\{(?:.|\s)*?(\w+)""".r
 
-  // The operation type, paired with the document from the operation keyword onwards, so that
-  // anything preceding it (comments, fragment definitions) cannot be mistaken for the operation.
-  // A document that is a bare selection set is an anonymous query per the spec.
+  // Paired with the document from the keyword onwards, so nothing preceding it can be mistaken for
+  // the operation. A bare selection set is an anonymous query per the spec.
   private def operation(query: GraphQLQuery): Option[(String, String)] =
     OperationType
       .findFirstMatchIn(query)

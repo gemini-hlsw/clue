@@ -42,8 +42,7 @@ object Otel4sMiddleware:
   private def emptyAttrs[F[_]: Applicative]
     : (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]] = (_, _) => List.empty.pure
 
-  // Transport-specific attributes for the one-shot HTTP clients, supplied at construction rather
-  // than baked into `Otel4sFetchClient`. The streaming clients extend it but speak WebSocket, and
+  // Supplied only here: the streaming clients extend `Otel4sFetchClient` but speak WebSocket, and
   // must not describe their requests as HTTP.
   private val httpAttributes: List[Attribute[?]] =
     List(HttpAttributes.HttpRequestMethod("POST"))
@@ -87,13 +86,7 @@ object Otel4sMiddleware:
   ): PersistentStreamingClient[F, S, CP, CE] =
     apply(client, identityMod[F], emptyAttrs[F])
 
-  /**
-   * The span name: `clue-<operation>-<descriptor, else the document's own summary>`.
-   *
-   * The descriptor wins when present precisely because it is the one name the call site chose; the
-   * document summary (`<type>-<name>`) is the fallback, and it degrades to placeholders rather than
-   * failing when the document cannot be parsed.
-   */
+  /** The descriptor is the name the call site chose, so it wins over the document's own summary. */
   private[otel4s] def spanName(
     operation:  String,
     document:   GraphQLQuery,
@@ -138,9 +131,6 @@ object Otel4sMiddleware:
           ) *> span.setStatus(StatusCode.Error, "GraphQL request returned errors")
         .getOrElse(F.unit)
 
-  /**
-   * Inculde the requested query size as an attribute
-   */
   private[otel4s] def requestBodySize(
     document:      GraphQLQuery,
     operationName: Option[String],
@@ -153,9 +143,8 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
   wrapped:                                 FetchClientWithPars[F, P, S],
   spanMod:                                 Otel4sMiddleware.SpanMod[F],
   additionalAttributesF:                   (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]],
-  // Attributes describing the transport, added to the `request` span. Empty unless the
-  // construction site can vouch for one, so that a client speaking a protocol it doesn't know
-  // about stays silent rather than inheriting someone else's claim.
+  // Empty unless the construction site can vouch for a transport, so a client stays silent rather
+  // than inheriting someone else's claim.
   private[otel4s] val transportAttributes: List[Attribute[?]] = Nil
 ) extends FetchClientWithPars[F, P, S]:
   protected def traceSpan(
@@ -169,7 +158,6 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
       .addAttributes(Otel4sMiddleware.commonAttributes(document, operationName, descriptor)*)
   )
 
-  // Merge existing extensions with otel trace parent headers.
   protected def mergeOtelExtension(
     extensions:   Option[JsonObject],
     traceHeaders: Map[String, String]
