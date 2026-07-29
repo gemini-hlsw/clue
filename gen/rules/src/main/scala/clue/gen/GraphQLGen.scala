@@ -172,7 +172,7 @@ class GraphQLGen(val config: GraphQLGenConfig)
                               addData(schema, operation, config, document.subqueries, fragments),
                               addVarEncoder,
                               addDataDecoder,
-                              addConvenienceMethod(schemaType, operation, objName)
+                              addConvenienceMethod(schemaType, operation, objName, config)
                             )
                           )
 
@@ -275,7 +275,7 @@ class GraphQLGen(val config: GraphQLGenConfig)
                               schema.types.find(_.name == rootTypeName)
                             ),
                             addDataDecoder,
-                            addConvenienceMethod(schemaType, operation, objName)
+                            addConvenienceMethod(schemaType, operation, objName, config)
                           )
                         )
 

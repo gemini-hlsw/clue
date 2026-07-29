@@ -31,7 +31,8 @@ trait FetchClientWithPars[F[_], P, S] {
     operationName: Option[String] = none,
     variables:     Option[JsonObject] = none,
     extensions:    Option[JsonObject] = none,
-    modParams:     P => P = identity
+    modParams:     P => P = identity,
+    descriptor:    Option[String] = none
   ): F[GraphQLResponse[D]]
 }
 
@@ -44,8 +45,14 @@ case class RequestApplied[
 ] protected[clue] (
   client:        FetchClientWithPars[F, P, S],
   operation:     GraphQLOperation[S],
-  operationName: Option[String]
+  operationName: Option[String],
+  descriptor:    Option[String] = none
 ) {
+
+  /** Attaches a tracing-only display name (see `clue.descriptor`). Does not affect execution. */
+  def withDescriptor(descriptor: String): RequestApplied[F, P, S, V, D] =
+    copy(descriptor = descriptor.some)
+
   def withInput(variables: V): F[GraphQLResponse[D]] =
     withInput(variables, identity)
 
@@ -55,14 +62,29 @@ case class RequestApplied[
       operationName,
       variables.asJsonObject.some,
       none,
-      modParams
+      modParams,
+      descriptor
     )
 
   def withModParams(modParams: P => P): F[GraphQLResponse[D]] =
-    client.requestInternal(GraphQLQuery(operation.document), operationName, none, none, modParams)
+    client.requestInternal(
+      GraphQLQuery(operation.document),
+      operationName,
+      none,
+      none,
+      modParams,
+      descriptor
+    )
 
   def apply: F[GraphQLResponse[D]] =
-    client.requestInternal(GraphQLQuery(operation.document), operationName, none, none, identity)
+    client.requestInternal(
+      GraphQLQuery(operation.document),
+      operationName,
+      none,
+      none,
+      identity,
+      descriptor
+    )
 }
 
 object RequestApplied {
@@ -94,7 +116,8 @@ trait StreamingClient[F[_], S] extends FetchClientWithPars[F, Unit, S] {
     document:      GraphQLQuery,
     operationName: Option[String] = none,
     variables:     Option[JsonObject] = none,
-    extensions:    Option[JsonObject] = none
+    extensions:    Option[JsonObject] = none,
+    descriptor:    Option[String] = none
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]]
 }
 
@@ -106,18 +129,31 @@ case class SubscriptionApplied[
 ] protected[clue] (
   client:        StreamingClient[F, S],
   subscription:  GraphQLOperation[S],
-  operationName: Option[String] = none
+  operationName: Option[String] = none,
+  descriptor:    Option[String] = none
 ) {
+
+  /** Attaches a tracing-only display name (see `clue.descriptor`). Does not affect execution. */
+  def withDescriptor(descriptor: String): SubscriptionApplied[F, S, V, D] =
+    copy(descriptor = descriptor.some)
+
   def withInput(variables: V): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     client.subscribeInternal(
       GraphQLQuery(subscription.document),
       operationName,
       variables.asJsonObject.some,
-      none
+      none,
+      descriptor
     )
 
   def apply: Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
-    client.subscribeInternal(GraphQLQuery(subscription.document), operationName, none, none)
+    client.subscribeInternal(
+      GraphQLQuery(subscription.document),
+      operationName,
+      none,
+      none,
+      descriptor
+    )
 }
 
 object SubscriptionApplied {

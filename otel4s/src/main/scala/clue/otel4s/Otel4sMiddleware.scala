@@ -15,16 +15,18 @@ import clue.PersistentStreamingClient
 import clue.StreamingClient
 import clue.TraceHeaderInjector
 import clue.model.GraphQLQuery
+import clue.model.GraphQLRequest
 import clue.model.GraphQLResponse
+import clue.model.json.given
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.JsonObject
+import io.circe.syntax.*
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.context.propagation.TextMapUpdater
 import org.typelevel.otel4s.semconv.attributes.HttpAttributes
 import org.typelevel.otel4s.semconv.experimental.attributes.GraphqlExperimentalAttributes
-import org.typelevel.otel4s.semconv.experimental.attributes.GraphqlExperimentalAttributes.GraphqlOperationTypeValue
 import org.typelevel.otel4s.trace.Span
 import org.typelevel.otel4s.trace.SpanBuilder
 import org.typelevel.otel4s.trace.SpanKind
@@ -33,13 +35,6 @@ import org.typelevel.otel4s.trace.Tracer
 
 object Otel4sMiddleware:
 
-  private[otel4s] def extractOperation(query: String): Option[GraphqlOperationTypeValue] =
-    val trimmed = query.trim.toLowerCase
-    if trimmed.startsWith("query") then GraphqlOperationTypeValue.Query.some
-    else if trimmed.startsWith("mutation") then GraphqlOperationTypeValue.Mutation.some
-    else if trimmed.startsWith("subscription") then GraphqlOperationTypeValue.Subscription.some
-    else none
-
   private[otel4s] type SpanMod[F[_]] = SpanBuilder[F] => SpanBuilder[F]
 
   private def identityMod[F[_]]: SpanMod[F] = identity
@@ -47,13 +42,18 @@ object Otel4sMiddleware:
   private def emptyAttrs[F[_]: Applicative]
     : (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]] = (_, _) => List.empty.pure
 
+  // Supplied only here: the streaming clients extend `Otel4sFetchClient` but speak WebSocket, and
+  // must not describe their requests as HTTP.
+  private val httpAttributes: List[Attribute[?]] =
+    List(HttpAttributes.HttpRequestMethod("POST"))
+
   // Fetch client
   def apply[F[_]: Tracer: MonadCancelThrow, P: TraceHeaderInjector, S](
     client:                FetchClientWithPars[F, P, S],
     spanMod:               SpanMod[F],
     additionalAttributesF: (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]]
   ): FetchClientWithPars[F, P, S] =
-    Otel4sFetchClient[F, P, S](client, spanMod, additionalAttributesF)
+    Otel4sFetchClient[F, P, S](client, spanMod, additionalAttributesF, httpAttributes)
 
   def apply[F[_]: Tracer: MonadCancelThrow, P: TraceHeaderInjector, S](
     client: FetchClientWithPars[F, P, S]
@@ -86,24 +86,35 @@ object Otel4sMiddleware:
   ): PersistentStreamingClient[F, S, CP, CE] =
     apply(client, identityMod[F], emptyAttrs[F])
 
+  /** The descriptor is the name the call site chose, so it wins over the document's own summary. */
+  private[otel4s] def spanName(
+    operation:  String,
+    document:   GraphQLQuery,
+    descriptor: Option[String]
+  ): String =
+    s"clue-$operation-${descriptor.getOrElse(document.querySummary)}"
+
   private[otel4s] def commonAttributes(
     document:      GraphQLQuery,
-    operationName: Option[String]
+    operationName: Option[String],
+    descriptor:    Option[String]
   ): List[Attribute[?]] =
     val base = List(
       Attribute("clue.version", BuildInfo.version),
       GraphqlExperimentalAttributes.GraphqlDocument(document.value)
     )
 
-    val opType = extractOperation(document.value)
-      .map(t => GraphqlExperimentalAttributes.GraphqlOperationType(t.value))
+    val opType = document.operationType
+      .map(GraphqlExperimentalAttributes.GraphqlOperationType(_))
       .toList
 
     val opName = operationName
       .map(n => GraphqlExperimentalAttributes.GraphqlOperationName(n))
       .toList
 
-    base ++ opType ++ opName
+    val descr = descriptor.map(d => Attribute("clue.descriptor", d)).toList
+
+    base ++ opType ++ opName ++ descr
 
   private[otel4s] def responseAttributes[F[_]: Applicative as F, D](
     span:   Span[F],
@@ -120,22 +131,33 @@ object Otel4sMiddleware:
           ) *> span.setStatus(StatusCode.Error, "GraphQL request returned errors")
         .getOrElse(F.unit)
 
+  private[otel4s] def requestBodySize(
+    document:      GraphQLQuery,
+    operationName: Option[String],
+    variables:     Option[JsonObject],
+    extensions:    Option[JsonObject]
+  ): Long =
+    GraphQLRequest(document, operationName, variables, extensions).asJson.noSpaces.length.toLong
+
 class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInjector, S](
-  wrapped:               FetchClientWithPars[F, P, S],
-  spanMod:               Otel4sMiddleware.SpanMod[F],
-  additionalAttributesF: (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]]
+  wrapped:                                 FetchClientWithPars[F, P, S],
+  spanMod:                                 Otel4sMiddleware.SpanMod[F],
+  additionalAttributesF:                   (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]],
+  // Empty unless the construction site can vouch for a transport, so a client stays silent rather
+  // than inheriting someone else's claim.
+  private[otel4s] val transportAttributes: List[Attribute[?]] = Nil
 ) extends FetchClientWithPars[F, P, S]:
   protected def traceSpan(
     operation:     String,
     document:      GraphQLQuery,
-    operationName: Option[String]
+    operationName: Option[String],
+    descriptor:    Option[String]
   ) = spanMod(
-    T.spanBuilder(s"clue-$operation-${document.querySummary}")
+    T.spanBuilder(Otel4sMiddleware.spanName(operation, document, descriptor))
       .withSpanKind(SpanKind.Client)
-      .addAttributes(Otel4sMiddleware.commonAttributes(document, operationName)*)
+      .addAttributes(Otel4sMiddleware.commonAttributes(document, operationName, descriptor)*)
   )
 
-  // Merge existing extensions with otel trace parent headers.
   protected def mergeOtelExtension(
     extensions:   Option[JsonObject],
     traceHeaders: Map[String, String]
@@ -148,11 +170,12 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
     operationName: Option[String],
     variables:     Option[JsonObject],
     extensions:    Option[JsonObject],
-    modParams:     P => P
+    modParams:     P => P,
+    descriptor:    Option[String]
   ): F[GraphQLResponse[D]] =
     MonadCancelThrow[F].uncancelable: poll =>
-      traceSpan("request", document, operationName)
-        .addAttribute(HttpAttributes.HttpRequestMethod("POST"))
+      traceSpan("request", document, operationName, descriptor)
+        .addAttributes(transportAttributes*)
         .build
         .use: span =>
           for
@@ -160,12 +183,26 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
             _            <- span.addAttributes(additional*)
             traceHeaders <- T.propagate(Map.empty)
             mergedExt     = mergeOtelExtension(extensions, traceHeaders)
+            // Measure the payload after trace headers are merged in
+            _            <- span.addAttribute(
+                              Attribute(
+                                "clue.request.body.size",
+                                Otel4sMiddleware.requestBodySize(document, operationName, variables, mergedExt)
+                              )
+                            )
             modWithTrace  =
               modParams.andThen(p => TraceHeaderInjector[P].addHeaders(p, traceHeaders))
             result       <-
               poll(
                 wrapped
-                  .requestInternal[D](document, operationName, variables, mergedExt, modWithTrace)
+                  .requestInternal[D](
+                    document,
+                    operationName,
+                    variables,
+                    mergedExt,
+                    modWithTrace,
+                    descriptor
+                  )
               )
             _            <- Otel4sMiddleware.responseAttributes(span, result)
           yield result
@@ -178,19 +215,33 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
     with StreamingClient[F, S]:
   protected[clue] def subscribeInternal[D: Decoder](
     document:      GraphQLQuery,
-    operationName: Option[String] = none,
-    variables:     Option[JsonObject] = none,
-    extensions:    Option[JsonObject] = none
+    operationName: Option[String],
+    variables:     Option[JsonObject],
+    extensions:    Option[JsonObject],
+    descriptor:    Option[String]
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     for
-      res          <- traceSpan("subscribe", document, operationName).build.resource
+      res          <- traceSpan("subscribe", document, operationName, descriptor).build.resource
       span          = res.span
       _            <- Resource.eval:
                         additionalAttributesF(document, variables).flatMap: attrs =>
                           span.addAttributes(attrs*)
       traceHeaders <- Resource.eval(T.propagate(Map.empty))
       mergedExt     = mergeOtelExtension(extensions, traceHeaders)
-      stream       <- wrapped.subscribeInternal[D](document, operationName, variables, mergedExt)
+      _            <- Resource.eval:
+                        span.addAttribute(
+                          Attribute(
+                            "clue.request.body.size",
+                            Otel4sMiddleware.requestBodySize(document, operationName, variables, mergedExt)
+                          )
+                        )
+      stream       <- wrapped.subscribeInternal[D](
+                        document,
+                        operationName,
+                        variables,
+                        mergedExt,
+                        descriptor
+                      )
     yield stream.onFinalizeCase: exitCase =>
       span.addAttribute(Attribute("clue.exitCase", exitCase.toOutcome.toString)) *>
         (exitCase match

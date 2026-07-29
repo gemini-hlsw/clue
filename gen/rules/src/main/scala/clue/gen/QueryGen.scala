@@ -772,7 +772,8 @@ trait QueryGen extends Generator {
   protected def addConvenienceMethod(
     schemaType: Type,
     operation:  UntypedOperation,
-    objName:    String
+    objName:    String,
+    config:     GraphQLGenConfig
   ): List[Stat] => List[Stat] =
     parentBody =>
       parentBody
@@ -805,6 +806,19 @@ trait QueryGen extends Generator {
                   new clue.ClientAppliedF[F, $schemaType, ClientAppliedFP] {
                     def applyP[P](client: clue.FetchClientWithPars[F, P, $schemaType]) = new ClientAppliedFP(client)
                   }"""
+          // When descriptor generation is enabled, tag the request/subscription with the
+          // object name so otel4s can name the span `clue-<op>-<ObjectName>`.
+          val objTerm        = Term.Name(objName)
+          val afterRequest   =
+            if (config.descriptor)
+              q"client.request($objTerm).withDescriptor(${Lit.String(objName)})"
+            else
+              q"client.request($objTerm)"
+          val afterSubscribe =
+            if (config.descriptor)
+              q"client.subscribe(this).withDescriptor(${Lit.String(objName)})"
+            else
+              q"client.subscribe(this)"
           parentBody ++
             (operation match {
               case _: UntypedQuery =>
@@ -812,8 +826,7 @@ trait QueryGen extends Generator {
                   applied,
                   q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
                       def query(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail}) =
-                        client.request(${Term
-                      .Name(objName)}).withInput(Variables(...$variablesNames), modParams)
+                        $afterRequest.withInput(Variables(...$variablesNames), modParams)
                     }
                   """
                 )
@@ -823,8 +836,7 @@ trait QueryGen extends Generator {
                   applied,
                   q"""class ClientAppliedFP[F[_], P](val client: clue.FetchClientWithPars[F, P, $schemaType]) {
                       def execute(...${(paramss.head :+ param"modParams: P => P = identity") +: paramss.tail}) =
-                        client.request(${Term
-                      .Name(objName)}).withInput(Variables(...$variablesNames), modParams)
+                        $afterRequest.withInput(Variables(...$variablesNames), modParams)
                     }
                   """
                 )
@@ -837,7 +849,7 @@ trait QueryGen extends Generator {
                   default = none
                 )
                 List(
-                  q"def subscribe[F[_]](...${paramss :+ List(clientParam)}) = client.subscribe(this).withInput(Variables(...$variablesNames))"
+                  q"def subscribe[F[_]](...${paramss :+ List(clientParam)}) = $afterSubscribe.withInput(Variables(...$variablesNames))"
                 )
             })
         }
