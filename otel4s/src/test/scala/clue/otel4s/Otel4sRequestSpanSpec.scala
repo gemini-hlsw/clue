@@ -20,8 +20,8 @@ import org.typelevel.otel4s.trace.Tracer
  *
  * `Otel4sStreamingClient extends Otel4sFetchClient`, so it used to inherit `requestInternal`
  * wholesale — including the hardcoded `http.request.method: POST` attribute. That mislabelled
- * queries/mutations sent as WebSocket `Subscribe` frames as HTTP POST. These tests pin the fix:
- * the HTTP client reports the method, the streaming client does not.
+ * queries/mutations sent as WebSocket `Subscribe` frames as HTTP POST. These tests pin the fix: the
+ * HTTP client reports the method, the streaming client does not.
  *
  * Only the pure attribute lists are inspected, so a noop tracer suffices and no request is ever
  * actually run (the wrapped clients' methods are never called).
@@ -56,7 +56,7 @@ class Otel4sRequestSpanSpec extends FunSuite:
         extensions:    Option[JsonObject],
         modParams:     Unit => Unit,
         descriptor:    Option[String]
-      ): IO[GraphQLResponse[D]] =
+      ): IO[GraphQLResponse[D]]                       =
         IO.never
       protected[clue] def subscribeInternal[D: Decoder](
         document:      GraphQLQuery,
