@@ -219,7 +219,7 @@ lazy val sbtPlugin =
       scalacOptions      := Nil,
       addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % V.scalafixVersion),
       addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
-      addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.3.2"),
+      addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.4.0"),
       buildInfoPackage   := "clue.sbt",
       buildInfoKeys      := Seq[BuildInfoKey](
         version,
