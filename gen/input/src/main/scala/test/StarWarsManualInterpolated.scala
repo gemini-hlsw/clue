@@ -9,12 +9,13 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 
 // A hand-written operation composing a subquery via interpolation. This is valid:
 // `friends` is selected with the spliced subquery. Validation must NOT report an
 // error here (the spliced subquery is validated where it's defined).
 trait StarWarsManualInterpolated extends GraphQLOperation[StarWars] {
-  override val document: String =
-    s"query { hero(episode: NEWHOPE) { id friends $StarWarsSubquery } }"
+  override val document =
+    gql"query { hero(episode: NEWHOPE) { id friends $StarWarsSubquery } }"
 }
 // format: on

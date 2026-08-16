@@ -58,7 +58,7 @@ case class RequestApplied[
 
   def withInput(variables: V, modParams: P => P): F[GraphQLResponse[D]] =
     client.requestInternal(
-      GraphQLQuery(operation.document),
+      GraphQLQuery(operation.document.value),
       operationName,
       variables.asJsonObject.some,
       none,
@@ -68,7 +68,7 @@ case class RequestApplied[
 
   def withModParams(modParams: P => P): F[GraphQLResponse[D]] =
     client.requestInternal(
-      GraphQLQuery(operation.document),
+      GraphQLQuery(operation.document.value),
       operationName,
       none,
       none,
@@ -78,7 +78,7 @@ case class RequestApplied[
 
   def apply: F[GraphQLResponse[D]] =
     client.requestInternal(
-      GraphQLQuery(operation.document),
+      GraphQLQuery(operation.document.value),
       operationName,
       none,
       none,
@@ -139,7 +139,7 @@ case class SubscriptionApplied[
 
   def withInput(variables: V): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     client.subscribeInternal(
-      GraphQLQuery(subscription.document),
+      GraphQLQuery(subscription.document.value),
       operationName,
       variables.asJsonObject.some,
       none,
@@ -148,7 +148,7 @@ case class SubscriptionApplied[
 
   def apply: Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     client.subscribeInternal(
-      GraphQLQuery(subscription.document),
+      GraphQLQuery(subscription.document.value),
       operationName,
       none,
       none,

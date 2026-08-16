@@ -9,11 +9,12 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 import clue.annotation.GraphQL
 
 @GraphQL
 trait LucumaQuery3 extends GraphQLOperation[LucumaODB] {
-  val document = """
+  val document = gql"""
       query {
         observations(programId: "p-2", first: 2147483647) {
           nodes {

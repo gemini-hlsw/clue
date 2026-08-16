@@ -13,6 +13,7 @@ import cats.effect.std.SecureRandom
 import cats.syntax.all.*
 import clue.FetchClient
 import clue.GraphQLOperation
+import clue.gql
 import clue.http4s.Http4sWebSocketBackend
 import clue.http4s.Http4sWebSocketClient
 import clue.websocket.WebSocketClient
@@ -32,41 +33,41 @@ object Demo extends IOApp.Simple {
   type DemoDB
 
   object Query extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
-    override val document: String = """
-      |query {
-      |  observations(WHERE: {program: {id: {EQ: "p-2"}}}) {
-      |    matches {
-      |      id
-      |      title
-      |      subtitle
-      |    }
-      |  }
-      |}""".stripMargin
+    override val document = gql"""
+      query {
+        observations(WHERE: {program: {id: {EQ: "p-2"}}}) {
+          matches {
+            id
+            title
+            subtitle
+          }
+        }
+      }"""
   }
 
   object Subscription extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
-    override val document: String = """
-      |subscription {
-      |  observationEdit(input: {programId: "p-2"}) {
-      |    value {
-      |      id
-      |    }
-      |  }
-      |}""".stripMargin
+    override val document = gql"""
+      subscription {
+        observationEdit(input: {programId: "p-2"}) {
+          value {
+            id
+          }
+        }
+      }"""
   }
 
   object Mutation extends GraphQLOperation[DemoDB] {
     type Data = Json
     case class Variables(observationId: String, subtitle: String)
 
-    override val document: String                        = """
-    |mutation ($observationId: ObservationId!, $subtitle: String){
-    |  updateObservations(input: {WHERE: {id: {EQ: $observationId}}, SET: {subtitle: $subtitle}}) {
-    |    observations {
-    |      id
-    |    }
-    |  }
-    |}""".stripMargin
+    override val document                                = gql"""
+      mutation ($$observationId: ObservationId!, $$subtitle: String){
+        updateObservations(input: {WHERE: {id: {EQ: $$observationId}}, SET: {subtitle: $$subtitle}}) {
+          observations {
+            id
+          }
+        }
+      }"""
     override val varEncoder: Encoder.AsObject[Variables] = deriveEncoder
 
     override val dataDecoder: Decoder[Data] = Decoder[Json]

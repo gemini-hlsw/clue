@@ -60,7 +60,7 @@ Either:
 They must extend `GraphQLOperation[S]`, defining the following members:
 
 ``` scala
-  val document: String
+  val document: GraphQLDocument   // built with the `gql` interpolator (see below)
 
   type Variables
   type Data
@@ -69,6 +69,12 @@ They must extend `GraphQLOperation[S]`, defining the following members:
   val dataDecoder: io.circe.Decoder[Data]
 ```
 
+The `document` is built with the `gql` string interpolator (`import clue.gql`) rather than a plain
+`String`/`s"..."`. `gql` produces the same text at runtime, but its type (`GraphQLDocument`) can only
+be obtained through `gql`, so every operation goes through the compile-time check that splices its
+subqueries correctly (see [Subquery variables](#subquery-variables) below). For a document built by
+other means, `GraphQLDocument.unsafeFromString(...)` is the explicit (check-skipping) escape hatch.
+
 #### Example
 
 ``` scala
@@ -76,9 +82,9 @@ They must extend `GraphQLOperation[S]`, defining the following members:
   import io.circe.generic.semiauto._
 
   object CharacterQuery extends GraphQLOperation[StarWars] {
-    val document = """
-        query (charId: ID!) {
-          character(id: $charId) {
+    val document = gql"""
+        query ($$charId: ID!) {
+          character(id: $$charId) {
             id
             name
           }

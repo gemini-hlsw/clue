@@ -9,12 +9,13 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 
 // A hand-written operation with a query parameter AND a spliced subquery. The `$$`
 // escapes the GraphQL variable (so it survives interpolation), while `$StarWarsSubquery`
 // is a real splice. This must validate with NO diagnostic.
 trait StarWarsManualParamInterpolated extends GraphQLOperation[StarWars] {
-  override val document: String =
-    s"query ($$charId: ID!) { character(id: $$charId) { id friends $StarWarsSubquery } }"
+  override val document =
+    gql"query ($$charId: ID!) { character(id: $$charId) { id friends $StarWarsSubquery } }"
 }
 // format: on

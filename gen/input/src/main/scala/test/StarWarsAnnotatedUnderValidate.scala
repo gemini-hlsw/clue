@@ -9,6 +9,7 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 import clue.annotation.GraphQL
 
 // Under `GraphQLValidate` (validation only, as used by `clueCheck`), an `@GraphQL` annotation is
@@ -16,6 +17,6 @@ import clue.annotation.GraphQL
 // a warning (it never generates here).
 @GraphQL // assert: GraphQLValidate
 trait StarWarsAnnotatedUnderValidate extends GraphQLOperation[StarWars] {
-  override val document: String = "query { hero(episode: NEWHOPE) { id } }"
+  override val document = gql"query { hero(episode: NEWHOPE) { id } }"
 }
 // format: on

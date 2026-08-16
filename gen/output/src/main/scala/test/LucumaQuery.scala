@@ -6,6 +6,7 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 
 
 object LucumaQuery extends GraphQLOperation[LucumaODB] {
@@ -15,7 +16,7 @@ object LucumaQuery extends GraphQLOperation[LucumaODB] {
   ignoreUnusedImportEnums()
   import LucumaODB.Types._
   ignoreUnusedImportTypes()
-  val document = """
+  val document = gql"""
       query Program {
         program(programId: "p-2") {
           id

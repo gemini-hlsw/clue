@@ -11,16 +11,22 @@ object InterpolatorTestSub extends GraphQLSubquery.Typed[Unit, Json] {
   override val subquery: String = "{ hero(episode: $ep) { name } }"
 }
 
+// Declares a NULLABLE variable, to exercise the "usable as" relaxation.
+object InterpolatorTestSubNullable extends GraphQLSubquery.Typed[Unit, Json] {
+  type Variables = "($ep: Episode)"
+  override val subquery: String = "{ heroOpt(episode: $ep) { name } }"
+}
+
 class GraphQLInterpolatorSuite extends munit.FunSuite {
 
   test("gql assembles the document like s-interpolation") {
     val doc = gql"query ($$ep: Episode!) $InterpolatorTestSub"
-    assertEquals(doc, "query ($ep: Episode!) { hero(episode: $ep) { name } }")
+    assertEquals(doc.value, "query ($ep: Episode!) { hero(episode: $ep) { name } }")
   }
 
   test("gql passes through a spliced value that declares no variables") {
     val doc = gql"query { hero } trailing ${1}"
-    assertEquals(doc, "query { hero } trailing 1")
+    assertEquals(doc.value, "query { hero } trailing 1")
   }
 
   test("a required variable the operation does not declare is a compile error") {
@@ -34,10 +40,8 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
   }
 
   test("a non-null operation variable satisfies a nullable requirement") {
-    // Sanity for the "usable as" rule: Episode! is usable where Episode is required.
-    assertEquals(usableProbe, "query ($ep: Episode!) { hero(episode: $ep) { name } }")
+    // "usable as": a non-null Episode! is usable where the subquery only needs a nullable Episode.
+    val doc = gql"query ($$ep: Episode!) $InterpolatorTestSubNullable"
+    assertEquals(doc.value, "query ($ep: Episode!) { heroOpt(episode: $ep) { name } }")
   }
-
-  private val usableProbe: String =
-    gql"query ($$ep: Episode!) $InterpolatorTestSub"
 }

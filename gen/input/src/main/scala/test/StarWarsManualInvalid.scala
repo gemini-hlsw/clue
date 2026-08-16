@@ -9,12 +9,13 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 
 // A hand-written operation: the code generator is NOT used here (no @GraphQL
 // annotation), but the document must still be validated against the schema.
 // The query references `invalidField`, which does not exist on the `Query`
 // type, so the validation pass must report a diagnostic.
 trait StarWarsManualInvalid extends GraphQLOperation[StarWars] {
-  override val document: String = "query { invalidField }" // assert: GraphQLGen
+  override val document = gql"query { invalidField }" // assert: GraphQLGen
 }
 // format: on

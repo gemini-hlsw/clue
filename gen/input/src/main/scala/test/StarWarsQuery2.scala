@@ -10,13 +10,14 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 import clue.annotation.GraphQL
 // gql: import japgolly.scalajs.react.Dummy._
 
 object Wrapper /* gql: extends Something */ {
   @GraphQL // assert: GraphQLGen
   trait StarWarsQuery2 extends GraphQLOperation[StarWars] {
-  override val document: String = """
+  override val document = gql"""
         fragment fields on Character {
           id
           name
@@ -30,8 +31,8 @@ object Wrapper /* gql: extends Something */ {
             primaryFunction
           }
         }
-        query ($charId: ID!) {
-          character(id: $charId) {
+        query ($$charId: ID!) {
+          character(id: $$charId) {
             ...fields
           }
         }

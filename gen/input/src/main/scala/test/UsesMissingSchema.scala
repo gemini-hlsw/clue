@@ -9,6 +9,7 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 import clue.annotation.GraphQL
 
 // A schema type with no corresponding `<name>.graphql` in `schemaDirs`. Loading it fails; that is
@@ -18,6 +19,6 @@ trait NoSuchSchema
 
 @GraphQL // assert: GraphQLGen
 trait UsesMissingSchema extends GraphQLOperation[NoSuchSchema] {
-  override val document: String = "query { whatever }"
+  override val document = gql"query { whatever }"
 }
 // format: on

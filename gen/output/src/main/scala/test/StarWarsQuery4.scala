@@ -6,6 +6,7 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 
 
 object StarWarsQuery4 extends GraphQLOperation[StarWars] {
@@ -15,7 +16,7 @@ object StarWarsQuery4 extends GraphQLOperation[StarWars] {
   ignoreUnusedImportEnums()
   import StarWars.Types._
   ignoreUnusedImportTypes()
-  override val document: String = s"""
+  override val document = gql"""
         query ($$charId: ID!) {
           character(id: $$charId) $StarWarsNestedSubquery
         }

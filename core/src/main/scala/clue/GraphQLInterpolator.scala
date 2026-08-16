@@ -5,20 +5,36 @@ package clue
 
 import scala.quoted.*
 
-extension (inline sc: StringContext)
+/**
+ * An assembled GraphQL operation document. The only way to obtain one is the `gql` interpolator, so
+ * an operation's `document` is always run through the compile-time caller-check — a plain `String`
+ * or `s"..."` does not type-check as a `GraphQLDocument`. Read the underlying string with `.value`.
+ */
+opaque type GraphQLDocument = String
+object GraphQLDocument {
+  // `gql"..."` is the validated way to build a document — a plain `String`/`s"..."` won't type-check
+  // as a `GraphQLDocument`. `unsafeFromString` is the explicit escape hatch for documents built by
+  // other means; it skips the caller-check, so prefer `gql`.
+  def unsafeFromString(value: String): GraphQLDocument           = value
+  extension (document:        GraphQLDocument) def value: String = document
+}
+
+extension (inline sc:         StringContext)
   /**
-   * Builds a GraphQL operation `document`, splicing subqueries inline. At runtime it produces exactly
-   * the string the standard `s"..."` interpolator would. At compile time it runs the *caller-check*:
-   * for every spliced value that declares variables (a `GraphQLSubquery` with a `type Variables`
-   * member), it verifies the operation's `query (...)` header declares each required variable with a
-   * compatible ("usable as") type — reading the requirement straight from the subquery's type, so it
-   * works even when the subquery is shipped in a dependency jar.
+   * Builds a GraphQL operation `document`, splicing subqueries inline. At runtime it produces
+   * exactly the string the standard `s"..."` interpolator would. At compile time it runs the
+   * *caller-check*: for every spliced value that declares variables (a `GraphQLSubquery` with a
+   * `type Variables` member), it verifies the operation's `query (...)` header declares each
+   * required variable with a compatible ("usable as") type — reading the requirement straight from
+   * the subquery's type, so it works even when the subquery is shipped in a dependency jar.
    */
-  inline def gql(inline args: Any*): String = ${ GraphQLInterpolator.gqlImpl('sc, 'args) }
+  inline def gql(inline args: Any*): GraphQLDocument = ${ GraphQLInterpolator.gqlImpl('sc, 'args) }
 
 private[clue] object GraphQLInterpolator {
 
-  def gqlImpl(scExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(using Quotes): Expr[String] = {
+  def gqlImpl(scExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(using
+    Quotes
+  ): Expr[GraphQLDocument] = {
     import quotes.reflect.*
 
     val parts: List[String] = scExpr match {
@@ -129,7 +145,7 @@ private[clue] object GraphQLInterpolator {
       }
     }
 
-    // Runtime string: identical to `s"..."`.
-    '{ $scExpr.s(${ Varargs(argExprs) }*) }
+    // Runtime string, identical to `s"..."`, wrapped as a GraphQLDocument.
+    '{ GraphQLDocument.unsafeFromString($scExpr.s(${ Varargs(argExprs) }*)) }
   }
 }

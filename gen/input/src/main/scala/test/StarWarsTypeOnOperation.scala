@@ -9,12 +9,13 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 import clue.annotation.GraphQLType
 
 // `@GraphQLType` declares a subquery's root type; it is meaningless on a `GraphQLOperation` and must
 // be reported as an error.
 @GraphQLType("Query") // assert: GraphQLGen
 abstract class StarWarsTypeOnOperation extends GraphQLOperation[StarWars] {
-  override val document: String = "query { hero(episode: NEWHOPE) { id } }"
+  override val document = gql"query { hero(episode: NEWHOPE) { id } }"
 }
 // format: on

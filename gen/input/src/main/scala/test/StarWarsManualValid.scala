@@ -9,11 +9,12 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 
 // A hand-written operation (no @GraphQL annotation) with a valid document.
 // The validation pass must NOT report any diagnostic; an unexpected diagnostic
 // would fail this testkit case.
 trait StarWarsManualValid extends GraphQLOperation[StarWars] {
-  override val document: String = "query { hero(episode: NEWHOPE) { id name } }"
+  override val document = gql"query { hero(episode: NEWHOPE) { id name } }"
 }
 // format: on

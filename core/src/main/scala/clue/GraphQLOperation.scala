@@ -10,7 +10,7 @@ import io.circe.Encoder
  * A query, mutation or subscription must extend this trait.
  */
 trait GraphQLOperation[S] {
-  val document: String
+  val document: GraphQLDocument
   type Variables
   type Data
 

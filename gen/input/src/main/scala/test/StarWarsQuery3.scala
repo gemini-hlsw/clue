@@ -9,11 +9,12 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 import clue.annotation.GraphQL
 
 @GraphQL // assert: GraphQLGen
 trait StarWarsQuery3 extends GraphQLOperation[StarWars] {
-  override val document: String = s"""
+  override val document = gql"""
         query ($$charId: ID!) {
           character(id: $$charId) {
             id

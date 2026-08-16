@@ -134,7 +134,7 @@ class GraphQLGen(val config: GraphQLGenConfig)
                   case None           =>
                     IO.pure(
                       errorDiagnostic(
-                        "The GraphQLOperation must define a 'val document: String' with a literal value.",
+                        "The GraphQLOperation must define a 'val document' with a literal or `gql\"...\"` value.",
                         obj.pos
                       )
                     )
