@@ -22,7 +22,7 @@ import munit.CatsEffectSuite
 class DescriptorSpec extends CatsEffectSuite:
 
   private object Op extends GraphQLOperation.Typed[Unit, JsonObject, Json]:
-    val document = "query NamedOp { field }"
+    val document = gql"query NamedOp { field }"
 
   // A client that records the `descriptor` it was handed and answers with an empty response.
   private class Recorder(ref: Ref[IO, Option[Option[String]]]) extends StreamingClient[IO, Unit]:
