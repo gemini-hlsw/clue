@@ -10,14 +10,16 @@
  */
 package test
 
+import clue.GraphQLDocument
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
+import clue.gql
 
 @GraphQL
 trait StarWarsDescriptorQuery extends GraphQLOperation[StarWars] {
-  override val document: String = """
-        query ($charId: ID!) {
-          character(id: $charId) {
+  override val document: GraphQLDocument = gql"""
+        query ($$charId: ID!) {
+          character(id: $$charId) {
             id
             name
           }

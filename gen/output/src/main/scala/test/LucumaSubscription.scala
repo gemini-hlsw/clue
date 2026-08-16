@@ -6,6 +6,7 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 
 
 object LucumaSubscription extends GraphQLOperation[LucumaODB] {
@@ -15,9 +16,9 @@ object LucumaSubscription extends GraphQLOperation[LucumaODB] {
   ignoreUnusedImportEnums()
   import LucumaODB.Types._
   ignoreUnusedImportTypes()
-  val document = """
-      subscription AsterismEdit($programId: ProgramId) {
-        asterismEdit(programId: $programId) {
+  val document = gql"""
+      subscription AsterismEdit($$programId: ProgramId) {
+        asterismEdit(programId: $$programId) {
           editType
           value {
             id

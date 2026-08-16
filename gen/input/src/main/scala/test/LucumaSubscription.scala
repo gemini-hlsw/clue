@@ -10,12 +10,13 @@ package test
 
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
+import clue.gql
 
 @GraphQL
 trait LucumaSubscription extends GraphQLOperation[LucumaODB] {
-  val document = """
-      subscription AsterismEdit($programId: ProgramId) {
-        asterismEdit(programId: $programId) {
+  val document = gql"""
+      subscription AsterismEdit($$programId: ProgramId) {
+        asterismEdit(programId: $$programId) {
           editType
           value {
             id

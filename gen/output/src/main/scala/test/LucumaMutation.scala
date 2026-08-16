@@ -6,6 +6,7 @@
 package test
 
 import clue.GraphQLOperation
+import clue.gql
 
 
 object LucumaMutation extends GraphQLOperation[LucumaODB] {
@@ -15,9 +16,9 @@ object LucumaMutation extends GraphQLOperation[LucumaODB] {
   ignoreUnusedImportEnums()
   import LucumaODB.Types._
   ignoreUnusedImportTypes()
-  val document = """
-      mutation DeleteAsterism($asterismId: AsterismId!) {
-        deleteAsterism(asterismId: $asterismId) {
+  val document = gql"""
+      mutation DeleteAsterism($$asterismId: AsterismId!) {
+        deleteAsterism(asterismId: $$asterismId) {
           id
           existence
         }

@@ -5,7 +5,9 @@
 
 package test
 
+import clue.GraphQLDocument
 import clue.GraphQLOperation
+import clue.gql
 
 
 object StarWarsDescriptorQuery extends GraphQLOperation[StarWars] {
@@ -15,9 +17,9 @@ object StarWarsDescriptorQuery extends GraphQLOperation[StarWars] {
   ignoreUnusedImportEnums()
   import StarWars.Types._
   ignoreUnusedImportTypes()
-  override val document: String = """
-        query ($charId: ID!) {
-          character(id: $charId) {
+  override val document: GraphQLDocument = gql"""
+        query ($$charId: ID!) {
+          character(id: $$charId) {
             id
             name
           }
