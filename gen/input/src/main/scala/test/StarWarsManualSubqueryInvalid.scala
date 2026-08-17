@@ -9,12 +9,13 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 // Hand-written subquery using `GraphQLSubquery`. The selection set references
 // `invalidField`, which doesn't exist on `Character`, so validation must report it.
 @GraphQLType("Character")
 abstract class StarWarsManualSubqueryInvalid extends GraphQLSubquery[StarWars] {
-  override val subquery: String = "{ id invalidField }" // assert: GraphQLGen
+  override val subquery = gql"{ id invalidField }" // assert: GraphQLGen
 }
 // format: on

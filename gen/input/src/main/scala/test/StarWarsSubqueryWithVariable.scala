@@ -9,6 +9,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 // A subquery that references a variable (`$ep`), declared via `type VariableDefs`. The declaration is
@@ -17,6 +18,6 @@ import clue.annotation.GraphQLType
 @GraphQLType("Query")
 abstract class StarWarsSubqueryWithVariable extends GraphQLSubquery[StarWars] {
   type VariableDefs = "($ep: Episode!)"
-  override val subquery: String = "{ hero(episode: $ep) { name } }"
+  override val subquery = gql"{ hero(episode: $$ep) { name } }"
 }
 // format: on

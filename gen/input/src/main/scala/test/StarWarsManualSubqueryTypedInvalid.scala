@@ -9,6 +9,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 // Hand-written subquery using `GraphQLSubquery.Typed`. The selection set references
@@ -16,6 +17,6 @@ import clue.annotation.GraphQLType
 @GraphQLType("Character")
 abstract class StarWarsManualSubqueryTypedInvalid
     extends GraphQLSubquery.Typed[StarWars, Int] {
-  override val subquery: String = "{ id invalidField }" // assert: GraphQLGen
+  override val subquery = gql"{ id invalidField }" // assert: GraphQLGen
 }
 // format: on

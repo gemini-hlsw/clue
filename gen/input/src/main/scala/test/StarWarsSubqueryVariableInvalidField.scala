@@ -9,6 +9,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 // A subquery that declares `$ep` via `type VariableDefs` AND has a genuine error (`invalidField`
@@ -17,6 +18,6 @@ import clue.annotation.GraphQLType
 @GraphQLType("Query")
 abstract class StarWarsSubqueryVariableInvalidField extends GraphQLSubquery[StarWars] {
   type VariableDefs = "($ep: Episode!)"
-  override val subquery: String = "{ hero(episode: $ep) { invalidField } }" // assert: GraphQLGen
+  override val subquery = gql"{ hero(episode: $$ep) { invalidField } }" // assert: GraphQLGen
 }
 // format: on

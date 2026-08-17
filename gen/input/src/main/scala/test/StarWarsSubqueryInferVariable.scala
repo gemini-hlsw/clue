@@ -9,6 +9,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQL
 import clue.annotation.GraphQLType
 
@@ -17,7 +18,7 @@ import clue.annotation.GraphQLType
 @GraphQL
 @GraphQLType("Query")
 abstract class StarWarsSubqueryInferVariable extends GraphQLSubquery[StarWars] {
-  override val subquery: String = "{ hero(episode: $ep) { name } }"
+  override val subquery = gql"{ hero(episode: $$ep) { name } }"
 }
 
 @clue.annotation.GraphQLStub

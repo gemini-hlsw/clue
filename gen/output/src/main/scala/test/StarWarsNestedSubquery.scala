@@ -6,6 +6,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 
@@ -16,7 +17,7 @@ import clue.annotation.GraphQLType
   ignoreUnusedImportEnums()
   import StarWars.Types._
   ignoreUnusedImportTypes()
-  override val subquery: String = s"""
+  override val subquery = gql"""
         {
           id
           name

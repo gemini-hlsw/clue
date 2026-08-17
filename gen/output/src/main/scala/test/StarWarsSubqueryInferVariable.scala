@@ -6,6 +6,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 // A generated subquery that references `$ep` without declaring it: the generator infers the variable
@@ -19,7 +20,7 @@ import clue.annotation.GraphQLType
   import StarWars.Types._
   ignoreUnusedImportTypes()
   type VariableDefs = "($ep: Episode!)"
-  override val subquery: String = "{ hero(episode: $ep) { name } }"
+  override val subquery = gql"{ hero(episode: $$ep) { name } }"
   case class Data(val hero: Data.Hero)
   object Data {
     case class Hero(val name: Option[String] = None)

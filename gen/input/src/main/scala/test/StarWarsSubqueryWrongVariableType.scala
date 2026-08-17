@@ -9,6 +9,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 // A subquery declaring `$ep: String!` but using it where `Episode!` is required (`hero(episode:)`).
@@ -16,6 +17,6 @@ import clue.annotation.GraphQLType
 @GraphQLType("Query")
 abstract class StarWarsSubqueryWrongVariableType extends GraphQLSubquery[StarWars] {
   type VariableDefs = "($ep: String!)"
-  override val subquery: String = "{ hero(episode: $ep) { name } }" // assert: GraphQLGen
+  override val subquery = gql"{ hero(episode: $$ep) { name } }" // assert: GraphQLGen
 }
 // format: on

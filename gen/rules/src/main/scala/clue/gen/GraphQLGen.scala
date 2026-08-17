@@ -237,7 +237,7 @@ class GraphQLGen(val config: GraphQLGenConfig)
                   case None           =>
                     IO.pure(
                       errorDiagnostic(
-                        "The GraphQLOperation must define a 'val subquery' with a literal String value.",
+                        "The GraphQLSubquery must define a 'val subquery' with a literal or `gql\"...\"` value.",
                         obj.pos
                       )
                     )

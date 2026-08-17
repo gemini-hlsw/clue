@@ -194,12 +194,10 @@ trait QueryGen extends Generator {
    * All errors and warnings are accumulated into the [[Result]] (nothing is thrown).
    */
   private def validateParsed(
-    schema:         Schema,
-    rootTypeOf:     UntypedOperation => Result[NamedType],
-    operations:     List[UntypedOperation],
-    fragments:      List[UntypedFragment],
-    extraVars:      Query.Vars = Map.empty,
-    checkVariables: Boolean = true
+    schema:     Schema,
+    rootTypeOf: UntypedOperation => Result[NamedType],
+    operations: List[UntypedOperation],
+    fragments:  List[UntypedFragment]
   ): Result[Unit] = {
     val compiler = new QueryCompiler(GQLParser, schema, List.empty)
     val phases   =
@@ -212,18 +210,16 @@ trait QueryGen extends Generator {
     val fragMap  = fragments.map(f => f.name -> f).toMap
 
     for {
-      // The variable/fragment checks are skipped for subqueries (see [[validateSubquery]]): they
-      // reference variables they don't declare, which this check would wrongly report as undefined.
-      // `reportUnused = false` regardless: grackle's unused detection is unreliable — its
-      // `collectValueRefs` overwrites instead of accumulating variable refs (`loop(values,
-      // Set(nme))`), so when one value holds several variables (e.g. an input object with multiple
-      // `$var` fields) all but the last are falsely reported as unused.
+      // `reportUnused = false`: grackle's unused detection is unreliable — its `collectValueRefs`
+      // overwrites instead of accumulating variable refs (`loop(values, Set(nme))`), so when one
+      // value holds several variables (e.g. an input object with multiple `$var` fields) all but the
+      // last are falsely reported as unused. Note that re-enabling it would also need an exemption
+      // for subqueries: a subquery legitimately declares variables that only a subquery it splices
+      // uses, and a splice is rendered as `__typename` here (see [[InterpolatedGql.render]]).
       // TODO Re-enable unused detection when grackle releases the bug fix for `collectValueRefs`.
-      _ <- if (checkVariables)
-             Result.fromProblems(
-               compiler.validateVariablesAndFragments(operations, fragments, reportUnused = false)
-             )
-           else Result.success(())
+      _ <- Result.fromProblems(
+             compiler.validateVariablesAndFragments(operations, fragments, reportUnused = false)
+           )
       _ <- Result.fromProblems(compiler.validateFieldMergeability(operations, fragments))
       _ <- operations.traverse_ { op =>
              for {
@@ -238,7 +234,7 @@ trait QueryGen extends Generator {
                                  None,
                                  schema,
                                  Context(rootType),
-                                 createDummyVars(varDefs) ++ extraVars,
+                                 createDummyVars(varDefs),
                                  fragMap,
                                  op.query,
                                  Env.empty,

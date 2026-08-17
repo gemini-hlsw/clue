@@ -8,13 +8,20 @@ import io.circe.Json
 // A subquery declaring a required variable, used to exercise the `gql` caller-check.
 object InterpolatorTestSub extends GraphQLSubquery.Typed[Unit, Json] {
   type VariableDefs = "($ep: Episode!)"
-  override val subquery: String = "{ hero(episode: $ep) { name } }"
+  override val subquery = gql"{ hero(episode: $$ep) { name } }"
 }
 
 // Declares a NULLABLE variable, to exercise the "usable as" relaxation.
 object InterpolatorTestSubNullable extends GraphQLSubquery.Typed[Unit, Json] {
   type VariableDefs = "($ep: Episode)"
-  override val subquery: String = "{ heroOpt(episode: $ep) { name } }"
+  override val subquery = gql"{ heroOpt(episode: $$ep) { name } }"
+}
+
+// Splices a subquery that requires `$ep`, and declares it: the subquery-into-subquery caller-check
+// reads this `VariableDefs` as the declaration site.
+object InterpolatorTestParent extends GraphQLSubquery.Typed[Unit, Json] {
+  type VariableDefs = "($ep: Episode!)"
+  override val subquery = gql"{ friends $InterpolatorTestSub }"
 }
 
 class GraphQLInterpolatorSuite extends munit.FunSuite {
@@ -43,5 +50,43 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
     // "usable as": a non-null Episode! is usable where the subquery only needs a nullable Episode.
     val doc = gql"query ($$ep: Episode!) $InterpolatorTestSubNullable"
     assertEquals(doc.value, "query ($ep: Episode!) { heroOpt(episode: $ep) { name } }")
+  }
+
+  test("a subquery splicing a subquery assembles like s-interpolation") {
+    assertEquals(InterpolatorTestParent.subquery.value,
+                 "{ friends { hero(episode: $ep) { name } } }"
+    )
+  }
+
+  test("a subquery that does not declare a spliced subquery's variable is a compile error") {
+    val errors = compileErrors("""
+      object UndeclaringParent extends GraphQLSubquery.Typed[Unit, io.circe.Json] {
+        override val subquery = gql"{ friends $InterpolatorTestSub }"
+      }
+      ()
+    """)
+    assert(errors.contains("does not declare variable $ep"), errors)
+    assert(errors.contains("subquery ["), errors)
+  }
+
+  test("a subquery declaring a spliced subquery's variable at the wrong type is a compile error") {
+    val errors = compileErrors("""
+      object WrongTypeParent extends GraphQLSubquery.Typed[Unit, io.circe.Json] {
+        type VariableDefs = "($ep: String!)"
+        override val subquery = gql"{ friends $InterpolatorTestSub }"
+      }
+      ()
+    """)
+    assert(errors.contains("usable as Episode!"), errors)
+  }
+
+  test("requirements propagate transitively through a nested subquery") {
+    // `InterpolatorTestParent` had to declare `$ep` to splice its child, so an operation splicing
+    // the parent must declare it too.
+    val errors = compileErrors("""gql"query { $InterpolatorTestParent }"""")
+    assert(errors.contains("does not declare variable $ep"), errors)
+
+    val doc = gql"query ($$ep: Episode!) $InterpolatorTestParent"
+    assertEquals(doc.value, "query ($ep: Episode!) { friends { hero(episode: $ep) { name } } }")
   }
 }

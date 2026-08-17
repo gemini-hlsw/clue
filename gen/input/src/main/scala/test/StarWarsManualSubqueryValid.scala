@@ -9,12 +9,13 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 // Hand-written subquery with a valid selection set on `Character`. Validation must
 // NOT report any diagnostic; an unexpected diagnostic would fail this testkit case.
 @GraphQLType("Character")
 abstract class StarWarsManualSubqueryValid extends GraphQLSubquery[StarWars] {
-  override val subquery: String = "{ id name }"
+  override val subquery = gql"{ id name }"
 }
 // format: on

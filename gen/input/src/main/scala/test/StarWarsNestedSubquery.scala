@@ -9,6 +9,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQL
 import clue.annotation.GraphQLType
 
@@ -16,7 +17,7 @@ import clue.annotation.GraphQLType
 @GraphQLType("Character")
 abstract class StarWarsNestedSubquery extends GraphQLSubquery[StarWars] {
 
-  override val subquery: String = s"""
+  override val subquery = gql"""
         {
           id
           name

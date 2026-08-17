@@ -9,6 +9,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 // Hand-written subquery using `GraphQLSubquery.Typed` with a valid selection set on
@@ -16,6 +17,6 @@ import clue.annotation.GraphQLType
 @GraphQLType("Character")
 abstract class StarWarsManualSubqueryTypedValid
     extends GraphQLSubquery.Typed[StarWars, Int] {
-  override val subquery: String = "{ id name }"
+  override val subquery = gql"{ id name }"
 }
 // format: on

@@ -1,6 +1,7 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.gql
 import clue.annotation.GraphQLType
 
 trait StarWars
@@ -9,5 +10,5 @@ trait StarWars
 // `Character`. `clueCheck` must fail.
 @GraphQLType("Character")
 abstract class HandwrittenSubquery extends GraphQLSubquery[StarWars] {
-  override val subquery: String = "{ id invalidField }"
+  override val subquery = gql"{ id invalidField }"
 }
