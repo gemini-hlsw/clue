@@ -13,7 +13,6 @@ package test
 import clue.GraphQLDocument
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
-import clue.gql
 
 @GraphQL
 trait StarWarsDescriptorQuery extends GraphQLOperation[StarWars] {

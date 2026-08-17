@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 
 // A hand-written operation with a query parameter AND a spliced subquery. The `$$`
 // escapes the GraphQL variable (so it survives interpolation), while `$StarWarsSubquery`

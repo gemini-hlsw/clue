@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 import clue.annotation.GraphQL
 
 // Under `GraphQLValidate` (validation only, as used by `clueCheck`), an `@GraphQL` annotation is

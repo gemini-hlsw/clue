@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 
 // Hand-written operation using `GraphQLOperation.Typed` with a valid document.
 // Validation must NOT report any diagnostic.

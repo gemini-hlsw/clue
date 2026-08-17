@@ -385,6 +385,28 @@ trait QueryGen extends Generator {
       }
       .getOrElse("")
 
+  /**
+   * The variables to validate a subquery against: the declared `type VariableDefs`, or — when the
+   * generator processes the subquery (`@GraphQL`), which also emits the declaration for it — the
+   * set inferred from usage. A hand-written subquery must declare them itself, so `infer` is false
+   * there and an undeclared variable is reported.
+   */
+  protected def subqueryVariableDefs(
+    schema:        Schema,
+    rootTypeNames: List[String],
+    stats:         List[Stat],
+    subquery:      String,
+    infer:         Boolean
+  ): String =
+    extractVariableDefs(stats).getOrElse {
+      rootTypeNames match {
+        // Inference needs a single unambiguous root type, which is what `@GraphQL` requires anyway.
+        case rootTypeName :: Nil if infer =>
+          inferSubqueryVariableDefs(schema, rootTypeName, subquery)
+        case _                            => ""
+      }
+    }
+
   // Emit `type VariableDefs = "(...)"` into a generated subquery object when its variables were
   // inferred (the author didn't declare them) and it references at least one. When the author wrote
   // an explicit `type VariableDefs`, it is already in the body and carried through, so nothing is

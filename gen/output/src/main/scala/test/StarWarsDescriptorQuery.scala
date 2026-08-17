@@ -7,7 +7,6 @@ package test
 
 import clue.GraphQLDocument
 import clue.GraphQLOperation
-import clue.gql
 
 
 object StarWarsDescriptorQuery extends GraphQLOperation[StarWars] {

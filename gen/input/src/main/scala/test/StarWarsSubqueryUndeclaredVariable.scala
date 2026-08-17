@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLSubquery
-import clue.gql
 import clue.annotation.GraphQLType
 
 // A subquery that uses `$ep` but does NOT declare it via `type VariableDefs`. Under the stricter check

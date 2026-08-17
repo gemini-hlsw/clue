@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLSubquery
-import clue.gql
 import clue.annotation.GraphQLType
 
 // A subquery declaring `$ep: String!` but using it where `Episode!` is required (`hero(episode:)`).

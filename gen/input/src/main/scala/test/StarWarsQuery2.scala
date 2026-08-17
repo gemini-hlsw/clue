@@ -10,7 +10,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 import clue.annotation.GraphQL
 // gql: import japgolly.scalajs.react.Dummy._
 

@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 
 // A hand-written operation that splices a subquery AND has a genuine error: `invalidField`
 // doesn't exist on `Character`. Validation must still report it (the spliced subquery must not

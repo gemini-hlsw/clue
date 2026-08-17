@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 import clue.annotation.GraphQL
 
 // An annotated (generated) operation with an invalid field. The generator now reports the error as

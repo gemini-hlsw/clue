@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLSubquery
-import clue.gql
 import io.circe.Json
 
 // A hand-written subquery with no `@GraphQLType` annotation: the root type can't be determined, so

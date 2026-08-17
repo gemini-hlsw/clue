@@ -10,7 +10,6 @@ package test
 
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
-import clue.gql
 
 @GraphQL
 trait LucumaSubscription extends GraphQLOperation[LucumaODB] {

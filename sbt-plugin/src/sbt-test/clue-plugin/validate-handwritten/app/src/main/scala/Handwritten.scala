@@ -1,7 +1,6 @@
 package test
 
 import clue.GraphQLSubquery
-import clue.gql
 import clue.annotation.GraphQLType
 
 trait StarWars

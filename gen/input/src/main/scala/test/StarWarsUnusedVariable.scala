@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 
 // Unused-variable detection is disabled because grackle's `collectValueRefs` overwrites instead of
 // accumulating variable references, falsely flagging variables that appear alongside others (e.g.

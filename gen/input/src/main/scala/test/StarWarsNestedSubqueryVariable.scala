@@ -10,7 +10,6 @@ package test
 
 import clue.GraphQLOperation
 import clue.GraphQLSubquery
-import clue.gql
 import clue.annotation.GraphQLType
 import io.circe.Json
 

@@ -13,7 +13,6 @@ import cats.effect.std.SecureRandom
 import cats.syntax.all.*
 import clue.FetchClient
 import clue.GraphQLOperation
-import clue.gql
 import clue.http4s.Http4sWebSocketBackend
 import clue.http4s.Http4sWebSocketClient
 import clue.websocket.WebSocketClient

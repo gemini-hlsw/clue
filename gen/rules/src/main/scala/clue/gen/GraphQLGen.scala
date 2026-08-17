@@ -52,17 +52,43 @@ class GraphQLGen(val config: GraphQLGenConfig)
               ) =>
             // Annotated objects already supply their own Variables/Data (e.g. via
             // GraphQLOperation.Typed or GraphQLSubquery.Typed), so there's nothing to generate. We
-            // still validate the document/subquery, then copy the object stripping the @GraphQL
-            // annotation (keeping any others, such as @GraphQLType).
+            // still validate the document/subquery, add the inferred `VariableDefs` if it's a
+            // subquery that needs one, then copy the object stripping the @GraphQL annotation
+            // (keeping any others, such as @GraphQLType).
             val newMods = GraphQLAnnotation.removeFrom(mods)
-            val copied  =
+
+            def copied(body: List[Stat]): Patch =
               Patch.replaceTree(
                 obj,
                 indented(obj)(
-                  q"..$newMods object $name ${buildTemplate(early, inits, (self.some, stats))}".toString
+                  q"..$newMods object $name ${buildTemplate(early, inits, (self.some, body))}".toString
                 )
               ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
-            validateGraphQLDefn(mods, inits, stats, obj.pos, generating = true).map(_ + copied)
+
+            // Like a generated subquery, an annotated one gets its referenced variables inferred and
+            // emitted as `type VariableDefs`, so the `gql` caller-check sees what it requires.
+            val body: IO[List[Stat]] =
+              (extractSubquerySchemaType(inits),
+               extractSubquery(stats),
+               extractRootTypes(mods)
+              ) match {
+                case (Some(schemaType), Some(subquery), rootTypeName :: Nil)
+                    if extractVariableDefs(stats).isEmpty =>
+                  config
+                    .getSchema(schemaType.value)
+                    .map(
+                      _.toOption.fold(stats)(schema =>
+                        addVariableDefsTypeAlias(
+                          none,
+                          inferSubqueryVariableDefs(schema, rootTypeName, subquery.render)
+                        )(stats)
+                      )
+                    )
+                case _ => IO.pure(stats)
+              }
+
+            (validateGraphQLDefn(mods, inits, stats, obj.pos, generating = true), body)
+              .mapN((diagnostics, newBody) => diagnostics + copied(newBody))
           case obj @ Defn.Object(
                 GraphQLStubAnnotation(_),
                 _,

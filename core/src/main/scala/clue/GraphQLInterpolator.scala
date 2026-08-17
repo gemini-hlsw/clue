@@ -51,6 +51,17 @@ extension (inline sc:         StringContext)
    */
   inline def gql(inline args: Any*): GraphQLDocument = ${ GraphQLInterpolator.gqlImpl('sc, 'args) }
 
+/**
+ * Makes `gql` available inside operation/subquery bodies without an import. `protected`, so it
+ * doesn't leak into the public API of the operations and subqueries that inherit it.
+ */
+trait GraphQLTextSyntax {
+  extension (inline sc: StringContext)
+    protected inline def gql(inline args: Any*): GraphQLDocument = ${
+      GraphQLInterpolator.gqlImpl('sc, 'args)
+    }
+}
+
 private[clue] object GraphQLInterpolator {
 
   def gqlImpl(scExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(using

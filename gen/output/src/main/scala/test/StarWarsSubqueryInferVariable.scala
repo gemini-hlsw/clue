@@ -6,7 +6,6 @@
 package test
 
 import clue.GraphQLSubquery
-import clue.gql
 import clue.annotation.GraphQLType
 
 // A generated subquery that references `$ep` without declaring it: the generator infers the variable

@@ -6,7 +6,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 import japgolly.scalajs.react.Dummy._
 
 object Wrapper extends Something {

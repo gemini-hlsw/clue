@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 
 // A hand-written operation composing a subquery via interpolation. This is valid:
 // `friends` is selected with the spliced subquery. Validation must NOT report an

@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLSubquery
-import clue.gql
 import clue.annotation.GraphQL
 import clue.annotation.GraphQLType
 

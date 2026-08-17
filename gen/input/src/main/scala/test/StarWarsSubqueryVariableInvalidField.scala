@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLSubquery
-import clue.gql
 import clue.annotation.GraphQLType
 
 // A subquery that declares `$ep` via `type VariableDefs` AND has a genuine error (`invalidField`

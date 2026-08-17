@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 import clue.annotation.GraphQLType
 
 // `@GraphQLType` declares a subquery's root type; it is meaningless on a `GraphQLOperation` and must

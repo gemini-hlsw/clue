@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLSubquery
-import clue.gql
 import clue.annotation.GraphQLType
 
 // Hand-written subquery using `GraphQLSubquery.Typed`. The selection set references

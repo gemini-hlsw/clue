@@ -15,7 +15,7 @@ import io.circe.Decoder
  * means the subquery references no variables. It is read by name — syntactically by the generator,
  * and at compile time by the `gql` interpolator, which checks it against every splice site.
  */
-abstract class GraphQLSubquery[S] {
+abstract class GraphQLSubquery[S] extends GraphQLTextSyntax {
   type Data
 
   val dataDecoder: Decoder[Data]

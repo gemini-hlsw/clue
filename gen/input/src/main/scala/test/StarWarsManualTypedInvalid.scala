@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 
 // Hand-written operation using `GraphQLOperation.Typed`. The document references
 // `invalidField`, which doesn't exist on `Query`, so validation must report it.

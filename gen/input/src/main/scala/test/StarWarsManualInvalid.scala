@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 
 // A hand-written operation: the code generator is NOT used here (no @GraphQL
 // annotation), but the document must still be validated against the schema.

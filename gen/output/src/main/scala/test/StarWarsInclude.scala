@@ -6,7 +6,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 
 
 object StarWarsInclude extends GraphQLOperation[StarWars] {

@@ -9,7 +9,6 @@
 package test
 
 import clue.GraphQLOperation
-import clue.gql
 
 // A hand-written operation (no @GraphQL annotation) with a valid document.
 // The validation pass must NOT report any diagnostic; an unexpected diagnostic
