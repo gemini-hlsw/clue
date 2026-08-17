@@ -72,8 +72,9 @@ They must extend `GraphQLOperation[S]`, defining the following members:
 The `document` is built with the `gql` string interpolator (`import clue.gql`) rather than a plain
 `String`/`s"..."`. `gql` produces the same text at runtime, but its type (`GraphQLDocument`) can only
 be obtained through `gql`, so every operation goes through the compile-time check that splices its
-subqueries correctly (see [Subquery variables](#subquery-variables) below). For a document built by
-other means, `GraphQLDocument.unsafeFromString(...)` is the explicit (check-skipping) escape hatch.
+subqueries correctly (see [Subquery variables](#subquery-variables) below). `.stripMargin` works on a
+`GraphQLDocument` as it does on a `String`. For a document built by other means,
+`GraphQLDocument.unsafeFromString(...)` is the explicit (check-skipping) escape hatch.
 
 #### Example
 

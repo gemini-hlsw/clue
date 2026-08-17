@@ -16,8 +16,22 @@ object GraphQLDocument {
   // `gql"..."` is the validated way to build one — a plain `String`/`s"..."` won't type-check as a
   // `GraphQLDocument`. `unsafeFromString` is the explicit escape hatch for text built by other
   // means; it skips the caller-check, so prefer `gql`.
-  def unsafeFromString(value: String): GraphQLDocument           = value
-  extension (document:        GraphQLDocument) def value: String = document
+  def unsafeFromString(value: String): GraphQLDocument = value
+
+  extension (document: GraphQLDocument) {
+    def value: String = document
+
+    /**
+     * As `String.stripMargin`. It runs on the assembled text, so it also strips margins inside
+     * spliced subqueries — the same as calling `.stripMargin` on an `s"..."` interpolation.
+     */
+    def stripMargin: GraphQLDocument = stripMargin('|')
+
+    def stripMargin(marginChar: Char): GraphQLDocument =
+      // Explicit `StringOps` because inside this file `GraphQLDocument` is `String`, so a bare
+      // `document.stripMargin` would resolve back to this extension.
+      new scala.collection.StringOps(document).stripMargin(marginChar)
+  }
 }
 
 extension (inline sc:         StringContext)

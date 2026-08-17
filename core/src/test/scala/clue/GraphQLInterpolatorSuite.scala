@@ -52,6 +52,13 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
     assertEquals(doc.value, "query ($ep: Episode!) { heroOpt(episode: $ep) { name } }")
   }
 
+  test("stripMargin strips the assembled document") {
+    val doc = gql"""query {
+                   |  hero
+                   |}""".stripMargin
+    assertEquals(doc.value, "query {\n  hero\n}")
+  }
+
   test("a subquery splicing a subquery assembles like s-interpolation") {
     assertEquals(InterpolatorTestParent.subquery.value,
                  "{ friends { hero(episode: $ep) { name } } }"

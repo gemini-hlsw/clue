@@ -34,26 +34,26 @@ object Demo extends IOApp.Simple {
 
   object Query extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
     override val document = gql"""
-      query {
-        observations(WHERE: {program: {id: {EQ: "p-2"}}}) {
-          matches {
-            id
-            title
-            subtitle
-          }
-        }
-      }"""
+      |query {
+      |  observations(WHERE: {program: {id: {EQ: "p-2"}}}) {
+      |    matches {
+      |      id
+      |      title
+      |      subtitle
+      |    }
+      |  }
+      |}""".stripMargin
   }
 
   object Subscription extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
     override val document = gql"""
-      subscription {
-        observationEdit(input: {programId: "p-2"}) {
-          value {
-            id
-          }
-        }
-      }"""
+      |subscription {
+      |  observationEdit(input: {programId: "p-2"}) {
+      |    value {
+      |      id
+      |    }
+      |  }
+      |}""".stripMargin
   }
 
   object Mutation extends GraphQLOperation[DemoDB] {
@@ -61,13 +61,13 @@ object Demo extends IOApp.Simple {
     case class Variables(observationId: String, subtitle: String)
 
     override val document                                = gql"""
-      mutation ($$observationId: ObservationId!, $$subtitle: String){
-        updateObservations(input: {WHERE: {id: {EQ: $$observationId}}, SET: {subtitle: $$subtitle}}) {
-          observations {
-            id
-          }
-        }
-      }"""
+    |mutation ($$observationId: ObservationId!, $$subtitle: String){
+    |  updateObservations(input: {WHERE: {id: {EQ: $$observationId}}, SET: {subtitle: $$subtitle}}) {
+    |    observations {
+    |      id
+    |    }
+    |  }
+    |}""".stripMargin
     override val varEncoder: Encoder.AsObject[Variables] = deriveEncoder
 
     override val dataDecoder: Decoder[Data] = Decoder[Json]
