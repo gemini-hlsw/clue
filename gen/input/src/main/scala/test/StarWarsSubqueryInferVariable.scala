@@ -13,7 +13,7 @@ import clue.annotation.GraphQL
 import clue.annotation.GraphQLType
 
 // A generated subquery that references `$ep` without declaring it: the generator infers the variable
-// from usage (`hero(episode: Episode!)`) and emits `type Variables = "($ep: Episode!)"`.
+// from usage (`hero(episode: Episode!)`) and emits `type VariableDefs = "($ep: Episode!)"`.
 @GraphQL
 @GraphQLType("Query")
 abstract class StarWarsSubqueryInferVariable extends GraphQLSubquery[StarWars] {

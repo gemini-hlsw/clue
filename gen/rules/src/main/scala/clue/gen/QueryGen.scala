@@ -99,11 +99,11 @@ trait QueryGen extends Generator {
   protected def extractSubquery(stats: List[Stat]): Option[InterpolatedGql] =
     extractGql("subquery", stats)
 
-  // The declared GraphQL variables of a subquery, from its `type Variables = "(...)"` member
+  // The declared GraphQL variables of a subquery, from its `type VariableDefs = "(...)"` member
   // (parenthesized var-defs in operation-header syntax). Absent ⇒ the subquery references no
   // variables. Uses the type test + field accessors to avoid the deprecated `Defn.Type` extractor.
-  protected def extractVariables(stats: List[Stat]): Option[String] =
-    stats.collectFirst { case d: Defn.Type if d.name.value == "Variables" => d.body }.collect {
+  protected def extractVariableDefs(stats: List[Stat]): Option[String] =
+    stats.collectFirst { case d: Defn.Type if d.name.value == "VariableDefs" => d.body }.collect {
       case Lit.String(value) => value
     }
 
@@ -360,10 +360,10 @@ trait QueryGen extends Generator {
   /**
    * Infer the GraphQL variables a subquery references, from their usage, rendered as a
    * parenthesized var-def list (`($a: T, $b: U)`) in operation-header syntax, sorted by name for
-   * deterministic output. Empty if the subquery references none. Used to auto-emit `type Variables`
-   * for `@GraphQL` subqueries that don't declare it explicitly.
+   * deterministic output. Empty if the subquery references none. Used to auto-emit
+   * `type VariableDefs` for `@GraphQL` subqueries that don't declare it explicitly.
    */
-  protected def inferSubqueryVariables(
+  protected def inferSubqueryVariableDefs(
     schema:       Schema,
     rootTypeName: String,
     subquery:     String
@@ -389,23 +389,24 @@ trait QueryGen extends Generator {
       }
       .getOrElse("")
 
-  // Emit `type Variables = "(...)"` into a generated subquery object when its variables were inferred
-  // (the author didn't declare them) and it references at least one. When the author wrote an explicit
-  // `type Variables`, it is already in the body and carried through, so nothing is added.
-  protected def addVariablesTypeAlias(
-    explicitVariables: Option[String],
-    variables:         String
+  // Emit `type VariableDefs = "(...)"` into a generated subquery object when its variables were
+  // inferred (the author didn't declare them) and it references at least one. When the author wrote
+  // an explicit `type VariableDefs`, it is already in the body and carried through, so nothing is
+  // added.
+  protected def addVariableDefsTypeAlias(
+    explicitVariableDefs: Option[String],
+    variableDefs:         String
   ): List[Stat] => List[Stat] =
     parentBody =>
-      if (explicitVariables.isDefined || variables.isEmpty) parentBody
-      else q"type Variables = ${Lit.String(variables)}" :: parentBody
+      if (explicitVariableDefs.isDefined || variableDefs.isEmpty) parentBody
+      else q"type VariableDefs = ${Lit.String(variableDefs)}" :: parentBody
 
   /**
    * Validate a subquery (a selection set on `rootTypeName`) against the `schema`. Grackle's
    * `compile` always roots a document at the schema's operation types, so the root type is supplied
    * explicitly here.
    *
-   * `variables` is the subquery's declared variables (from its `type Variables` member),
+   * `variableDefs` is the subquery's declared variables (from its `type VariableDefs` member),
    * parenthesized in operation-header syntax (e.g. `($ep: Episode!)`), or empty if it declares
    * none. They are spliced into the wrapper operation so the standard variable checks apply: a
    * variable used but not declared is reported, and each declared type is checked against its
@@ -414,7 +415,7 @@ trait QueryGen extends Generator {
   protected def validateSubquery(
     schema:       Schema,
     rootTypeName: String,
-    variables:    String,
+    variableDefs: String,
     subquery:     String
   ): Result[Unit] =
     Result
@@ -423,8 +424,9 @@ trait QueryGen extends Generator {
         s"Undefined root type [$rootTypeName] for subquery"
       )
       .flatMap { rootType =>
-        GQLParser.parseText(s"query $variables $subquery").flatMap { case (operations, fragments) =>
-          validateParsed(schema, _ => Result.success(rootType), operations, fragments)
+        GQLParser.parseText(s"query $variableDefs $subquery").flatMap {
+          case (operations, fragments) =>
+            validateParsed(schema, _ => Result.success(rootType), operations, fragments)
         }
       }
 
@@ -435,10 +437,10 @@ trait QueryGen extends Generator {
   protected def validateSubqueryTypes(
     schema:        Schema,
     rootTypeNames: List[String],
-    variables:     String,
+    variableDefs:  String,
     subquery:      String
   ): Result[Unit] =
-    rootTypeNames.parTraverse_(validateSubquery(schema, _, variables, subquery))
+    rootTypeNames.parTraverse_(validateSubquery(schema, _, variableDefs, subquery))
 
   import DefineType._
   protected def addVars(

@@ -15,7 +15,7 @@ import clue.annotation.GraphQLType
 // The declared variable type is incompatible with its usage — an error.
 @GraphQLType("Query")
 abstract class StarWarsSubqueryWrongVariableType extends GraphQLSubquery[StarWars] {
-  type Variables = "($ep: String!)"
+  type VariableDefs = "($ep: String!)"
   override val subquery: String = "{ hero(episode: $ep) { name } }" // assert: GraphQLGen
 }
 // format: on

@@ -7,13 +7,13 @@ import io.circe.Json
 
 // A subquery declaring a required variable, used to exercise the `gql` caller-check.
 object InterpolatorTestSub extends GraphQLSubquery.Typed[Unit, Json] {
-  type Variables = "($ep: Episode!)"
+  type VariableDefs = "($ep: Episode!)"
   override val subquery: String = "{ hero(episode: $ep) { name } }"
 }
 
 // Declares a NULLABLE variable, to exercise the "usable as" relaxation.
 object InterpolatorTestSubNullable extends GraphQLSubquery.Typed[Unit, Json] {
-  type Variables = "($ep: Episode)"
+  type VariableDefs = "($ep: Episode)"
   override val subquery: String = "{ heroOpt(episode: $ep) { name } }"
 }
 

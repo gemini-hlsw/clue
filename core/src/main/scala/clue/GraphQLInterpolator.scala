@@ -24,7 +24,7 @@ extension (inline sc:         StringContext)
    * Builds a GraphQL operation `document`, splicing subqueries inline. At runtime it produces
    * exactly the string the standard `s"..."` interpolator would. At compile time it runs the
    * *caller-check*: for every spliced value that declares variables (a `GraphQLSubquery` with a
-   * `type Variables` member), it verifies the operation's `query (...)` header declares each
+   * `type VariableDefs` member), it verifies the operation's `query (...)` header declares each
    * required variable with a compatible ("usable as") type — reading the requirement straight from
    * the subquery's type, so it works even when the subquery is shipped in a dependency jar.
    */
@@ -48,10 +48,10 @@ private[clue] object GraphQLInterpolator {
       case _           => report.errorAndAbort("gql: splice arguments must be explicit")
     }
 
-    // Read a spliced value's `Variables` literal-type member, if it has one (a `GraphQLSubquery`).
-    def variablesOf(arg: Expr[Any]): Option[String] = {
+    // Read a spliced value's `VariableDefs` literal-type member, if it has one (a `GraphQLSubquery`).
+    def variableDefsOf(arg: Expr[Any]): Option[String] = {
       val tpe = arg.asTerm.tpe
-      val sym = tpe.typeSymbol.typeMember("Variables")
+      val sym = tpe.typeSymbol.typeMember("VariableDefs")
       if (sym.isNoSymbol) None
       else {
         // A type alias surfaces as `TypeBounds(lo, hi)` with `lo == hi`; read `hi`.
@@ -126,7 +126,7 @@ private[clue] object GraphQLInterpolator {
     val opVars: Map[String, String] = parts.headOption.map(operationVars).getOrElse(Map.empty)
 
     argExprs.foreach { arg =>
-      variablesOf(arg).foreach { required =>
+      variableDefsOf(arg).foreach { required =>
         parseVarDefs(required).foreach { case (name, reqType) =>
           opVars.get(name) match {
             case None                                       =>

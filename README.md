@@ -132,20 +132,21 @@ Hand-written subqueries may declare **multiple** types (the selection is validat
 
 ##### Subquery variables
 
-A subquery that references GraphQL variables declares them in a `type Variables` member, written in
-operation-header syntax:
+A subquery that references GraphQL variables declares them in a `type VariableDefs` member, written
+in operation-header syntax (the GraphQL spec's `VariablesDefinition`). It is a declaration only —
+there is no runtime value, case class or encoder behind it, unlike an operation's `Variables`:
 
 ```scala
 @GraphQLType("Query")
 abstract class HeroByEpisode extends GraphQLSubquery.Typed[StarWars, Json] {
-  type Variables = "($ep: Episode!)"
-  val subquery   = "{ hero(episode: $ep) { name } }"
+  type VariableDefs = "($ep: Episode!)"
+  val subquery      = "{ hero(episode: $ep) { name } }"
 }
 ```
 
 The declaration is checked against usage (here `$ep` feeds `hero(episode: Episode!)`); a variable
 used but not declared, or declared with an incompatible type, is a scalafix error. For subqueries
-processed by the generator (`@GraphQL`), `type Variables` is **inferred from usage and emitted
+processed by the generator (`@GraphQL`), `type VariableDefs` is **inferred from usage and emitted
 automatically** when you don't write it; hand-written subqueries declare it explicitly.
 
 To splice a subquery into an operation *and* have the operation's variables checked against it, build
@@ -159,8 +160,8 @@ trait MyQuery extends GraphQLOperation[StarWars] {
 
 `gql` produces exactly the string `s` would, but at **compile time** it verifies the operation
 declares every variable required by each spliced subquery, with a compatible ("usable as") type. It
-reads the requirement from the subquery's `type Variables` directly, so the check works even when the
-subquery comes from a dependency jar; a missing or wrong-typed variable is a compile error.
+reads the requirement from the subquery's `type VariableDefs` directly, so the check works even when
+the subquery comes from a dependency jar; a missing or wrong-typed variable is a compile error.
 
 The schema location is configured (once) in `.scalafix.conf`:
 

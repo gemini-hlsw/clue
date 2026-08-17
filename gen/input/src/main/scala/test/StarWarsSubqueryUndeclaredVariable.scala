@@ -11,7 +11,7 @@ package test
 import clue.GraphQLSubquery
 import clue.annotation.GraphQLType
 
-// A subquery that uses `$ep` but does NOT declare it via `type Variables`. Under the stricter check
+// A subquery that uses `$ep` but does NOT declare it via `type VariableDefs`. Under the stricter check
 // (variables must be declared) this is an undefined-variable error.
 @GraphQLType("Query")
 abstract class StarWarsSubqueryUndeclaredVariable extends GraphQLSubquery[StarWars] {
