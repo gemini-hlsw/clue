@@ -14,7 +14,7 @@ import io.circe.Json
 // a warning is reported (proving validation now runs on annotated `.Typed` objects).
 
 @GraphQLType("Droid") object StarWarsTypedSubqueryAnnotatedDeprecated extends GraphQLSubquery.Typed[StarWars, Json] {
-  override val subquery: String = """
+  override val subquery = gql"""
         {
           primaryFunction
         }

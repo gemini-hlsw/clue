@@ -9,14 +9,16 @@
 package test
 
 import clue.GraphQLSubquery
+import clue.annotation.GraphQL
 import clue.annotation.GraphQLType
+import io.circe.Json
 
-// A subquery that references a variable (`$ep`), declared via `type VariableDefs`. The declaration is
-// checked against usage (`$ep` feeds `hero(episode: Episode!)`) and the selection is valid, so this
-// must NOT report any diagnostic.
+// An annotated `object` subquery: nothing is generated (it supplies its own `Data` via `.Typed`), but
+// it still references `$ep`, so the generator infers and emits `type VariableDefs` for it, exactly as
+// it does for the subqueries it generates.
+@GraphQL
 @GraphQLType("Query")
-abstract class StarWarsSubqueryWithVariable extends GraphQLSubquery[StarWars] {
-  type VariableDefs = "($ep: Episode!)"
+object StarWarsAnnotatedSubqueryVariable extends GraphQLSubquery.Typed[StarWars, Json] {
   override val subquery = gql"{ hero(episode: $$ep) { name } }"
 }
 // format: on

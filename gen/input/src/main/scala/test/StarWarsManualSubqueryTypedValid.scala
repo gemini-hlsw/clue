@@ -16,6 +16,6 @@ import clue.annotation.GraphQLType
 @GraphQLType("Character")
 abstract class StarWarsManualSubqueryTypedValid
     extends GraphQLSubquery.Typed[StarWars, Int] {
-  override val subquery: String = "{ id name }"
+  override val subquery = gql"{ id name }"
 }
 // format: on

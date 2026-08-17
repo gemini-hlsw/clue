@@ -52,17 +52,43 @@ class GraphQLGen(val config: GraphQLGenConfig)
               ) =>
             // Annotated objects already supply their own Variables/Data (e.g. via
             // GraphQLOperation.Typed or GraphQLSubquery.Typed), so there's nothing to generate. We
-            // still validate the document/subquery, then copy the object stripping the @GraphQL
-            // annotation (keeping any others, such as @GraphQLType).
+            // still validate the document/subquery, add the inferred `VariableDefs` if it's a
+            // subquery that needs one, then copy the object stripping the @GraphQL annotation
+            // (keeping any others, such as @GraphQLType).
             val newMods = GraphQLAnnotation.removeFrom(mods)
-            val copied  =
+
+            def copied(body: List[Stat]): Patch =
               Patch.replaceTree(
                 obj,
                 indented(obj)(
-                  q"..$newMods object $name ${buildTemplate(early, inits, (self.some, stats))}".toString
+                  q"..$newMods object $name ${buildTemplate(early, inits, (self.some, body))}".toString
                 )
               ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
-            validateGraphQLDefn(mods, inits, stats, obj.pos, generating = true).map(_ + copied)
+
+            // Like a generated subquery, an annotated one gets its referenced variables inferred and
+            // emitted as `type VariableDefs`, so the `gql` caller-check sees what it requires.
+            val body: IO[List[Stat]] =
+              (extractSubquerySchemaType(inits),
+               extractSubquery(stats),
+               extractRootTypes(mods)
+              ) match {
+                case (Some(schemaType), Some(subquery), rootTypeName :: Nil)
+                    if extractVariableDefs(stats).isEmpty =>
+                  config
+                    .getSchema(schemaType.value)
+                    .map(
+                      _.toOption.fold(stats)(schema =>
+                        addVariableDefsTypeAlias(
+                          none,
+                          inferSubqueryVariableDefs(schema, rootTypeName, subquery.render)
+                        )(stats)
+                      )
+                    )
+                case _ => IO.pure(stats)
+              }
+
+            (validateGraphQLDefn(mods, inits, stats, obj.pos, generating = true), body)
+              .mapN((diagnostics, newBody) => diagnostics + copied(newBody))
           case obj @ Defn.Object(
                 GraphQLStubAnnotation(_),
                 _,
@@ -134,7 +160,7 @@ class GraphQLGen(val config: GraphQLGenConfig)
                   case None           =>
                     IO.pure(
                       errorDiagnostic(
-                        "The GraphQLOperation must define a 'val document: String' with a literal value.",
+                        "The GraphQLOperation must define a 'val document' with a literal or `gql\"...\"` value.",
                         obj.pos
                       )
                     )
@@ -237,17 +263,25 @@ class GraphQLGen(val config: GraphQLGenConfig)
                   case None           =>
                     IO.pure(
                       errorDiagnostic(
-                        "The GraphQLOperation must define a 'val subquery' with a literal String value.",
+                        "The GraphQLSubquery must define a 'val subquery' with a literal or `gql\"...\"` value.",
                         obj.pos
                       )
                     )
                   case Some(subquery) =>
                     withSchema(schemaType.value, obj.pos) { schema =>
+                      val explicitVariableDefs: Option[String] = extractVariableDefs(stats)
+                      // For @GraphQL subqueries, infer the referenced variables from usage when the
+                      // author didn't declare them; the inferred set is emitted as
+                      // `type VariableDefs`.
+                      val variableDefs: String                 =
+                        explicitVariableDefs.getOrElse(
+                          inferSubqueryVariableDefs(schema, rootTypeName, subquery.render)
+                        )
                       // Validate the subquery against its root type first, reporting all problems
                       // as diagnostics (errors at the subquery, warnings at the definition).
-                      val validation: Result[Unit] =
-                        validateSubquery(schema, rootTypeName, subquery.render)
-                      val diagnostics: Patch       =
+                      val validation: Result[Unit]             =
+                        validateSubquery(schema, rootTypeName, variableDefs, subquery.render)
+                      val diagnostics: Patch                   =
                         lintResult(
                           validation,
                           gqlValuePos("subquery", stats).getOrElse(obj.pos),
@@ -258,13 +292,17 @@ class GraphQLGen(val config: GraphQLGenConfig)
                       else {
                         // Validation passed, so parsing and variable-type resolution below succeed.
                         val (operations, fragments) =
-                          GQLParser.parseText(s"query ${subquery.render}").toOption.get
+                          GQLParser
+                            .parseText(s"query $variableDefs ${subquery.render}")
+                            .toOption
+                            .get
                         // TODO Support multi-operation queries?
                         val operation               = operations.head
 
                         // Modifications to add the missing definitions.
                         val modObjDefs = scala.Function.chain(
                           List(
+                            addVariableDefsTypeAlias(explicitVariableDefs, variableDefs),
                             addImports(schemaType.value),
                             addData(
                               schema,

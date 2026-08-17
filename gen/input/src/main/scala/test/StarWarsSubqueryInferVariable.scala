@@ -12,25 +12,14 @@ import clue.GraphQLSubquery
 import clue.annotation.GraphQL
 import clue.annotation.GraphQLType
 
-@GraphQL // assert: GraphQLGen
-@GraphQLType("Character")
-abstract class StarWarsNestedSubquery extends GraphQLSubquery[StarWars] {
-
-  override val subquery = gql"""
-        {
-          id
-          name
-          ... on Human {
-            homePlanet
-          }
-          contacts:friends $StarWarsSubquery
-          ... on Droid {
-            primaryFunction
-          }
-        }
-      """
+// A generated subquery that references `$ep` without declaring it: the generator infers the variable
+// from usage (`hero(episode: Episode!)`) and emits `type VariableDefs = "($ep: Episode!)"`.
+@GraphQL
+@GraphQLType("Query")
+abstract class StarWarsSubqueryInferVariable extends GraphQLSubquery[StarWars] {
+  override val subquery = gql"{ hero(episode: $$ep) { name } }"
 }
 
 @clue.annotation.GraphQLStub
-object StarWarsNestedSubquery
+object StarWarsSubqueryInferVariable
 // format: on

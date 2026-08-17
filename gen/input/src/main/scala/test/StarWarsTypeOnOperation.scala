@@ -15,6 +15,6 @@ import clue.annotation.GraphQLType
 // be reported as an error.
 @GraphQLType("Query") // assert: GraphQLGen
 abstract class StarWarsTypeOnOperation extends GraphQLOperation[StarWars] {
-  override val document: String = "query { hero(episode: NEWHOPE) { id } }"
+  override val document = gql"query { hero(episode: NEWHOPE) { id } }"
 }
 // format: on

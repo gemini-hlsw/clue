@@ -32,7 +32,7 @@ object Demo extends IOApp.Simple {
   type DemoDB
 
   object Query extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
-    override val document: String = """
+    override val document = gql"""
       |query {
       |  observations(WHERE: {program: {id: {EQ: "p-2"}}}) {
       |    matches {
@@ -45,7 +45,7 @@ object Demo extends IOApp.Simple {
   }
 
   object Subscription extends GraphQLOperation.Typed.NoInput[DemoDB, Json] {
-    override val document: String = """
+    override val document = gql"""
       |subscription {
       |  observationEdit(input: {programId: "p-2"}) {
       |    value {
@@ -59,9 +59,9 @@ object Demo extends IOApp.Simple {
     type Data = Json
     case class Variables(observationId: String, subtitle: String)
 
-    override val document: String                        = """
-    |mutation ($observationId: ObservationId!, $subtitle: String){
-    |  updateObservations(input: {WHERE: {id: {EQ: $observationId}}, SET: {subtitle: $subtitle}}) {
+    override val document                                = gql"""
+    |mutation ($$observationId: ObservationId!, $$subtitle: String){
+    |  updateObservations(input: {WHERE: {id: {EQ: $$observationId}}, SET: {subtitle: $$subtitle}}) {
     |    observations {
     |      id
     |    }

@@ -15,6 +15,6 @@ import clue.GraphQLOperation
 // several `$var` fields in one input object). So even this genuinely-unused `$unused` must NOT
 // produce a diagnostic.
 trait StarWarsUnusedVariable extends GraphQLOperation[StarWars] {
-  override val document: String = "query ($unused: ID!) { hero(episode: NEWHOPE) { id } }"
+  override val document = gql"query ($$unused: ID!) { hero(episode: NEWHOPE) { id } }"
 }
 // format: on

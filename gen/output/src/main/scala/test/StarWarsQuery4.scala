@@ -15,7 +15,7 @@ object StarWarsQuery4 extends GraphQLOperation[StarWars] {
   ignoreUnusedImportEnums()
   import StarWars.Types._
   ignoreUnusedImportTypes()
-  override val document: String = s"""
+  override val document = gql"""
         query ($$charId: ID!) {
           character(id: $$charId) $StarWarsNestedSubquery
         }

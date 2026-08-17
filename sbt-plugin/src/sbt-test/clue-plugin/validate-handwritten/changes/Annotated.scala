@@ -10,5 +10,5 @@ trait StarWars
 // and `clueCheck` still succeed.
 @GraphQL
 trait AnnotatedInMain extends GraphQLOperation[StarWars] {
-  override val document: String = "query { hero(episode: NEWHOPE) { id } }"
+  override val document = gql"query { hero(episode: NEWHOPE) { id } }"
 }

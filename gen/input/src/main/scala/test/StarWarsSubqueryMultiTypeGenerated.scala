@@ -17,6 +17,6 @@ import clue.annotation.GraphQLType
 @GraphQL // assert: GraphQLGen
 @GraphQLType("Human", "Droid")
 abstract class StarWarsSubqueryMultiTypeGenerated extends GraphQLSubquery[StarWars] {
-  override val subquery: String = "{ id name }"
+  override val subquery = gql"{ id name }"
 }
 // format: on

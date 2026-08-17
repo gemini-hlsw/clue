@@ -15,6 +15,6 @@ import clue.GraphQLOperation
 // The query references `invalidField`, which does not exist on the `Query`
 // type, so the validation pass must report a diagnostic.
 trait StarWarsManualInvalid extends GraphQLOperation[StarWars] {
-  override val document: String = "query { invalidField }" // assert: GraphQLGen
+  override val document = gql"query { invalidField }" // assert: GraphQLGen
 }
 // format: on

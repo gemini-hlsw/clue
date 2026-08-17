@@ -16,6 +16,6 @@ import io.circe.Json
 // selection `{ id name }` is valid on both `Human` and `Droid`, so this must NOT report a diagnostic.
 @GraphQLType("Human", "Droid")
 abstract class StarWarsManualSubqueryMultiType extends GraphQLSubquery.Typed[StarWars, Json] {
-  override val subquery: String = "{ id name }"
+  override val subquery = gql"{ id name }"
 }
 // format: on

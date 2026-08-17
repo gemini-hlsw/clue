@@ -13,11 +13,11 @@ import clue.annotation.GraphQL
 
 @GraphQL
 trait StarWarsInclude extends GraphQLOperation[StarWars] {
-  override val document: String = """
-        query ($humanId: ID!, $skipId: Boolean!, $withName: Boolean!) {
-          human(id: $humanId) {
-            id @skip(if: $skipId)
-            name @include(if: $withName)
+  override val document = gql"""
+        query ($$humanId: ID!, $$skipId: Boolean!, $$withName: Boolean!) {
+          human(id: $$humanId) {
+            id @skip(if: $$skipId)
+            name @include(if: $$withName)
             homePlanet
           }
         }

@@ -17,6 +17,6 @@ import io.circe.Json
 // must report it.
 @GraphQLType("Character")
 object StarWarsTypedSubqueryObjectInvalid extends GraphQLSubquery.Typed[StarWars, Json] {
-  override val subquery: String = "{ id invalidField }" // assert: GraphQLGen
+  override val subquery = gql"{ id invalidField }" // assert: GraphQLGen
 }
 // format: on

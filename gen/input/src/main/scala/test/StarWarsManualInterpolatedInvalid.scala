@@ -14,7 +14,7 @@ import clue.GraphQLOperation
 // doesn't exist on `Character`. Validation must still report it (the spliced subquery must not
 // mask the error), so a diagnostic is expected on the document.
 trait StarWarsManualInterpolatedInvalid extends GraphQLOperation[StarWars] {
-  override val document: String =
-    s"query ($$charId: ID!) { character(id: $$charId) { invalidField friends $StarWarsSubquery } }" // assert: GraphQLGen
+  override val document =
+    gql"query ($$charId: ID!) { character(id: $$charId) { invalidField friends $StarWarsSubquery } }" // assert: GraphQLGen
 }
 // format: on

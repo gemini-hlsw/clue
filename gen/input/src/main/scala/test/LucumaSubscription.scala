@@ -13,9 +13,9 @@ import clue.annotation.GraphQL
 
 @GraphQL
 trait LucumaSubscription extends GraphQLOperation[LucumaODB] {
-  val document = """
-      subscription AsterismEdit($programId: ProgramId) {
-        asterismEdit(programId: $programId) {
+  val document = gql"""
+      subscription AsterismEdit($$programId: ProgramId) {
+        asterismEdit(programId: $$programId) {
           editType
           value {
             id

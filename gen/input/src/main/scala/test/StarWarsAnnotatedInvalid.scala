@@ -15,6 +15,6 @@ import clue.annotation.GraphQL
 // a diagnostic and skips code generation (no output file => linter mode), instead of aborting.
 @GraphQL
 trait StarWarsAnnotatedInvalid extends GraphQLOperation[StarWars] {
-  override val document: String = "query { invalidField }" // assert: GraphQLGen
+  override val document = gql"query { invalidField }" // assert: GraphQLGen
 }
 // format: on

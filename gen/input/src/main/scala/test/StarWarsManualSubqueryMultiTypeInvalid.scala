@@ -16,6 +16,6 @@ import io.circe.Json
 // `Droid`, so validating the selection against every declared type must report it for `Droid`.
 @GraphQLType("Human", "Droid")
 abstract class StarWarsManualSubqueryMultiTypeInvalid extends GraphQLSubquery.Typed[StarWars, Json] {
-  override val subquery: String = "{ id homePlanet }" // assert: GraphQLGen
+  override val subquery = gql"{ id homePlanet }" // assert: GraphQLGen
 }
 // format: on

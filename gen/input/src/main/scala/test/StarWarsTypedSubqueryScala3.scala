@@ -16,5 +16,5 @@ import io.circe.Json
 // real usage. `invalidField` doesn't exist on `Character`, so validation must report it.
 @GraphQLType("Character")
 object StarWarsTypedSubqueryScala3 extends GraphQLSubquery.Typed[StarWars, Json]:
-  override val subquery: String = "{ id invalidField }" // assert: GraphQLGen
+  override val subquery = gql"{ id invalidField }" // assert: GraphQLGen
 // format: on

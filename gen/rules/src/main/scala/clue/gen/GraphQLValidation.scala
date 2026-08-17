@@ -160,7 +160,17 @@ trait GraphQLValidation extends QueryGen {
             else
               withSchema(schemaType.value, defnPos) { schema =>
                 lintResult(
-                  validateSubqueryTypes(schema, rootTypes, subquery.render),
+                  validateSubqueryTypes(
+                    schema,
+                    rootTypes,
+                    subqueryVariableDefs(schema,
+                                         rootTypes,
+                                         stats,
+                                         subquery.render,
+                                         infer = generating
+                    ),
+                    subquery.render
+                  ),
                   gqlValuePos("subquery", stats).getOrElse(defnPos),
                   defnPos
                 )

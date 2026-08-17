@@ -17,7 +17,7 @@ object Wrapper extends Something {
     ignoreUnusedImportEnums()
     import StarWars.Types._
     ignoreUnusedImportTypes()
-    override val document: String = """
+    override val document = gql"""
           fragment fields on Character {
             id
             name
@@ -31,8 +31,8 @@ object Wrapper extends Something {
               primaryFunction
             }
           }
-          query ($charId: ID!) {
-            character(id: $charId) {
+          query ($$charId: ID!) {
+            character(id: $$charId) {
               ...fields
             }
           }

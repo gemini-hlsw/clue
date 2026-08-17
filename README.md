@@ -60,7 +60,7 @@ Either:
 They must extend `GraphQLOperation[S]`, defining the following members:
 
 ``` scala
-  val document: String
+  val document: GraphQLDocument   // built with the `gql` interpolator (see below)
 
   type Variables
   type Data
@@ -69,6 +69,13 @@ They must extend `GraphQLOperation[S]`, defining the following members:
   val dataDecoder: io.circe.Decoder[Data]
 ```
 
+The `document` is built with the `gql` string interpolator (`import clue.gql`) rather than a plain
+`String`/`s"..."`. `gql` produces the same text at runtime, but its type (`GraphQLDocument`) can only
+be obtained through `gql`, so every operation goes through the compile-time check that splices its
+subqueries correctly (see [Subquery variables](#subquery-variables) below). `.stripMargin` works on a
+`GraphQLDocument` as it does on a `String`. For a document built by other means,
+`GraphQLDocument.unsafeFromString(...)` is the explicit (check-skipping) escape hatch.
+
 #### Example
 
 ``` scala
@@ -76,9 +83,9 @@ They must extend `GraphQLOperation[S]`, defining the following members:
   import io.circe.generic.semiauto._
 
   object CharacterQuery extends GraphQLOperation[StarWars] {
-    val document = """
-        query (charId: ID!) {
-          character(id: $charId) {
+    val document = gql"""
+        query ($$charId: ID!) {
+          character(id: $$charId) {
             id
             name
           }
@@ -116,13 +123,76 @@ A subquery declares the GraphQL root type(s) its selection applies to with a
 ```scala
 @GraphQLType("Character")
 abstract class FriendFields extends GraphQLSubquery.Typed[StarWars, Json] {
-  val subquery = "{ id name }"
+  val subquery = gql"{ id name }"
 }
 ```
+
+A subquery's `subquery` is a `GraphQLDocument` too, so it is built with `gql` for the same reason a
+`document` is (see [Subquery variables](#subquery-variables)).
 
 Hand-written subqueries may declare **multiple** types (the selection is validated against each:
 `@GraphQLType("Human", "Droid")`). A subquery processed by the generator (`@GraphQL`) must declare
 **exactly one** type. `@GraphQLType` is only valid on a subquery, not on a `GraphQLOperation`.
+
+##### Subquery variables
+
+A subquery that references GraphQL variables **must** declare them in a `type VariableDefs` member,
+written in operation-header syntax (the GraphQL spec's `VariablesDefinition`). A subquery that
+references none omits it — the member is not part of `GraphQLSubquery`, so there is nothing to write.
+It is a declaration only: no runtime value, case class or encoder behind it, unlike an operation's
+`Variables`:
+
+```scala
+@GraphQLType("Query")
+abstract class HeroByEpisode extends GraphQLSubquery.Typed[StarWars, Json] {
+  type VariableDefs = "($ep: Episode!)"
+  val subquery      = gql"{ hero(episode: $$ep) { name } }"
+}
+```
+
+(`$` is escaped as `$$` inside `gql`, as in any interpolated string. The `VariableDefs` literal is a
+plain string, so it is written with a single `$`.)
+
+The declaration is checked against usage (here `$ep` feeds `hero(episode: Episode!)`); a variable
+used but not declared, or declared with an incompatible type, is a scalafix error. Declaring a
+variable the subquery doesn't use is currently accepted (unused-variable detection is disabled, see
+`validateParsed`). For subqueries processed by the generator (`@GraphQL`), `type VariableDefs` is
+**inferred from usage and emitted automatically** when you don't write it; hand-written subqueries
+declare it explicitly.
+
+Note that the declaration is what the caller-check below keys on: a subquery that uses a variable
+without declaring it reads as "requires nothing" to callers. That omission is an error wherever the
+subquery is validated (it needs `@GraphQLType` and a configured schema), so keep validation enabled
+on projects that publish subqueries.
+
+To splice a subquery into an operation *and* have the operation's variables checked against it, build
+the `document` with the `gql` interpolator (from `clue`) instead of `s`:
+
+```scala
+trait MyQuery extends GraphQLOperation[StarWars] {
+  val document = gql"query ($$ep: Episode!) $HeroByEpisode"
+}
+```
+
+`gql` produces exactly the string `s` would, but at **compile time** it verifies the operation
+declares every variable required by each spliced subquery, with a compatible ("usable as") type. It
+reads the requirement from the subquery's `type VariableDefs` directly, so the check works even when
+the subquery comes from a dependency jar; a missing or wrong-typed variable is a compile error.
+
+A subquery splicing another subquery is checked the same way, against its own `VariableDefs` instead
+of an operation header:
+
+```scala
+@GraphQLType("Character")
+object FriendsWithHero extends GraphQLSubquery.Typed[StarWars, Json] {
+  type VariableDefs = "($ep: Episode!)"       // required: `HeroByEpisode` needs it
+  val subquery      = gql"{ id friends $HeroByEpisode }"
+}
+```
+
+Because each level has to declare what the level below requires, the requirement reaches the
+operation transitively — an operation splicing `FriendsWithHero` must declare `$ep` as well. Nesting
+is checked one level at a time; no whole-tree analysis is involved.
 
 The schema location is configured (once) in `.scalafix.conf`:
 

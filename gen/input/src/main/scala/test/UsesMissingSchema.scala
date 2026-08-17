@@ -18,6 +18,6 @@ trait NoSuchSchema
 
 @GraphQL // assert: GraphQLGen
 trait UsesMissingSchema extends GraphQLOperation[NoSuchSchema] {
-  override val document: String = "query { whatever }"
+  override val document = gql"query { whatever }"
 }
 // format: on

@@ -14,6 +14,6 @@ import clue.GraphQLOperation
 // `invalidField`, which doesn't exist on `Query`, so validation must report it.
 abstract class StarWarsManualTypedInvalid
     extends GraphQLOperation.Typed[StarWars, Map[String, Int], Int] {
-  override val document: String = "query { invalidField }" // assert: GraphQLGen
+  override val document = gql"query { invalidField }" // assert: GraphQLGen
 }
 // format: on

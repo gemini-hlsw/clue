@@ -14,6 +14,6 @@ import clue.GraphQLOperation
 // Validation must NOT report any diagnostic.
 abstract class StarWarsManualTypedValid
     extends GraphQLOperation.Typed[StarWars, Map[String, Int], Int] {
-  override val document: String = "query { hero(episode: NEWHOPE) { id name } }"
+  override val document = gql"query { hero(episode: NEWHOPE) { id name } }"
 }
 // format: on

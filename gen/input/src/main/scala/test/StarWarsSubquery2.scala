@@ -17,7 +17,7 @@ import io.circe.Json
 @GraphQLType("Character")
 object StarWarsSubquery2 extends GraphQLSubquery.Typed[StarWars, Json] {
 
-  override val subquery: String = """
+  override val subquery = gql"""
         {
           name
         }

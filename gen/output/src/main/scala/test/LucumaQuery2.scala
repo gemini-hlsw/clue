@@ -15,7 +15,7 @@ object LucumaQuery2 extends GraphQLOperation[LucumaODB] {
   ignoreUnusedImportEnums()
   import LucumaODB.Types._
   ignoreUnusedImportTypes()
-  val document = """
+  val document = gql"""
       query Program {
         program(programId: "p-2") {
           id

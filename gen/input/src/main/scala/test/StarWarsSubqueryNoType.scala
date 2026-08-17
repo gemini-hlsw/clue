@@ -15,6 +15,6 @@ import io.circe.Json
 // the selection can't be validated — a warning is reported (anchored at the definition) instead of
 // silently skipping.
 abstract class StarWarsSubqueryNoType extends GraphQLSubquery.Typed[StarWars, Json] { // assert: GraphQLGen
-  override val subquery: String = "{ id name }"
+  override val subquery = gql"{ id name }"
 }
 // format: on

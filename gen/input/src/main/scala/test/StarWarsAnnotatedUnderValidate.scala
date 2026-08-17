@@ -16,6 +16,6 @@ import clue.annotation.GraphQL
 // a warning (it never generates here).
 @GraphQL // assert: GraphQLValidate
 trait StarWarsAnnotatedUnderValidate extends GraphQLOperation[StarWars] {
-  override val document: String = "query { hero(episode: NEWHOPE) { id } }"
+  override val document = gql"query { hero(episode: NEWHOPE) { id } }"
 }
 // format: on

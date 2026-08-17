@@ -13,9 +13,9 @@ import clue.annotation.GraphQL
 
 @GraphQL
 trait LucumaMutation extends GraphQLOperation[LucumaODB] {
-  val document = """
-      mutation DeleteAsterism($asterismId: AsterismId!) {
-        deleteAsterism(asterismId: $asterismId) {
+  val document = gql"""
+      mutation DeleteAsterism($$asterismId: AsterismId!) {
+        deleteAsterism(asterismId: $$asterismId) {
           id
           existence
         }

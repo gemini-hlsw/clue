@@ -16,7 +16,7 @@ import clue.annotation.GraphQL
 object Wrapper /* gql: extends Something */ {
   @GraphQL // assert: GraphQLGen
   trait StarWarsQuery2 extends GraphQLOperation[StarWars] {
-  override val document: String = """
+  override val document = gql"""
         fragment fields on Character {
           id
           name
@@ -30,8 +30,8 @@ object Wrapper /* gql: extends Something */ {
             primaryFunction
           }
         }
-        query ($charId: ID!) {
-          character(id: $charId) {
+        query ($$charId: ID!) {
+          character(id: $$charId) {
             ...fields
           }
         }

@@ -20,7 +20,7 @@ import io.circe.Json
 @GraphQLType("Droid")
 object StarWarsTypedSubqueryAnnotatedDeprecated
     extends GraphQLSubquery.Typed[StarWars, Json] {
-  override val subquery: String = """
+  override val subquery = gql"""
         {
           primaryFunction
         }

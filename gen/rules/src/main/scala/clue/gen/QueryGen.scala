@@ -99,6 +99,14 @@ trait QueryGen extends Generator {
   protected def extractSubquery(stats: List[Stat]): Option[InterpolatedGql] =
     extractGql("subquery", stats)
 
+  // The declared GraphQL variables of a subquery, from its `type VariableDefs = "(...)"` member
+  // (parenthesized var-defs in operation-header syntax). Absent ⇒ the subquery references no
+  // variables. Uses the type test + field accessors to avoid the deprecated `Defn.Type` extractor.
+  protected def extractVariableDefs(stats: List[Stat]): Option[String] =
+    stats.collectFirst { case d: Defn.Type if d.name.value == "VariableDefs" => d.body }.collect {
+      case Lit.String(value) => value
+    }
+
   // TODO Support concatenation and stripMargin?
   // Actually when we support gql"" that should delimit things...
   // Actually(2)... Scalafix runs in a completely different context than the actual code.
@@ -186,12 +194,10 @@ trait QueryGen extends Generator {
    * All errors and warnings are accumulated into the [[Result]] (nothing is thrown).
    */
   private def validateParsed(
-    schema:         Schema,
-    rootTypeOf:     UntypedOperation => Result[NamedType],
-    operations:     List[UntypedOperation],
-    fragments:      List[UntypedFragment],
-    extraVars:      Query.Vars = Map.empty,
-    checkVariables: Boolean = true
+    schema:     Schema,
+    rootTypeOf: UntypedOperation => Result[NamedType],
+    operations: List[UntypedOperation],
+    fragments:  List[UntypedFragment]
   ): Result[Unit] = {
     val compiler = new QueryCompiler(GQLParser, schema, List.empty)
     val phases   =
@@ -204,18 +210,16 @@ trait QueryGen extends Generator {
     val fragMap  = fragments.map(f => f.name -> f).toMap
 
     for {
-      // The variable/fragment checks are skipped for subqueries (see [[validateSubquery]]): they
-      // reference variables they don't declare, which this check would wrongly report as undefined.
-      // `reportUnused = false` regardless: grackle's unused detection is unreliable — its
-      // `collectValueRefs` overwrites instead of accumulating variable refs (`loop(values,
-      // Set(nme))`), so when one value holds several variables (e.g. an input object with multiple
-      // `$var` fields) all but the last are falsely reported as unused.
+      // `reportUnused = false`: grackle's unused detection is unreliable — its `collectValueRefs`
+      // overwrites instead of accumulating variable refs (`loop(values, Set(nme))`), so when one
+      // value holds several variables (e.g. an input object with multiple `$var` fields) all but the
+      // last are falsely reported as unused. Note that re-enabling it would also need an exemption
+      // for subqueries: a subquery legitimately declares variables that only a subquery it splices
+      // uses, and a splice is rendered as `__typename` here (see [[InterpolatedGql.render]]).
       // TODO Re-enable unused detection when grackle releases the bug fix for `collectValueRefs`.
-      _ <- if (checkVariables)
-             Result.fromProblems(
-               compiler.validateVariablesAndFragments(operations, fragments, reportUnused = false)
-             )
-           else Result.success(())
+      _ <- Result.fromProblems(
+             compiler.validateVariablesAndFragments(operations, fragments, reportUnused = false)
+           )
       _ <- Result.fromProblems(compiler.validateFieldMergeability(operations, fragments))
       _ <- operations.traverse_ { op =>
              for {
@@ -230,7 +234,7 @@ trait QueryGen extends Generator {
                                  None,
                                  schema,
                                  Context(rootType),
-                                 createDummyVars(varDefs) ++ extraVars,
+                                 createDummyVars(varDefs),
                                  fragMap,
                                  op.query,
                                  Env.empty,
@@ -332,14 +336,104 @@ trait QueryGen extends Generator {
     go(query, rootType.some)
   }
 
+  // Render a grackle type back to GraphQL type syntax (e.g. `Episode!`, `[String!]`, `ID`). grackle
+  // types are non-null by default; `NullableType` marks the nullable positions.
+  private def renderGraphQLType(tpe: GType): String =
+    tpe match {
+      case NullableType(inner) => renderNullableGraphQLType(inner)
+      case ListType(inner)     => s"[${renderGraphQLType(inner)}]!"
+      case named: NamedType    => s"${named.name}!"
+      case other               => throw new Exception(s"Cannot render GraphQL type [$other]")
+    }
+
+  private def renderNullableGraphQLType(tpe: GType): String =
+    tpe match {
+      case ListType(inner)  => s"[${renderGraphQLType(inner)}]"
+      case named: NamedType => named.name
+      case other            => throw new Exception(s"Cannot render GraphQL type [$other]")
+    }
+
+  /**
+   * Infer the GraphQL variables a subquery references, from their usage, rendered as a
+   * parenthesized var-def list (`($a: T, $b: U)`) in operation-header syntax, sorted by name for
+   * deterministic output. Empty if the subquery references none. Used to auto-emit
+   * `type VariableDefs` for `@GraphQL` subqueries that don't declare it explicitly.
+   */
+  protected def inferSubqueryVariableDefs(
+    schema:       Schema,
+    rootTypeName: String,
+    subquery:     String
+  ): String =
+    scala.util
+      .Try {
+        (for {
+          rootType <- schema.definition(rootTypeName)
+          parsed   <- GQLParser.parseText(s"query $subquery").toOption
+        } yield {
+          val (operations, fragments) = parsed
+          val inferred: Query.Vars    =
+            operations.foldLeft(Map.empty[String, (GType, Value)])((acc, op) =>
+              acc ++ inferVariableVars(schema, rootType, op.query, fragments)
+            )
+          if (inferred.isEmpty) ""
+          else
+            inferred.toList
+              .sortBy(_._1)
+              .map { case (name, (tpe, _)) => s"$$$name: ${renderGraphQLType(tpe)}" }
+              .mkString("(", ", ", ")")
+        }).getOrElse("")
+      }
+      .getOrElse("")
+
+  /**
+   * The variables to validate a subquery against: the declared `type VariableDefs`, or — when the
+   * generator processes the subquery (`@GraphQL`), which also emits the declaration for it — the
+   * set inferred from usage. A hand-written subquery must declare them itself, so `infer` is false
+   * there and an undeclared variable is reported.
+   */
+  protected def subqueryVariableDefs(
+    schema:        Schema,
+    rootTypeNames: List[String],
+    stats:         List[Stat],
+    subquery:      String,
+    infer:         Boolean
+  ): String =
+    extractVariableDefs(stats).getOrElse {
+      rootTypeNames match {
+        // Inference needs a single unambiguous root type, which is what `@GraphQL` requires anyway.
+        case rootTypeName :: Nil if infer =>
+          inferSubqueryVariableDefs(schema, rootTypeName, subquery)
+        case _                            => ""
+      }
+    }
+
+  // Emit `type VariableDefs = "(...)"` into a generated subquery object when its variables were
+  // inferred (the author didn't declare them) and it references at least one. When the author wrote
+  // an explicit `type VariableDefs`, it is already in the body and carried through, so nothing is
+  // added.
+  protected def addVariableDefsTypeAlias(
+    explicitVariableDefs: Option[String],
+    variableDefs:         String
+  ): List[Stat] => List[Stat] =
+    parentBody =>
+      if (explicitVariableDefs.isDefined || variableDefs.isEmpty) parentBody
+      else q"type VariableDefs = ${Lit.String(variableDefs)}" :: parentBody
+
   /**
    * Validate a subquery (a selection set on `rootTypeName`) against the `schema`. Grackle's
    * `compile` always roots a document at the schema's operation types, so the root type is supplied
    * explicitly here.
+   *
+   * `variableDefs` is the subquery's declared variables (from its `type VariableDefs` member),
+   * parenthesized in operation-header syntax (e.g. `($ep: Episode!)`), or empty if it declares
+   * none. They are spliced into the wrapper operation so the standard variable checks apply: a
+   * variable used but not declared is reported, and each declared type is checked against its
+   * usage.
    */
   protected def validateSubquery(
     schema:       Schema,
     rootTypeName: String,
+    variableDefs: String,
     subquery:     String
   ): Result[Unit] =
     Result
@@ -348,24 +442,9 @@ trait QueryGen extends Generator {
         s"Undefined root type [$rootTypeName] for subquery"
       )
       .flatMap { rootType =>
-        GQLParser.parseText(s"query $subquery").flatMap { case (operations, fragments) =>
-          // A subquery references variables declared by the enclosing operation, not itself. We
-          // infer dummy values for them from their usage so the subquery is still validated without
-          // reporting them as undefined, and skip the variable-declaration check for the same reason.
-          // TODO Replace with real variable propagation through subqueries.
-          val inferredVars: Query.Vars =
-            operations.foldLeft(Map.empty[String, (GType, Value)]) { (acc, op) =>
-              acc ++ inferVariableVars(schema, rootType, op.query, fragments)
-            }
-
-          validateParsed(
-            schema,
-            _ => Result.success(rootType),
-            operations,
-            fragments,
-            inferredVars,
-            checkVariables = false
-          )
+        GQLParser.parseText(s"query $variableDefs $subquery").flatMap {
+          case (operations, fragments) =>
+            validateParsed(schema, _ => Result.success(rootType), operations, fragments)
         }
       }
 
@@ -376,9 +455,10 @@ trait QueryGen extends Generator {
   protected def validateSubqueryTypes(
     schema:        Schema,
     rootTypeNames: List[String],
+    variableDefs:  String,
     subquery:      String
   ): Result[Unit] =
-    rootTypeNames.parTraverse_(validateSubquery(schema, _, subquery))
+    rootTypeNames.parTraverse_(validateSubquery(schema, _, variableDefs, subquery))
 
   import DefineType._
   protected def addVars(

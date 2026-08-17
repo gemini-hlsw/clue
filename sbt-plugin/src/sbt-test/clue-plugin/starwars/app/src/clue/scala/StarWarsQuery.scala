@@ -11,9 +11,9 @@ import test.StarWars
 
 @GraphQL
 trait StarWarsQuery extends GraphQLOperation[StarWars] {
-  override val document: String = """
-        query ($charId: ID!) {
-          character(id: $charId) {
+  override val document = gql"""
+        query ($$charId: ID!) {
+          character(id: $$charId) {
             id
             name
             ... on Human {

@@ -15,11 +15,11 @@ object StarWarsInclude extends GraphQLOperation[StarWars] {
   ignoreUnusedImportEnums()
   import StarWars.Types._
   ignoreUnusedImportTypes()
-  override val document: String = """
-        query ($humanId: ID!, $skipId: Boolean!, $withName: Boolean!) {
-          human(id: $humanId) {
-            id @skip(if: $skipId)
-            name @include(if: $withName)
+  override val document = gql"""
+        query ($$humanId: ID!, $$skipId: Boolean!, $$withName: Boolean!) {
+          human(id: $$humanId) {
+            id @skip(if: $$skipId)
+            name @include(if: $$withName)
             homePlanet
           }
         }
