@@ -116,6 +116,20 @@ object StreamingMessage:
       inline def apply(payload: JsonObject) = new Ping(payload.some)
 
     /**
+     * Server initiated message that keeps the client connection alive. It is either a response to a
+     * client `Ping` or a unidirectional heartbeat. It can arrive at any time.
+     *
+     * @param payload
+     *   optional field can be used to transfer additional details about the pong
+     */
+    final case class Pong(payload: Option[JsonObject] = none)
+        extends FromServer
+        with Payload[Option[JsonObject]] derives Eq
+
+    object Pong:
+      inline def apply(payload: JsonObject) = new Pong(payload.some)
+
+    /**
      * GraphQL execution result from the server. The result is associated with an operation that was
      * previously started by a `Start` message with the associated `id`.
      *

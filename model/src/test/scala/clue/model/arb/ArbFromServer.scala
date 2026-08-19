@@ -76,6 +76,11 @@ trait ArbFromServer:
       for p <- arbitrary[Option[JsonObject]](using arbOptJsonObject)
       yield Ping(p)
 
+  given Arbitrary[Pong] =
+    Arbitrary:
+      for p <- arbitrary[Option[JsonObject]](using arbOptJsonObject)
+      yield Pong(p)
+
   given Arbitrary[Next] =
     Arbitrary:
       for
@@ -99,6 +104,7 @@ trait ArbFromServer:
       Gen.oneOf[FromServer](
         arbitrary[ConnectionAck],
         arbitrary[Ping],
+        arbitrary[Pong],
         arbitrary[Next],
         arbitrary[Error],
         arbitrary[Complete]
