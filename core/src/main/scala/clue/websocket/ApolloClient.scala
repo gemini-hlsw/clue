@@ -212,6 +212,10 @@ class ApolloClient[F[_], P, S](
           case Connecting(_, Some(connection), _, _, _) =>
             connection.send(StreamingMessage.FromClient.Pong(payload)) // Respond the same payload.
           case _ => F.unit
+      case Right(StreamingMessage.FromServer.Pong(payload))                        =>
+        // A Pong is either the answer to our Ping or a unidirectional heartbeat.
+        // Either way, no reply is due.
+        s"Pong received from server with payload [$payload].".traceF
       case _                                                                       => s"Unexpected message received from server: [$msg]".warnF
     }
 

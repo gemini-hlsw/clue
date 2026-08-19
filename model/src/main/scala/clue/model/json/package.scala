@@ -156,6 +156,22 @@ package object json {
         p <- c.get[Option[JsonObject]]("payload")
       yield FromServer.Ping(p)
 
+  given FromServerPongEncoder: Encoder[FromServer.Pong] =
+    Encoder.instance: a =>
+      Json
+        .obj(
+          "type"    -> Json.fromString("pong"),
+          "payload" -> a.payload.asJson
+        )
+        .dropNullValues
+
+  given FromServerPongDecoder: Decoder[FromServer.Pong] =
+    Decoder.instance: c =>
+      for
+        _ <- checkType(c, "pong")
+        p <- c.get[Option[JsonObject]]("payload")
+      yield FromServer.Pong(p)
+
   given Encoder[GraphQLError.PathElement] =
     (a: GraphQLError.PathElement) => a.fold(_.asJson, _.asJson)
 
@@ -299,6 +315,7 @@ package object json {
     Encoder.instance:
       case m @ FromServer.ConnectionAck(_) => m.asJson
       case m @ FromServer.Ping(_)          => m.asJson
+      case m @ FromServer.Pong(_)          => m.asJson
       case m @ FromServer.Next(_, _)       => m.asJson
       case m @ FromServer.Error(_, _)      => m.asJson
       case m @ FromServer.Complete(_)      => m.asJson
@@ -309,6 +326,7 @@ package object json {
         .flatMap:
           case "connection_ack" => c.as[FromServer.ConnectionAck]
           case "ping"           => c.as[FromServer.Ping]
+          case "pong"           => c.as[FromServer.Pong]
           case "next"           => c.as[FromServer.Next]
           case "error"          => c.as[FromServer.Error]
           case "complete"       => c.as[FromServer.Complete]
