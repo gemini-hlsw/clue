@@ -15,22 +15,27 @@ import io.circe.syntax.*
 /**
  * In-memory WebSocket backend for tests. The test drives the client through it. It records the
  * messages that the client sends. It feeds server messages and close events to the client.
- *
- * @param autoAck
- *   if true, the backend answers a `connection_init` with a `connection_ack`
  */
 final class TestWebSocketBackend[F[_]: Async] private (
   sentRef:    Ref[F, Vector[StreamingMessage.FromClient]],
   currentRef: Ref[F, Option[(PersistentBackendHandler[F, CloseEvent], ConnectionId)]],
   closesRef:  Ref[F, Vector[Option[CloseParams]]],
-  autoAck:    Boolean
+  autoAckRef: Ref[F, Boolean]
 ) extends WebSocketBackend[F, String]:
+
+  /** Turns the automatic `connection_ack` answer on or off. */
+  def autoAck(enabled: Boolean): F[Unit] = autoAckRef.set(enabled)
 
   /** The messages that the client sent, in order. */
   val sent: F[List[StreamingMessage.FromClient]] = sentRef.get.map(_.toList)
 
   /** The close parameters of every `closeInternal` call, in order. */
   val closes: F[List[Option[CloseParams]]] = closesRef.get.map(_.toList)
+
+  /** Waits until the recorded client messages match the condition. */
+  def awaitSent(condition: List[StreamingMessage.FromClient] => Boolean): F[Unit] =
+    sent.flatMap: msgs =>
+      if condition(msgs) then Async[F].unit else Async[F].cede >> awaitSent(condition)
 
   /** Sends a message from the server to the client. */
   def emit(msg: StreamingMessage.FromServer): F[Unit] = emitRaw(msg.asJson.noSpaces)
@@ -55,12 +60,15 @@ final class TestWebSocketBackend[F[_]: Async] private (
           override def send(msg: StreamingMessage.FromClient): F[Unit] =
             sentRef.update(_ :+ msg) >>
               (msg match
-                case StreamingMessage.FromClient.ConnectionInit(_) if autoAck =>
-                  handler.onMessage(
-                    connectionId,
-                    StreamingMessage.FromServer.ConnectionAck().asJson.noSpaces
-                  )
-                case _                                                        => Async[F].unit)
+                case StreamingMessage.FromClient.ConnectionInit(_) =>
+                  autoAckRef.get.flatMap: enabled =>
+                    if enabled then
+                      handler.onMessage(
+                        connectionId,
+                        StreamingMessage.FromServer.ConnectionAck().asJson.noSpaces
+                      )
+                    else Async[F].unit
+                case _                                             => Async[F].unit)
 
           override protected[clue] def closeInternal(
             closeParameters: Option[CloseParams]
@@ -74,4 +82,5 @@ object TestWebSocketBackend:
       sent   <- Ref.of[F, Vector[StreamingMessage.FromClient]](Vector.empty)
       cur    <- Ref.of[F, Option[(PersistentBackendHandler[F, CloseEvent], ConnectionId)]](none)
       closes <- Ref.of[F, Vector[Option[CloseParams]]](Vector.empty)
-    yield new TestWebSocketBackend(sent, cur, closes, autoAck)
+      ack    <- Ref.of[F, Boolean](autoAck)
+    yield new TestWebSocketBackend(sent, cur, closes, ack)

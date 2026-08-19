@@ -228,14 +228,18 @@ class ApolloClient[F[_], P, S](
       (reconnectionStrategy(0, event.asRight) match {
         case None       =>
           stateModify:
-            case s @ Disconnected(_)                                                         =>
+            case s @ Disconnected(_) =>
               s -> s"onClose() called while disconnected.".debugF
-            case Connecting(stateConnectionId, _, _, _, latch)
+            case Connecting(stateConnectionId, _, _, subscriptions, latch)
                 if connectionId === stateConnectionId =>
-              Disconnected(connectionId.next) -> latch.error(error)
-            case Connected(stateConnectionId, _, _, _) if connectionId === stateConnectionId =>
-              Disconnected(connectionId.next) -> F.unit
-            case s @ _                                                                       =>
+              // The subscriptions go away with the state, so the subscribers must be told.
+              // Otherwise each subscriber stream waits forever on its queue.
+              Disconnected(connectionId.next) ->
+                (latch.error(error) >> crashSubscriptions(subscriptions, error))
+            case Connected(stateConnectionId, _, _, subscriptions)
+                if connectionId === stateConnectionId =>
+              Disconnected(connectionId.next) -> crashSubscriptions(subscriptions, error)
+            case s @ _               =>
               s -> debug
         case Some(wait) =>
           Latch[F, JsonObject].flatMap: newLatch =>
@@ -280,9 +284,7 @@ class ApolloClient[F[_], P, S](
     val disconnectBackend: F[Unit] =
       oldConnection.map(_.closeInternal(none).start.void).getOrElse(F.unit)
 
-    val errorSubscriptions: F[Unit] = subscriptions.toList.traverse { case (_, emitter) =>
-      emitter.crash(t)
-    }.void
+    val errorSubscriptions: F[Unit] = crashSubscriptions(subscriptions, t)
 
     reconnectionStrategy(attempt, t.asLeft) match
       case None       =>
@@ -393,6 +395,13 @@ class ApolloClient[F[_], P, S](
     subscriptions: Map[String, Emitter[F]]
   ): F[Unit] =
     subscriptions.toList.traverse { case (_, emitter) => emitter.halt }.void
+
+  // Crash = Terminate stream sent to client with an error.
+  private def crashSubscriptions(
+    subscriptions: Map[String, Emitter[F]],
+    t:             Throwable
+  ): F[Unit] =
+    subscriptions.toList.traverse { case (_, emitter) => emitter.crash(t) }.void
 
   private def haltSubscription(subscriptionId: String): F[Unit] =
     s"Halting subscription [$subscriptionId]".debugF >>
