@@ -28,8 +28,7 @@ import java.util.UUID
 class ApolloClient[F[_], P, S](
   connectionParams:     P,
   reconnectionStrategy: ReconnectionStrategy,
-  state:                Ref[F, State[F]],
-  connectionStatus:     SignallingRef[F, PersistentClientStatus]
+  state:                SignallingRef[F, State[F]]
 )(using
   F:                    Async[F],
   backend:              WebSocketBackend[F, P],
@@ -48,17 +47,16 @@ class ApolloClient[F[_], P, S](
         newState -> ((oldState, newState, action))
       }
       .flatMap { case (oldState, newState, action) =>
-        s"State Modified [$oldState] ==> [$newState]".traceF >>
-          connectionStatus.set(newState.status) >>
-          action
+        s"State Modified [$oldState] ==> [$newState]".traceF >> action
       }
 
   // <ApolloClient>
   override def status: F[PersistentClientStatus] =
-    connectionStatus.get
+    state.get.map(_.status)
 
+  // `changes` because a state transition does not always change the status.
   override def statusStream: fs2.Stream[F, PersistentClientStatus] =
-    connectionStatus.discrete
+    state.discrete.map(_.status).changes
 
   override def connect(): F[JsonObject] = connect(JsonObject.empty.pure[F])
 
@@ -67,7 +65,7 @@ class ApolloClient[F[_], P, S](
 
     Latch[F, JsonObject].flatMap { newLatch =>
       stateModify {
-        case Disconnected(connectionId)        =>
+        case Disconnected(connectionId, _)     =>
           Connecting(connectionId, none, payload.map(_.asJsonObject), Map.empty, newLatch) ->
             (doConnect(connectionId) >> newLatch.resolve.map(_.getOrElse(JsonObject.empty)))
         case s @ Connecting(_, _, _, _, latch) =>
@@ -92,14 +90,16 @@ class ApolloClient[F[_], P, S](
 
     // We *could* wait for onClose to be invoked before completing, but is there a point to that?
     stateModify {
-      case Connecting(connectionId, connection, _, _, latch)     =>
+      case Connecting(connectionId, connection, _, subscriptions, latch) =>
         // We need a wait for the connection to establish and then disconnect it, without blocking the client.
+        // The subscriptions go away with the state, so their streams must end here.
         Disconnected(connectionId.next) ->
           (latch.error(interruptedError) >>
+            haltSubscriptions(subscriptions) >>
             connection
               .map(_.closeInternal(closeParameters))
               .getOrElse(F.unit)) // >> TODO wait in background to complete and close
-      case Connected(connectionId, connection, _, subscriptions) =>
+      case Connected(connectionId, connection, _, subscriptions)         =>
         Disconnected(connectionId.next) ->
           (
             (gracefulTerminate(connection, subscriptions),
@@ -107,7 +107,7 @@ class ApolloClient[F[_], P, S](
             ).parTupled >>
               connection.closeInternal(closeParameters)
           )
-      case s                                                     => s -> error
+      case s                                                             => s -> error
     }.uncancelable
   }
 
@@ -130,14 +130,9 @@ class ApolloClient[F[_], P, S](
     modParams:     Unit => Unit,  // This is ignored here.
     descriptor:    Option[String] // This is ignored here.
   ): F[GraphQLResponse[D]] =
-    F.async(cb =>
-      startSubscription[D](document, operationName, variables, extensions)
-        .flatMap(subscription =>
-          subscription.stream.attempt.head.compile.onlyOrError.attempt
-            .map(onlyOrError => cb(onlyOrError.flatten))
-        )
-        .as(none) // Don't return a cancellation cleanup. Subscription is cleaned up whenm stream is finalized.
-    )
+    // A one-shot request is a subscription that ends after its first response.
+    subscriptionResource[D](document, operationName, variables, extensions)
+      .use(_.head.compile.lastOrError)
   // </FetchClient>
   // </StreamingClient>
   // </ApolloClient>
@@ -186,18 +181,14 @@ class ApolloClient[F[_], P, S](
             ).logAndRaiseF
       case Right(StreamingMessage.FromServer.Complete(subscriptionId))             =>
         state.get.flatMap:
-          case Connected(stateConnectionId, _, _, subscriptions)
-              if connectionId === stateConnectionId =>
-            subscriptions.get(subscriptionId) match {
-              case None               => F.unit
-              case Some(subscription) => subscription.halt
-            }
+          case Connected(stateConnectionId, _, _, _) if connectionId === stateConnectionId     =>
+            completeSubscription(subscriptionId)
           // Next 3 cases are expected. Server will send complete packages for subscriptions shut down when reestablishing/reinitializing.
           case Connecting(stateConnectionId, _, _, _, _) if connectionId =!= stateConnectionId =>
             F.unit
           case Connected(stateConnectionId, _, _, _) if connectionId =!= stateConnectionId     =>
             F.unit
-          case s @ Disconnected(_)                                                             =>
+          case s @ Disconnected(_, _)                                                          =>
             s"Complete RECEIVED for subscription [$subscriptionId] on Disconnected state.".debugF >>
               s"  \\-- State Is: [$s]".traceF
           case s @ _                                                                           =>
@@ -228,18 +219,19 @@ class ApolloClient[F[_], P, S](
       (reconnectionStrategy(0, event.asRight) match {
         case None       =>
           stateModify:
-            case s @ Disconnected(_) =>
+            case s @ Disconnected(_, _) =>
               s -> s"onClose() called while disconnected.".debugF
             case Connecting(stateConnectionId, _, _, subscriptions, latch)
                 if connectionId === stateConnectionId =>
               // The subscriptions go away with the state, so the subscribers must be told.
               // Otherwise each subscriber stream waits forever on its queue.
-              Disconnected(connectionId.next) ->
+              Disconnected(connectionId.next, error.some) ->
                 (latch.error(error) >> crashSubscriptions(subscriptions, error))
             case Connected(stateConnectionId, _, _, subscriptions)
                 if connectionId === stateConnectionId =>
-              Disconnected(connectionId.next) -> crashSubscriptions(subscriptions, error)
-            case s @ _               =>
+              Disconnected(connectionId.next, error.some) ->
+                crashSubscriptions(subscriptions, error)
+            case s @ _                  =>
               s -> debug
         case Some(wait) =>
           Latch[F, JsonObject].flatMap: newLatch =>
@@ -250,7 +242,7 @@ class ApolloClient[F[_], P, S](
                 doConnect(nextConnectionId, attempt = 1)
 
             stateModify:
-              case s @ Disconnected(stateConnectionId) if connectionId === stateConnectionId =>
+              case s @ Disconnected(stateConnectionId, _) if connectionId === stateConnectionId =>
                 s -> s"Unexpected onClose() called while disconnected. Not applying reconnectStrategy.".warnF
               case Connecting(stateConnectionId, _, initPayload, subscriptions, connectLatch)
                   if connectionId === stateConnectionId =>
@@ -265,7 +257,7 @@ class ApolloClient[F[_], P, S](
                   subscriptions,
                   newLatch
                 ) -> waitAndConnect(connectionId.next)
-              case s @ _                                                                     =>
+              case s @ _                                                                        =>
                 s -> debug
       })
   }
@@ -288,7 +280,7 @@ class ApolloClient[F[_], P, S](
 
     reconnectionStrategy(attempt, t.asLeft) match
       case None       =>
-        Disconnected(nextConnectionId) ->
+        Disconnected(nextConnectionId, t.some) ->
           (errorSubscriptions >> disconnectBackend >> t.logAndRaiseF)
       case Some(wait) =>
         Connecting(nextConnectionId, none, payload, subscriptions, newLatch) ->
@@ -350,8 +342,8 @@ class ApolloClient[F[_], P, S](
                         case Right(_) =>
                           Connected(connectionId, connection, payload, subscriptions) ->
                             startSubscriptions(connection, subscriptions)
-                    case Disconnected(connectionId) if result.isLeft                           =>
-                      Disconnected(connectionId) -> (s"Disconnected while initializing.".debugF >>
+                    case s @ Disconnected(_, _) if result.isLeft                               =>
+                      s -> (s"Disconnected while initializing.".debugF >>
                         RemoteInitializationException(result.swap.toOption.get).raiseF)
                     case s                                                                     =>
                       s -> (s"Unexpected state when initializing.".errorF >> s"State Is: [$s]".traceF >>
@@ -381,7 +373,7 @@ class ApolloClient[F[_], P, S](
         connection.send(StreamingMessage.FromClient.Subscribe(id, emitter.request))
       .void
 
-  // Stop = Send stop message to server.
+  // Stop = Send stop message to server. Does not halt the streams nor drop the subscriptions.
   private def stopSubscriptions(
     connection:    WebSocketConnection[F],
     subscriptions: Map[String, Emitter[F]]
@@ -403,21 +395,64 @@ class ApolloClient[F[_], P, S](
   ): F[Unit] =
     subscriptions.toList.traverse { case (_, emitter) => emitter.crash(t) }.void
 
-  private def haltSubscription(subscriptionId: String): F[Unit] =
-    s"Halting subscription [$subscriptionId]".debugF >>
-      state.get.flatMap {
-        case Connected(_, _, _, subscriptions) =>
-          for {
-            _ <- s"Current subscriptions: [${subscriptions.keySet}]".traceF
-            _ <- subscriptions.get(subscriptionId) match {
-                   case None               =>
-                     (new InvalidSubscriptionOperationException("stop", subscriptionId)).raiseF
-                   case Some(subscription) => subscription.halt
-                 }
-          } yield ()
-        case s @ _                             =>
-          InvalidSubscriptionOperationException("stop", subscriptionId).logAndRaiseF
-      }
+  // Drop = Remove the subscription from the state, so a reconnection does not restart it, and tell
+  // the server to stop sending. Never waits for a connection, since it runs uncancelably.
+  private def dropSubscription(
+    subscriptionId: String,
+    reason:         String,
+    halt:           Boolean,
+    notify:         Boolean = true
+  ): F[Unit] = {
+    def dropped(connection: Option[WebSocketConnection[F]], emitter: Emitter[F]): F[Unit] = {
+      val tellServer: F[Unit] =
+        connection.traverse_(_.send(StreamingMessage.FromClient.Complete(subscriptionId)))
+
+      // The halt runs even when the message fails. The subscription is gone from the state, so
+      // nothing else can end the stream and a reader would wait forever.
+      s"Dropping subscription [$subscriptionId] ($reason).".traceF >>
+        tellServer.whenA(notify).guarantee(emitter.halt.whenA(halt))
+    }
+
+    def drop(
+      current:       State[F],
+      subscriptions: Map[String, Emitter[F]],
+      connection:    Option[WebSocketConnection[F]]
+    )(rebuild: Map[String, Emitter[F]] => State[F]): (State[F], F[Unit]) =
+      subscriptions.get(subscriptionId) match
+        case Some(emitter) =>
+          rebuild(subscriptions - subscriptionId) -> dropped(connection, emitter)
+        case None          =>
+          current -> s"Subscription [$subscriptionId] already dropped ($reason).".traceF
+
+    stateModify {
+      case s @ Connected(cid, connection, i, subscriptions)         =>
+        drop(s, subscriptions, connection.some)(Connected(cid, connection, i, _))
+      case s @ Connecting(cid, connection, i, subscriptions, latch) =>
+        drop(s, subscriptions, none)(Connecting(cid, connection, i, _, latch))
+      // Every transition to Disconnected halts or crashes the subscriptions it drops, so the
+      // stream already ended here.
+      case s @ _                                                    =>
+        s -> s"Subscription [$subscriptionId] not dropped ($reason). Client is disconnected.".traceF
+    }
+  }
+
+  // Release = The stream ended on its own, so it needs no halt.
+  private def releaseSubscription(subscriptionId: String): F[Unit] =
+    dropSubscription(subscriptionId, "release", halt = false)
+
+  // Stop = The caller ended the subscription.
+  private def stopSubscription(subscriptionId: String): F[Unit] =
+    dropSubscription(subscriptionId, "stop", halt = true)
+
+  // Complete = The server ended the subscription. It needs no message back, and a reconnection
+  // must not restart it.
+  private def completeSubscription(subscriptionId: String): F[Unit] =
+    dropSubscription(subscriptionId, "server complete", halt = true, notify = false)
+
+  // Discard = The subscribe message never reached the server, so nobody holds or reads the
+  // subscription. Without this, a reconnection would restart a subscription nobody can stop.
+  private def discardSubscription(subscriptionId: String): F[Unit] =
+    dropSubscription(subscriptionId, "failed subscribe", halt = false, notify = false)
 
   private def createSubscription[D](
     subscriptionStream: Stream[F, D],
@@ -425,11 +460,7 @@ class ApolloClient[F[_], P, S](
   ): GraphQLSubscription[F, D] = new GraphQLSubscription[F, D] {
     override val stream: fs2.Stream[F, D] = subscriptionStream
 
-    override def stop(): F[Unit] =
-      for {
-        _ <- haltSubscription(subscriptionId)
-        _ <- sendStop(subscriptionId)
-      } yield ()
+    override def stop(): F[Unit] = stopSubscription(subscriptionId)
   }
 
   private type DataQueueType[D] = Option[Either[Throwable, GraphQLResponse[D]]]
@@ -452,8 +483,7 @@ class ApolloClient[F[_], P, S](
     def emitGraphQLErrors(errors: GraphQLErrors): F[Unit] =
       s"Emitting error: $errors".traceF >> queue.offer(GraphQLResponse.errors(errors).asRight.some)
 
-    def crash(t: Throwable): F[Unit] =
-      queue.offer(t.asLeft.some)
+    def crash(t: Throwable): F[Unit] = queue.offer(t.asLeft.some)
 
     val halt: F[Unit] = queue.offer(none)
   }
@@ -471,65 +501,40 @@ class ApolloClient[F[_], P, S](
 
   // TODO Handle interruptions in subscription and query.
 
-  private def subscriptionResource[D: Decoder, R](
+  // Wait until the client leaves the Connecting state.
+  private def awaitConnection: F[Unit] =
+    state.waitUntil(_.status =!= PersistentClientStatus.Connecting)
+
+  private def subscriptionResource[D: Decoder](
     subscription:  GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject],
     extensions:    Option[JsonObject]
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     Resource
-      .make(startSubscription[D](subscription, operationName, variables, extensions))(
-        _.stop()
-          .handleErrorWith(_.logF("Error stopping subscription"))
-      )
+      .makeFull[F, GraphQLSubscription[F, GraphQLResponse[D]]] { poll =>
+        // Only the wait for a connection is cancelable. Once the subscription is registered, its
+        // release must run, so the rest of the acquisition stays uncancelable and never waits.
+        def go: F[GraphQLSubscription[F, GraphQLResponse[D]]] =
+          startSubscription[D](subscription, operationName, variables, extensions)
+            .flatMap(_.fold(poll(awaitConnection) >> go)(_.pure[F]))
+
+        go
+      }(_.stop().handleErrorWith(_.logF("Error stopping subscription")))
       .map(_.stream)
 
+  // Never waits. Returns `none` if the client is still connecting, so the caller must retry.
   private def startSubscription[D: Decoder](
     subscription:  GraphQLQuery,
     operationName: Option[String],
     variables:     Option[JsonObject],
     extensions:    Option[JsonObject]
-  ): F[GraphQLSubscription[F, GraphQLResponse[D]]] =
+  ): F[Option[GraphQLSubscription[F, GraphQLResponse[D]]]] =
     state.get.flatMap {
-      case Connected(_, _, _, _)         =>
+      case Connected(_, _, _, _)     =>
         val request = GraphQLRequest(subscription, operationName, variables, extensions)
 
         buildQueue[D](request).flatMap { case (id, emitter) =>
-          def acquire: F[Unit] =
-            s"Acquiring queue for subscription [$id]".traceF >>
-              stateModify {
-                case Connected(cid, c, i, subscriptions) =>
-                  Connected(cid, c, i, subscriptions + (id -> emitter)) -> F.unit
-                case s @ Connecting(_, _, _, _, latch)   =>
-                  s -> (latch.resolve >> acquire)
-                case s @ _                               =>
-                  s ->
-                    InvalidSubscriptionOperationException("acquire queue", id).logAndRaiseF
-              }
-
-          def release: F[Unit] =
-            s"Releasing queue for subscription[$id]".traceF >>
-              stateModify {
-                case Connected(cid, c, i, subscriptions) =>
-                  Connected(cid, c, i, subscriptions - id) -> F.unit
-                case s @ Connecting(_, _, _, _, latch)   =>
-                  s -> (latch.resolve >> release)
-                case s @ Disconnected(_)                 =>
-                  // It's OK to call release when Disconnected.
-                  // It may happen if client is disconnected and we are halting streams.
-                  s -> F.unit
-              }
-
-          def sendStart: F[Unit] = state.get.flatMap {
-            // The connection may have changed since we created the subscription, so we re-get it.
-            case Connected(_, currentConnection, _, _) =>
-              currentConnection.send(StreamingMessage.FromClient.Subscribe(id, request))
-            case Connecting(_, _, _, _, latch)         =>
-              latch.resolve >> sendStart
-            case s @ _                                 =>
-              InvalidSubscriptionOperationException("send start", id).logAndRaiseF
-          }
-
           val stream =
             Stream
               .fromQueueUnterminated(emitter.queue)
@@ -540,26 +545,34 @@ class ApolloClient[F[_], P, S](
                 s"Stream for subscription [$id] finalized with ExitCase [$c]".traceF >>
                   (c match { // If canceled, we don't want to clean up. Other fibers may be evaluating the stream. Clients can explicitly call `stop()`.
                     case Resource.ExitCase.Canceled => F.unit
-                    case _                          => release
+                    // A failed complete message says nothing about the responses already read.
+                    case _                          =>
+                      releaseSubscription(id)
+                        .handleErrorWith(_.logF(s"Error releasing subscription [$id]"))
                   })
               )
 
-          (acquire >> sendStart).as(createSubscription(stream, id))
+          // Register the subscription and send the subscribe message in one state transition, so
+          // both use the same connection. If the send fails, the registration must go away again.
+          s"Acquiring queue for subscription [$id]".traceF >>
+            stateModify[Option[GraphQLSubscription[F, GraphQLResponse[D]]]] {
+              case Connected(cid, connection, i, subscriptions) =>
+                Connected(cid, connection, i, subscriptions + (id -> emitter)) ->
+                  connection
+                    .send(StreamingMessage.FromClient.Subscribe(id, request))
+                    .onError(_ => discardSubscription(id))
+                    .as(createSubscription(stream, id).some)
+              case s @ Connecting(_, _, _, _, _)                =>
+                s -> none.pure[F]
+              case s @ _                                        =>
+                s -> InvalidSubscriptionOperationException("acquire queue", id).logAndRaiseF_
+            }
         }
-      case Connecting(_, _, _, _, latch) =>
-        latch.resolve >>
-          startSubscription(subscription, operationName, variables, extensions)
-      case _                             =>
-        ConnectionNotInitializedException.logAndRaiseF_
-    }
-
-  private def sendStop(subscriptionId: String): F[Unit] =
-    state.get.flatMap {
-      // The connection may have changed since we created the subscription, so we re-get it.
-      case Connected(_, currentConnection, _, _) =>
-        currentConnection.send(StreamingMessage.FromClient.Complete(subscriptionId))
-      case s @ _                                 =>
-        InvalidSubscriptionOperationException("send stop", subscriptionId).logAndRaiseF
+      case Connecting(_, _, _, _, _) =>
+        none.pure[F]
+      // The client gave up on a connection, so the caller gets the failure that caused it.
+      case Disconnected(_, cause)    =>
+        cause.getOrElse(ConnectionNotInitializedException).logAndRaiseF_
     }
 
   // </GraphQLStreamingClient Helpers>
@@ -581,10 +594,8 @@ object ApolloClient {
     val logPrefix = s"clue.ApolloClient[${if (name.isEmpty) connectionParams else name}]"
 
     for {
-      state            <- Ref[F].of[State[F]](State.Disconnected(ConnectionId.Zero))
-      connectionStatus <-
-        SignallingRef[F, PersistentClientStatus](PersistentClientStatus.Disconnected)
-    } yield new ApolloClient(connectionParams, reconnectionStrategy, state, connectionStatus)(using
+      state <- SignallingRef[F].of[State[F]](State.Disconnected(ConnectionId.Zero))
+    } yield new ApolloClient(connectionParams, reconnectionStrategy, state)(using
       F,
       backend,
       logger.withModifiedString(s => s"$logPrefix $s"),
