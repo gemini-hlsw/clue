@@ -439,11 +439,14 @@ class ApolloClient[F[_], P, S](
     val request: GraphQLRequest[JsonObject]
   ) extends Emitter[F] {
 
+    // A decode failure belongs to this subscription alone. Offer it to the queue instead of
+    // raising it into the message handler, which would close the connection and with it every
+    // other subscription. The subscriber stream rethrows queue errors, so the caller still sees it.
     def emitData(response: GraphQLResponse[Json]): F[Unit] =
       for {
         _    <- s"Emitting data:\n$response".traceF
-        data <- F.delay(response.traverse(_.as[D])).rethrow
-        _    <- queue.offer(data.asRight.some)
+        data <- F.delay(response.traverse(_.as[D]))
+        _    <- queue.offer(data.some)
       } yield ()
 
     def emitGraphQLErrors(errors: GraphQLErrors): F[Unit] =
