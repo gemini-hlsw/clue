@@ -3,7 +3,6 @@
 
 package clue.js
 
-import cats.Applicative
 import cats.effect.*
 import cats.syntax.all.*
 import clue.*
@@ -16,11 +15,9 @@ import org.scalajs.dom.Fetch
 import org.scalajs.dom.Headers
 import org.scalajs.dom.HttpMethod
 import org.scalajs.dom.RequestInit
-import org.scalajs.macrotaskexecutor.MacrotaskExecutor.Implicits.*
+import org.scalajs.dom.Response
 
 import scala.scalajs.js.URIUtils
-import scala.util.Failure
-import scala.util.Success
 
 sealed trait FetchMethod extends Product with Serializable
 object FetchMethod {
@@ -34,56 +31,82 @@ final class FetchJsBackend[F[_]: Async](fetchMethod: FetchMethod)
     request:     GraphQLRequest[V],
     baseRequest: FetchJsRequest
   ): F[String] =
-    Async[F].async { cb =>
+    Sync[F].defer {
       val controller = new AbortController()
-      val _signal    = controller.signal
-      val _headers   = new Headers(baseRequest.headers)
-      val fetch      = fetchMethod match {
-        case FetchMethod.POST =>
-          _headers.set("Content-Type", "application/json")
-          Fetch
-            .fetch(
-              baseRequest.uri.toString,
-              new RequestInit {
-                method = HttpMethod.POST
-                body = request.asJson.noSpaces
-                headers = _headers
-                signal = _signal
-              }
-            )
-        case FetchMethod.GET  =>
-          Fetch
-            .fetch(
-              FetchJsBackend.buildGetUri(
-                baseRequest.uri.toString,
-                request.query.value,
-                request.variables.map(_.asJson.noSpaces),
-                request.operationName
-              ),
-              new RequestInit {
-                method = HttpMethod.GET
-                headers = _headers
-                signal = _signal
-              }
-            )
-      }
+      val abort      = Sync[F].delay(controller.abort())
 
-      Applicative[F]
-        .pure(
-          fetch.toFuture
-            .flatMap(_.text().toFuture)
-            .onComplete {
-              case Success(r) => cb(Right(r))
-              case Failure(t) => cb(Left(t))
+      val fetch: F[Response] =
+        Async[F].fromPromiseCancelable(
+          Sync[F].delay {
+            val _signal  = controller.signal
+            val _headers = new Headers(baseRequest.headers)
+            // The specification requires the GraphQL media type in the `Accept` header. A header
+            // that the caller set stays unchanged.
+            if (!_headers.has(FetchJsBackend.AcceptHeaderName))
+              _headers.set(FetchJsBackend.AcceptHeaderName, FetchJsBackend.AcceptHeaderValue)
+            val promise  = fetchMethod match {
+              case FetchMethod.POST =>
+                _headers.set("Content-Type", "application/json")
+                Fetch
+                  .fetch(
+                    baseRequest.uri.toString,
+                    new RequestInit {
+                      method = HttpMethod.POST
+                      body = request.asJson.noSpaces
+                      headers = _headers
+                      signal = _signal
+                    }
+                  )
+              case FetchMethod.GET  =>
+                Fetch
+                  .fetch(
+                    FetchJsBackend.buildGetUri(
+                      baseRequest.uri.toString,
+                      request.query.value,
+                      request.variables.map(_.asJson.noSpaces),
+                      request.operationName
+                    ),
+                    new RequestInit {
+                      method = HttpMethod.GET
+                      headers = _headers
+                      signal = _signal
+                    }
+                  )
             }
+            (promise, abort)
+          }
         )
-        .as(Sync[F].delay(controller.abort()).some)
+
+      fetch.flatMap { response =>
+        Async[F]
+          .fromPromiseCancelable(Sync[F].delay((response.text(), abort)))
+          .flatMap { body =>
+            val contentType = Option(response.headers.get("Content-Type"))
+            if (GraphQLOverHttp.processBody(response.status, contentType))
+              body.pure[F]
+            else
+              HttpStatusException(response.status, contentType, body).raiseError[F, String]
+          }
+      }
     }
 }
 
 object FetchJsBackend {
   def apply[F[_]: Async](method: FetchMethod = FetchMethod.POST): FetchJsBackend[F] =
     new FetchJsBackend[F](method)
+
+  /** The name of the `Accept` header. */
+  private val AcceptHeaderName: String = "Accept"
+
+  /** The legacy media type for GraphQL responses. */
+  private val JsonMediaType: String = "application/json"
+
+  /**
+   * The value of the `Accept` header that the specification recommends. It asks for the GraphQL
+   * media type and accepts the legacy JSON media type for older servers.
+   */
+  private val AcceptHeaderValue: String =
+    s"${GraphQLOverHttp.GraphQLResponseMediaType}, $JsonMediaType;q=0.9"
 
   /**
    * Build the URL for a GraphQL GET request.
