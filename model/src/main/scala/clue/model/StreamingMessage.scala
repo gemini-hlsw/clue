@@ -50,7 +50,22 @@ object StreamingMessage:
       inline def apply(payload: JsonObject) = new ConnectionInit(payload.some)
 
     /**
-     * Client initiated message that keeps the client connection alive.
+     * Client initiated message that keeps the client connection alive. The server must reply with a
+     * `FromServer.Pong`. It can be sent at any time after `ConnectionInit`.
+     *
+     * @param payload
+     *   optional field can be used to transfer additional details about the ping
+     */
+    final case class Ping(payload: Option[JsonObject] = none)
+        extends FromClient
+        with Payload[Option[JsonObject]] derives Eq
+
+    object Ping:
+      inline def apply(payload: JsonObject) = new Ping(payload.some)
+
+    /**
+     * Client initiated message that keeps the client connection alive. It is either a response to a
+     * server `Ping` or a unidirectional heartbeat. It can be sent at any time.
      *
      * @param payload
      *   optional field can be used to transfer additional details about the pong

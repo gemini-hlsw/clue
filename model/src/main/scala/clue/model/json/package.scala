@@ -55,6 +55,22 @@ package object json {
         p <- c.get[Option[JsonObject]]("payload")
       yield FromClient.ConnectionInit(p)
 
+  given Encoder[FromClient.Ping] =
+    Encoder.instance: a =>
+      Json
+        .obj(
+          "type"    -> Json.fromString("ping"),
+          "payload" -> a.payload.asJson
+        )
+        .dropNullValues
+
+  given Decoder[FromClient.Ping] =
+    Decoder.instance: c =>
+      for
+        _ <- checkType(c, "ping")
+        p <- c.get[Option[JsonObject]]("payload")
+      yield FromClient.Ping(p)
+
   given Encoder[FromClient.Pong] =
     Encoder.instance: a =>
       Json
@@ -104,6 +120,7 @@ package object json {
   given Encoder[StreamingMessage.FromClient] =
     Encoder.instance:
       case m @ FromClient.ConnectionInit(_) => m.asJson
+      case m @ FromClient.Ping(_)           => m.asJson
       case m @ FromClient.Pong(_)           => m.asJson
       case m @ FromClient.Subscribe(_, _)   => m.asJson
       case m @ FromClient.Complete(_)       => m.asJson
@@ -113,6 +130,7 @@ package object json {
       c.get[String]("type")
         .flatMap:
           case "connection_init" => Decoder[FromClient.ConnectionInit].widen(c)
+          case "ping"            => Decoder[FromClient.Ping].widen(c)
           case "pong"            => Decoder[FromClient.Pong].widen(c)
           case "subscribe"       => Decoder[FromClient.Subscribe].widen(c)
           case "complete"        => Decoder[FromClient.Complete].widen(c)
@@ -140,7 +158,7 @@ package object json {
         p <- c.get[Option[JsonObject]]("payload")
       yield FromServer.ConnectionAck(p)
 
-  given Encoder[FromServer.Ping] =
+  given FromServerPingEncoder: Encoder[FromServer.Ping] =
     Encoder.instance: a =>
       Json
         .obj(
@@ -149,7 +167,7 @@ package object json {
         )
         .dropNullValues
 
-  given Decoder[FromServer.Ping] =
+  given FromServerPingDecoder: Decoder[FromServer.Ping] =
     Decoder.instance: c =>
       for
         _ <- checkType(c, "ping")
