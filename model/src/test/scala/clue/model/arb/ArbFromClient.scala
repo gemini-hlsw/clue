@@ -20,6 +20,10 @@ trait ArbFromClient:
     Arbitrary:
       arbitrary[Option[JsonObject]](using arbOptJsonObject).map(ConnectionInit(_))
 
+  given Arbitrary[Ping] =
+    Arbitrary:
+      arbitrary[Option[JsonObject]](using arbOptJsonObject).map(Ping(_))
+
   given Arbitrary[Pong] =
     Arbitrary:
       arbitrary[Option[JsonObject]](using arbOptJsonObject).map(Pong(_))
@@ -39,6 +43,7 @@ trait ArbFromClient:
     Arbitrary:
       Gen.oneOf[FromClient](
         arbitrary[ConnectionInit],
+        arbitrary[Ping],
         arbitrary[Pong],
         arbitrary[Subscribe],
         arbitrary[Complete]
