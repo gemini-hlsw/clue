@@ -9,15 +9,13 @@ import io.circe.*
 // Client internal state for the FSM.
 // We keep a connectionId throughout all states to ensure that callback events (onClose, onMessage)
 // correpond to the current connection iteration. This is important in case of reconnections.
-protected sealed abstract class State[F[_]](val status: PersistentClientStatus) {
-  val connectionId: ConnectionId
-}
+protected enum State[F[_]](val status: PersistentClientStatus) {
+  def connectionId: ConnectionId
 
-protected object State {
-  final case class Disconnected[F[_]](connectionId: ConnectionId)
+  case Disconnected[F[_]](connectionId: ConnectionId, cause: Option[Throwable] = None)
       extends State[F](PersistentClientStatus.Disconnected)
 
-  final case class Connecting[F[_]](
+  case Connecting[F[_]](
     connectionId:  ConnectionId,
     connection:    Option[WebSocketConnection[F]],
     initPayload:   F[JsonObject],
@@ -25,7 +23,7 @@ protected object State {
     latch:         Latch[F, JsonObject]
   ) extends State[F](PersistentClientStatus.Connecting)
 
-  final case class Connected[F[_]](
+  case Connected[F[_]](
     connectionId:  ConnectionId,
     connection:    WebSocketConnection[F],
     initPayload:   F[JsonObject],

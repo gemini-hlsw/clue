@@ -3,13 +3,17 @@
 
 package clue.websocket
 
+import cats.data.Ior
 import cats.effect.*
 import cats.syntax.all.*
 import clue.ConnectionId
 import clue.PersistentBackendHandler
 import clue.PersistentConnection
+import clue.model.GraphQLResponse
 import clue.model.StreamingMessage
 import clue.model.json.given
+import fs2.concurrent.SignallingRef
+import io.circe.Json
 import io.circe.syntax.*
 
 /**
@@ -17,14 +21,18 @@ import io.circe.syntax.*
  * messages that the client sends. It feeds server messages and close events to the client.
  */
 final class TestWebSocketBackend[F[_]: Async] private (
-  sentRef:    Ref[F, Vector[StreamingMessage.FromClient]],
-  currentRef: Ref[F, Option[(PersistentBackendHandler[F, CloseEvent], ConnectionId)]],
-  closesRef:  Ref[F, Vector[Option[CloseParams]]],
-  autoAckRef: Ref[F, Boolean]
+  sentRef:      SignallingRef[F, Vector[StreamingMessage.FromClient]],
+  currentRef:   Ref[F, Option[(PersistentBackendHandler[F, CloseEvent], ConnectionId)]],
+  closesRef:    Ref[F, Vector[Option[CloseParams]]],
+  autoAckRef:   Ref[F, Boolean],
+  failSendsRef: Ref[F, Boolean]
 ) extends WebSocketBackend[F, String]:
 
   /** Turns the automatic `connection_ack` answer on or off. */
   def autoAck(enabled: Boolean): F[Unit] = autoAckRef.set(enabled)
+
+  /** Makes every further `send` raise, like a socket that died without a close event. */
+  def failSends(enabled: Boolean): F[Unit] = failSendsRef.set(enabled)
 
   /** The messages that the client sent, in order. */
   val sent: F[List[StreamingMessage.FromClient]] = sentRef.get.map(_.toList)
@@ -32,13 +40,39 @@ final class TestWebSocketBackend[F[_]: Async] private (
   /** The close parameters of every `closeInternal` call, in order. */
   val closes: F[List[Option[CloseParams]]] = closesRef.get.map(_.toList)
 
+  /** The subscribe messages that the client sent, in order. */
+  val subscribes: F[List[StreamingMessage.FromClient.Subscribe]] =
+    sent.map(_.collect { case s: StreamingMessage.FromClient.Subscribe => s })
+
+  /** The subscription ids of the complete messages that the client sent, in order. */
+  val completes: F[List[String]] =
+    sent.map(_.collect { case StreamingMessage.FromClient.Complete(id) => id })
+
+  /** Waits until the recorded client messages produce a result, and returns it. */
+  private def awaitSentF[A](f: List[StreamingMessage.FromClient] => Option[A]): F[A] =
+    sentRef.discrete.map(msgs => f(msgs.toList)).unNone.head.compile.lastOrError
+
+  /** Waits for the first subscribe message, for `query` if given, and returns its id. */
+  def awaitSubscribeId(query: Option[String] = none): F[String] =
+    awaitSentF(_.collectFirst {
+      case s: StreamingMessage.FromClient.Subscribe if query.forall(_ === s.payload.query.value) =>
+        s.id
+    })
+
   /** Waits until the recorded client messages match the condition. */
-  def awaitSent(condition: List[StreamingMessage.FromClient] => Boolean): F[Unit] =
-    sent.flatMap: msgs =>
-      if condition(msgs) then Async[F].unit else Async[F].cede >> awaitSent(condition)
+  private def awaitSent(condition: List[StreamingMessage.FromClient] => Boolean): F[Unit] =
+    awaitSentF(msgs => Option.when(condition(msgs))(()))
+
+  /** Waits until the client sent at least `count` connection_init messages. */
+  def awaitConnectionInits(count: Int): F[Unit] =
+    awaitSent(_.count(_.isInstanceOf[StreamingMessage.FromClient.ConnectionInit]) >= count)
 
   /** Sends a message from the server to the client. */
   def emit(msg: StreamingMessage.FromServer): F[Unit] = emitRaw(msg.asJson.noSpaces)
+
+  /** Sends a data message from the server for the subscription id. */
+  def emitNext(id: String, data: Json): F[Unit] =
+    emit(StreamingMessage.FromServer.Next(id, GraphQLResponse(Ior.right(data))))
 
   /** Sends raw text from the server to the client. */
   def emitRaw(msg: String): F[Unit] =
@@ -58,17 +92,20 @@ final class TestWebSocketBackend[F[_]: Async] private (
       .as(
         new PersistentConnection[F, CloseParams]:
           override def send(msg: StreamingMessage.FromClient): F[Unit] =
-            sentRef.update(_ :+ msg) >>
-              (msg match
-                case StreamingMessage.FromClient.ConnectionInit(_) =>
-                  autoAckRef.get.flatMap: enabled =>
-                    if enabled then
-                      handler.onMessage(
-                        connectionId,
-                        StreamingMessage.FromServer.ConnectionAck().asJson.noSpaces
-                      )
-                    else Async[F].unit
-                case _                                             => Async[F].unit)
+            failSendsRef.get.ifM(
+              Async[F].raiseError(new RuntimeException("send failed")),
+              sentRef.update(_ :+ msg) >>
+                (msg match
+                  case StreamingMessage.FromClient.ConnectionInit(_) =>
+                    autoAckRef.get.flatMap: enabled =>
+                      if enabled then
+                        handler.onMessage(
+                          connectionId,
+                          StreamingMessage.FromServer.ConnectionAck().asJson.noSpaces
+                        )
+                      else Async[F].unit
+                  case _                                             => Async[F].unit)
+            )
 
           override protected[clue] def closeInternal(
             closeParameters: Option[CloseParams]
@@ -79,8 +116,9 @@ final class TestWebSocketBackend[F[_]: Async] private (
 object TestWebSocketBackend:
   def apply[F[_]: Async](autoAck: Boolean = true): F[TestWebSocketBackend[F]] =
     for
-      sent   <- Ref.of[F, Vector[StreamingMessage.FromClient]](Vector.empty)
+      sent   <- SignallingRef.of[F, Vector[StreamingMessage.FromClient]](Vector.empty)
       cur    <- Ref.of[F, Option[(PersistentBackendHandler[F, CloseEvent], ConnectionId)]](none)
       closes <- Ref.of[F, Vector[Option[CloseParams]]](Vector.empty)
       ack    <- Ref.of[F, Boolean](autoAck)
-    yield new TestWebSocketBackend(sent, cur, closes, ack)
+      fail   <- Ref.of[F, Boolean](false)
+    yield new TestWebSocketBackend(sent, cur, closes, ack, fail)
