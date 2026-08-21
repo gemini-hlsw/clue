@@ -4,6 +4,7 @@
 package clue.js
 
 import cats.syntax.all.*
+import clue.model.GraphQLQuery
 
 import scala.scalajs.js.URIUtils
 
@@ -50,6 +51,26 @@ class FetchJsBackendSuite extends munit.FunSuite {
 
     assert(!uri.contains("#"), s"Unescaped '#' present in: $uri")
     assertEquals(parseParams(uri)("variables"), variables)
+  }
+
+  test("methodFor sends a mutation with POST, also when GET is configured") {
+    val query = GraphQLQuery("mutation Save($x: Int!) { save(x: $x) { id } }")
+    assertEquals(FetchJsBackend.methodFor(FetchMethod.GET, query), FetchMethod.POST)
+  }
+
+  test("methodFor sends a query with GET when GET is configured") {
+    val query = GraphQLQuery("query Foo { id }")
+    assertEquals(FetchJsBackend.methodFor(FetchMethod.GET, query), FetchMethod.GET)
+  }
+
+  test("methodFor sends an anonymous selection set with GET when GET is configured") {
+    val query = GraphQLQuery("{ id }")
+    assertEquals(FetchJsBackend.methodFor(FetchMethod.GET, query), FetchMethod.GET)
+  }
+
+  test("methodFor keeps POST for a query when POST is configured") {
+    val query = GraphQLQuery("query Foo { id }")
+    assertEquals(FetchJsBackend.methodFor(FetchMethod.POST, query), FetchMethod.POST)
   }
 
   test("buildGetUri encodes the operationName") {

@@ -6,6 +6,7 @@ package clue.js
 import cats.effect.*
 import cats.syntax.all.*
 import clue.*
+import clue.model.GraphQLQuery
 import clue.model.GraphQLRequest
 import clue.model.json.given
 import io.circe.Encoder
@@ -44,7 +45,7 @@ final class FetchJsBackend[F[_]: Async](fetchMethod: FetchMethod)
             // that the caller set stays unchanged.
             if (!_headers.has(FetchJsBackend.AcceptHeaderName))
               _headers.set(FetchJsBackend.AcceptHeaderName, FetchJsBackend.AcceptHeaderValue)
-            val promise  = fetchMethod match {
+            val promise  = FetchJsBackend.methodFor(fetchMethod, request.query) match {
               case FetchMethod.POST =>
                 _headers.set("Content-Type", "application/json")
                 Fetch
@@ -107,6 +108,19 @@ object FetchJsBackend {
    */
   private val AcceptHeaderValue: String =
     s"${GraphQLOverHttp.GraphQLResponseMediaType}, $JsonMediaType;q=0.9"
+
+  /**
+   * The HTTP method for one request.
+   *
+   * GraphQL-over-HTTP forbids GET for a mutation operation, because an intermediary can cache, log
+   * or replay a GET request. A mutation therefore goes out with POST, also when the backend is
+   * configured with `FetchMethod.GET`.
+   */
+  private[js] def methodFor(fetchMethod: FetchMethod, query: GraphQLQuery): FetchMethod =
+    fetchMethod match {
+      case FetchMethod.GET if query.operationType.contains("mutation") => FetchMethod.POST
+      case method                                                      => method
+    }
 
   /**
    * Build the URL for a GraphQL GET request.
