@@ -43,3 +43,19 @@ case class UnexpectedServerMessageException[M, S](msg: M, state: S)
 
 case class ResponseException[D](errors: GraphQLErrors, data: Option[D])
     extends GraphQLException(errors.map(_.message).toList.mkString(", "))
+
+/**
+ * The server answered with an HTTP status and a media type that do not allow the client to read the
+ * body as a GraphQL response.
+ *
+ * @param status
+ *   the HTTP status code of the response
+ * @param contentType
+ *   the value of the `Content-Type` header, if the response has one
+ * @param body
+ *   the body of the response
+ */
+case class HttpStatusException(status: Int, contentType: Option[String], body: String)
+    extends GraphQLException(
+      s"Unexpected HTTP status [$status] with content type [${contentType.getOrElse("<none>")}]"
+    )
