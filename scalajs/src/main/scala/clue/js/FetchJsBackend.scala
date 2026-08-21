@@ -16,8 +16,7 @@ import org.scalajs.dom.Headers
 import org.scalajs.dom.HttpMethod
 import org.scalajs.dom.RequestInit
 import org.scalajs.dom.Response
-
-import scala.scalajs.js.URIUtils
+import org.scalajs.dom.URLSearchParams
 
 sealed trait FetchMethod extends Product with Serializable
 object FetchMethod {
@@ -111,11 +110,8 @@ object FetchJsBackend {
   /**
    * Build the URL for a GraphQL GET request.
    *
-   * Each query-string component is individually encoded with `encodeURIComponent`. Encoding the
-   * whole URL with `encodeURI` (as was previously done) is unsafe: `encodeURI` leaves
-   * URL-structural characters such as `&`, `=` and `#` untouched, so a value (e.g. inside the
-   * serialized `variables` JSON) containing those characters could inject extra query parameters or
-   * truncate the request at a `#` fragment.
+   * `URLSearchParams` encodes each parameter. A value that contains `&`, `=` or `#` therefore
+   * cannot add a parameter or truncate the URL at a fragment.
    */
   private[js] def buildGetUri(
     baseUri:       String,
@@ -123,9 +119,12 @@ object FetchJsBackend {
     variables:     Option[String],
     operationName: Option[String]
   ): String = {
-    val q    = URIUtils.encodeURIComponent(query.trim.replaceAll(" +", " "))
-    val vars = variables.foldMap(v => s"&variables=${URIUtils.encodeURIComponent(v)}")
-    val op   = operationName.foldMap(o => s"&operationName=${URIUtils.encodeURIComponent(o)}")
-    s"$baseUri?query=$q$vars$op"
+    val params = new URLSearchParams()
+
+    params.append("query", query.trim)
+    variables.foreach(v => params.append("variables", v))
+    operationName.foreach(o => params.append("operationName", o))
+
+    s"$baseUri?${params.toString()}"
   }
 }

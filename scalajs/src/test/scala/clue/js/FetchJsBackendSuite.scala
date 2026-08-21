@@ -4,29 +4,35 @@
 package clue.js
 
 import cats.syntax.all.*
-
-import scala.scalajs.js.URIUtils
+import org.scalajs.dom.URLSearchParams
 
 class FetchJsBackendSuite extends munit.FunSuite {
 
-  // Parse the `?query=...&variables=...&operationName=...` query string back into a key -> value map,
-  // decoding each value, so we can assert that no component leaked URL-structural characters.
+  // Parse the `?query=...&variables=...&operationName=...` query string back into a key -> value map.
+  // `URLSearchParams` is the standard that `buildGetUri` writes, so a value that contains `&`, `=`,
+  // `#` or a space is decoded here in the same way that a server decodes it.
   private def parseParams(uri: String): Map[String, String] = {
-    val queryString = uri.substring(uri.indexOf('?') + 1)
-    queryString
-      .split('&')
-      .toList
-      .map { kv =>
-        val idx = kv.indexOf('=')
-        URIUtils.decodeURIComponent(kv.substring(0, idx)) ->
-          URIUtils.decodeURIComponent(kv.substring(idx + 1))
-      }
-      .toMap
+    val entries = Map.newBuilder[String, String]
+    new URLSearchParams(uri.substring(uri.indexOf('?') + 1))
+      .forEach((value, name) => entries += name -> value)
+    entries.result()
   }
 
-  test("buildGetUri collapses whitespace and trims the query") {
+  test("buildGetUri keeps repeated spaces inside a string literal") {
+    val query = """query { x(s: "two  spaces") }"""
+    val uri   = FetchJsBackend.buildGetUri("https://example.com/gql", query, none, none)
+    assertEquals(parseParams(uri)("query"), query)
+  }
+
+  test("buildGetUri keeps the indentation of a multi-line document") {
+    val query = "query Foo {\n    id\n    name\n}"
+    val uri   = FetchJsBackend.buildGetUri("https://example.com/gql", query, none, none)
+    assertEquals(parseParams(uri)("query"), query)
+  }
+
+  test("buildGetUri trims whitespace around the document") {
     val uri =
-      FetchJsBackend.buildGetUri("https://example.com/gql", "  query   Foo {  id }  ", none, none)
+      FetchJsBackend.buildGetUri("https://example.com/gql", "  query Foo { id }\n", none, none)
     assertEquals(parseParams(uri)("query"), "query Foo { id }")
   }
 
