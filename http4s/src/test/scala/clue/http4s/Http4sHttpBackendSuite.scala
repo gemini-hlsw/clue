@@ -65,6 +65,15 @@ class Http4sHttpBackendSuite extends CatsEffectSuite:
   private def acceptOf(request: Request[IO]): Option[String] =
     request.headers.get[Accept].map(Header[Accept].value)
 
+  test("request sends POST, also when the base request uses another method") {
+    run(
+      Status.Ok,
+      JsonContentType.some,
+      """{"data":{}}""",
+      Request[IO](Method.GET, uri"https://example.com/graphql")
+    ).map((_, sent) => assertEquals(sent.method, Method.POST))
+  }
+
   test("request sends the Accept header of the specification") {
     run(Status.Ok, JsonContentType.some, """{"data":{}}""")
       .map((_, sent) => assertEquals(acceptOf(sent), SpecAccept.some))
