@@ -51,16 +51,24 @@ class FetchJsBackendRequestSuite extends munit.FunSuite {
   }
 
   private def send(
-    method:  FetchMethod = FetchMethod.POST,
     headers: dom.Headers = new dom.Headers()
   ): Future[Either[Throwable, String]] =
-    FetchJsBackend[IO](method)
+    FetchJsBackend[IO]()
       .request(graphQLRequest, FetchJsRequest("https://example.com/graphql", headers))
       .attempt
       .unsafeToFuture()
 
   private def sentHeader(name: String): Option[String] =
     Option(lastInit.headers.asInstanceOf[dom.Headers].get(name))
+
+  test("request sends a POST request with the document in the body") {
+    stubFetch(200, "application/json".some, """{"data":{}}""")
+    send().map { _ =>
+      assertEquals(lastInit.method.asInstanceOf[String], "POST")
+      val body = lastInit.body.asInstanceOf[String]
+      assert(body.contains("query { id }"), s"Document not found in the body: [$body]")
+    }
+  }
 
   test("request sends the Accept header of the specification") {
     stubFetch(200, "application/json".some, """{"data":{}}""")

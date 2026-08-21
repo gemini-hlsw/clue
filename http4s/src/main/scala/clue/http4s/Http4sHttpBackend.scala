@@ -11,6 +11,7 @@ import clue.model.json.given
 import io.circe.Encoder
 import io.circe.syntax.*
 import org.http4s.MediaType
+import org.http4s.Method
 import org.http4s.QValue
 import org.http4s.Request
 import org.http4s.circe.*
@@ -44,7 +45,8 @@ final class Http4sHttpBackend[F[_]: Concurrent](val client: Client[F])
     baseRequest: Request[F]
   ): F[String] =
     client
-      .run(withAccept(baseRequest.withEntity(request.asJson)))
+      // Every GraphQL request goes out with POST. The method of the base request is ignored.
+      .run(withAccept(baseRequest.withMethod(Method.POST).withEntity(request.asJson)))
       .use { response =>
         val contentType: Option[String] =
           response.headers.get[`Content-Type`].map(_.mediaType.show)
