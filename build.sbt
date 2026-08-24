@@ -8,6 +8,14 @@ ThisBuild / crossScalaVersions          := Seq("3.8.4")
 ThisBuild / githubWorkflowScalaVersions := Seq("3.8.4")
 Global / onChangedBuildSource           := ReloadOnSourceChanges
 
+// The CI matrix covers Scala 3 only, which builds `sbt-clue` for sbt 2.x. Run the scripted tests
+// of the sbt 1.x cross-build (Scala 2.12) in a separate step.
+ThisBuild / githubWorkflowBuild += WorkflowStep.Sbt(
+  List("++ 2.12.20", "sbtPlugin/test"),
+  name = Some("Test the sbt plugin against sbt 1.x"),
+  cond = Some("matrix.project == 'rootJVM'")
+)
+
 // sbt-typelevel-ci hardcodes Java 11 (both the job's `javas` matrix and the baked-in
 // `matrix.java == 'temurin@11'` cond on its Setup Java step) for its auto-added
 // "validate-steward" job, but the scala-steward binary that coursier/setup-action
@@ -214,23 +222,45 @@ lazy val sbtPlugin =
     .in(file("sbt-plugin"))
     .enablePlugins(SbtPlugin, BuildInfoPlugin)
     .settings(
-      moduleName         := "sbt-clue",
-      crossScalaVersions := List("2.12.20"),
-      scalacOptions      := Nil,
-      addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"      % V.scalafixVersion),
-      addSbtPlugin("org.portable-scala" % "sbt-platform-deps" % "1.0.2"),
-      addSbtPlugin("org.portable-scala" % "sbt-crossproject"  % "1.4.0"),
-      buildInfoPackage   := "clue.sbt",
-      buildInfoKeys      := Seq[BuildInfoKey](
+      moduleName                           := "sbt-clue",
+      scalaVersion                         := "2.12.20",
+      crossScalaVersions                   := List("2.12.20", "3.8.4"),
+      scalacOptions                        := Nil,
+      (pluginCrossBuild / sbtVersion)      := {
+        scalaBinaryVersion.value match {
+          case "2.12" => "1.13.0"
+          case _      => "2.0.7"
+        }
+      },
+      addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"     % V.scalafixVersion),
+      addSbtPlugin("org.portable-scala" % "sbt-crossproject" % "1.4.0"),
+      addSbtPlugin("com.github.sbt"     % "sbt2-compat"      % "0.2.0"),
+      // Reads `Clue.schemaDirs` out of the scalafix configuration file. Both sbt 1.x and sbt 2.x
+      // already ship this jar, so depend on it as `Provided` and do not bundle a second copy.
+      libraryDependencies += "com.typesafe" % "config" % "1.4.5" % Provided,
+      // sbt-platform-deps supplies is only needed for sbt 1
+      libraryDependencies ++= {
+        if (scalaBinaryVersion.value == "2.12")
+          Seq(
+            Defaults.sbtPluginExtra(
+              "org.portable-scala" % "sbt-platform-deps" % "1.0.2",
+              (pluginCrossBuild / sbtBinaryVersion).value,
+              (pluginCrossBuild / scalaBinaryVersion).value
+            )
+          )
+        else Nil
+      },
+      buildInfoPackage                     := "clue.sbt",
+      buildInfoKeys                        := Seq[BuildInfoKey](
         version,
         organization,
         "rulesModule" -> (genRules / moduleName).value,
         "coreModule"  -> (core.jvm / moduleName).value
       ),
       buildInfoOptions += BuildInfoOption.PackagePrivate,
-      Test / test        :=
+      Test / test                          :=
         scripted.toTask("").value,
-      scripted           := scripted
+      scripted                             := scripted
         .dependsOn(
           genRules / publishLocal,
           model.jvm / publishLocal,
@@ -242,5 +272,8 @@ lazy val sbtPlugin =
         "-Dplugin.version=" + version.value,
         "-Dscala.version=" + (core.jvm / scalaVersion).value
       ),
-      scriptedBufferLog  := false
+      scriptedBufferLog                    := false,
+      tlVersionIntroduced                  := Map(
+        "3" -> "0.58.1"
+      )
     )
