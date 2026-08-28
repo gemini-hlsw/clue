@@ -3,8 +3,8 @@
 
 package clue.sbt
 
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
 import sbt.*
+import sbtcompat.PluginCompat.*
 import sbtcrossproject.CrossPlugin
 import scalafix.sbt.ScalafixPlugin
 
@@ -33,13 +33,13 @@ object CluePlugin extends AutoPlugin {
   }
   import autoImport._
 
-  override def buildSettings: Seq[Setting[_]] = Seq(
+  override def buildSettings: Seq[Setting[?]] = Seq(
     scalafixDependencies += BuildInfo.organization %% BuildInfo.rulesModule % BuildInfo.version,
     Compile / clueSourceGenerators                 := Seq.empty,
     clueClean                                      := {}
   )
 
-  override def projectSettings: Seq[Setting[_]] = Seq(
+  override def projectSettings: Seq[Setting[?]] = Seq(
     Compile / clueSourceDirectory :=
       crossProjectCrossType.?.value
         .flatMap { crossType =>
@@ -47,16 +47,18 @@ object CluePlugin extends AutoPlugin {
         }
         .getOrElse(sourceDirectory.value / "clue"),
     Compile / sourceGenerators ++= (Compile / clueSourceGenerators).value, // workaround for sbt/sbt#7173
-    libraryDependencies += BuildInfo.organization %%% BuildInfo.coreModule % BuildInfo.version,
+    libraryDependencies += PluginCompat
+      .platformModuleID(BuildInfo.organization, BuildInfo.coreModule, BuildInfo.version)
+      .value,
     // another workaround
-    clean                                          := clean.dependsOn(clueClean).value,
+    clean := clean.dependsOn(clueClean).value,
 
     // Validation of hand-written operations/subqueries living in this project's own sources. The
     // generator only scans `clueSourceDirectory`; the validation rule covers the rest.
     // semanticdb is required by the rule.
     semanticdbEnabled     := true,
     semanticdbVersion     := scalafixSemanticdb.revision,
-    clueCheck             := (Compile / scalafix).toTask(" GraphQLValidate --check").value,
+    clueCheck             := Def.uncached((Compile / scalafix).toTask(" GraphQLValidate --check").value),
     clueValidateOnCompile := true
   ) ++
     // Run validation on every compile. We decorate `compile` to run the real compilation first
@@ -70,7 +72,7 @@ object CluePlugin extends AutoPlugin {
     // compile dependency (we've already compiled), breaking the cycle, while the explicitly named
     // rule still runs.
     Seq(Compile, Test).map { config =>
-      config / compile := Def.taskDyn {
+      config / compile := Def.uncached(Def.taskDyn {
         val analysis = (config / compile).value
         if (clueValidateOnCompile.value)
           Def.task {
@@ -78,10 +80,10 @@ object CluePlugin extends AutoPlugin {
             analysis
           }
         else Def.task(analysis)
-      }.value
+      }.value)
     }
 
-  override def derivedProjects(proj: ProjectDefinition[_]): Seq[Project] = Seq(
+  override def derivedProjects(proj: ProjectDefinition[?]): Seq[Project] = Seq(
     Project(
       proj.id + "-clue",
       new File(proj.base.getParent(), proj.base.getName() + "-clue")
@@ -92,8 +94,9 @@ object CluePlugin extends AutoPlugin {
           (LocalProject(proj.id) / Compile / clueSourceDirectory).value,
         scalaVersion                  := (LocalProject(proj.id) / scalaVersion).value,
         Compile / unmanagedSourceDirectories += (Compile / clueSourceDirectory).value / "scala",
-        Compile / dependencyClasspath :=
-          (LocalProject(proj.id) / Compile / dependencyClasspath).value,
+        Compile / dependencyClasspath := Def.uncached(
+          (LocalProject(proj.id) / Compile / dependencyClasspath).value
+        ),
 
         // register generator
         LocalProject(proj.id) / Compile / clueSourceGenerators += Def.taskDyn {
@@ -107,13 +110,12 @@ object CluePlugin extends AutoPlugin {
             val _ = (Compile / scalafix)
               .toTask(s" GraphQLGen --out-from=$outFrom --out-to=$outTo")
               .value
-            (to ** "*.scala").get
+            (to ** "*.scala").get()
           }
         }.taskValue,
 
         // register clean
-        LocalProject(proj.id) / clueClean :=
-          clean.value,
+        LocalProject(proj.id) / clueClean := Def.uncached(clean.value),
 
         // scalafix stuff
         semanticdbEnabled := true,

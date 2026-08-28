@@ -33,7 +33,7 @@ The build aggregates these modules (see `build.sbt`):
 - **`otel4s`** (JVM+JS, pure) — `clue-otel4s`. Wraps any client with OpenTelemetry tracing via otel4s; emits a `SpanKind.Client` span per request/subscription and propagates W3C trace context. Depends on `core`.
 - **`http4s-jdk-demo`** — runnable demo (`NoPublish`) using the JDK http client behind http4s.
 - **`gen/*`** — the code generator (see below).
-- **`sbt-plugin`** — `sbt-clue`, the sbt plugin that runs the generator (`CluePlugin`), pinned to Scala 2.12.
+- **`sbt-plugin`** — `sbt-clue`, the sbt plugin that runs the generator (`CluePlugin`). It is cross-built for sbt 1.x (Scala 2.12) and sbt 2.x (Scala 3).
 
 ## Core architecture
 
@@ -68,7 +68,11 @@ Per `clue-plugin-integration.md`: add `sbt-clue` to `project/plugins.sbt`, `.ena
 
 ## Version pinning (gotcha)
 
-Different modules deliberately use different Scala versions: most are Scala 3 (`3.8.4`), `gen/rules` is **Scala 2.13.18** (Scalafix rules run on 2.13), and `sbt-plugin` is **Scala 2.12.20** (sbt plugins). Don't assume a single version across the build.
+Different modules deliberately use different Scala versions: most are Scala 3 (`3.8.4`), `gen/rules` is **Scala 2.13.18** (Scalafix rules run on 2.13), and `sbt-plugin` cross-builds **Scala 2.12.20** (for sbt 1.13.0) and **Scala 3.8.4** (for sbt 2.0.7). Don't assume a single version across the build.
+
+`(pluginCrossBuild / sbtVersion)` maps the Scala binary version of `sbt-plugin` to the sbt version. The default is Scala 2.12 / sbt 1, so a plain `publishLocal` publishes the Scala 3 libraries plus the sbt 1 plugin. Use `sbt '++ 3.8.4' sbtPlugin/test` for the sbt 2 side.
+
+The two sbt versions differ in API. `sbt-plugin/src/main/scala/clue/sbt/CluePlugin.scala` is shared, and the per-version shims are in `sbt-plugin/src/main/scala-2.12/` and `sbt-plugin/src/main/scala-3/`. The `sbt2-compat` plugin supplies `Def.uncached`, which every side-effecting task needs, because sbt 2 caches task results by default.
 
 ## Conventions
 

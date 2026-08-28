@@ -1,5 +1,7 @@
 # How to setup the Clue Plugin
 
+`sbt-clue` is cross-built for sbt 1.x and sbt 2.x.
+
 1. **Plugin Configuration**:
    - Add the Clue plugin to the project in `project/plugins.sbt`:
      ```scala
@@ -32,7 +34,9 @@
 
 ## How It Works
 
-1. The Clue plugin generates source code in `target/scala-[version]/src_managed`
+1. The Clue plugin generates source code in the `src_managed` directory of the project. On sbt 1.x
+   this is `<project>/target/scala-[version]/src_managed`. On sbt 2.x it is
+   `target/out/jvm/scala-[version]/[project]/src_managed`.
 2. These generated sources are compiled along with regular code
 3. Generated classes can be imported, like `import [package].SomeQueriesGQL`
 
@@ -58,5 +62,8 @@ as a warning (those are only processed by the generator). Do not add `rules = [G
 
 After setup, you should be able to see generated class files in:
 ```
+# sbt 1.x
 modules/[project]/target/scala-[version]/src_managed/[package]/[Query]GQL.scala
+# sbt 2.x
+target/out/jvm/scala-[version]/[project]/src_managed/[package]/[Query]GQL.scala
 ```

@@ -97,6 +97,10 @@ jobs:
         if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' doc
 
+      - name: Test the sbt plugin against sbt 1.x
+        if: matrix.project == 'rootJVM'
+        run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' '++ 2.12.20' sbtPlugin/test
+
       - name: Aggregate coverage reports
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' coverageReport coverageAggregate
 
