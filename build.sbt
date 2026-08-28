@@ -237,7 +237,7 @@ lazy val sbtPlugin =
       addSbtPlugin("com.github.sbt"     % "sbt2-compat"      % "0.2.0"),
       // Reads `Clue.schemaDirs` out of the scalafix configuration file. Both sbt 1.x and sbt 2.x
       // already ship this jar, so depend on it as `Provided` and do not bundle a second copy.
-      libraryDependencies += "com.typesafe" % "config" % "1.4.5" % Provided,
+      libraryDependencies += "com.typesafe" % "config" % "1.4.9" % Provided,
       // sbt-platform-deps supplies is only needed for sbt 1
       libraryDependencies ++= {
         if (scalaBinaryVersion.value == "2.12")
