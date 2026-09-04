@@ -358,14 +358,19 @@ class ApolloClient[F[_], P, S](
                         case Right(_) =>
                           Connected(connectionId, stateConnection, payload, subscriptions) ->
                             startSubscriptions(stateConnection, subscriptions)
-                    // The state moved to another connection, so this result is stale.
-                    // Replaced connections usually end in Disconnected state.
-                    case s if s.connectionId =!= connectionId    =>
-                      s -> s"Discarding initialization result of a replaced connection.".debugF
-                    case s @ Disconnected(_, _) if result.isLeft =>
+                    // A close of *this* connection moves the state to Disconnected and advances
+                    // the id by one.
+                    case s @ Disconnected(stateConnectionId, _)
+                        if result.isLeft &&
+                          (stateConnectionId === connectionId ||
+                            stateConnectionId === connectionId.next) =>
                       s -> (s"Disconnected while initializing.".debugF >>
                         RemoteInitializationException(result.swap.toOption.get).raiseF)
-                    case s                                       =>
+                    // The state moved to another connection, so this result is stale.
+                    // Replaced connections usually end in Disconnected state.
+                    case s if s.connectionId =!= connectionId =>
+                      s -> s"Discarding initialization result of a replaced connection.".debugF
+                    case s                                    =>
                       s -> (s"Unexpected state when initializing.".errorF >> s"State Is: [$s]".traceF >>
                         InvalidInvocationException(
                           s"Unexpected state when initializing. State may be inconsistent."
