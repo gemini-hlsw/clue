@@ -7,6 +7,7 @@ import cats.effect.*
 import cats.syntax.all.*
 import clue.DisconnectedException
 import clue.PersistentClientStatus
+import clue.RemoteInitializationException
 import clue.model.GraphQLQuery
 import clue.model.GraphQLResponse
 import clue.model.StreamingMessage
@@ -129,6 +130,20 @@ final class ApolloClientCloseSuite extends ApolloClientSuite:
       _       <- backend.closeFromServer(CloseParams(1000, "retry").asRight).start
       outcome <- fiber.joinWithNever.timeout(Timeout)
     yield assertEquals(outcome.leftMap(_.getMessage), "connect failed".asLeft)
+
+  test("A close while initializing fails connect() with a RemoteInitializationException"):
+    for
+      backend <- TestWebSocketBackend[IO](autoAck = false)
+      client  <- clientOn(backend, connect = false)
+      fiber   <- client.connect().attempt.start
+      _       <- backend.awaitConnectionInits(1).timeout(Timeout)
+      _       <- backend.closeFromServer(CloseParams(4403, "Forbidden").asRight)
+      outcome <- fiber.joinWithNever.timeout(Timeout)
+    yield assertEquals(
+      outcome,
+      RemoteInitializationException(DisconnectedException("4403: Forbidden"))
+        .asLeft[io.circe.JsonObject]
+    )
 
   test("A subscription that waits for a connection fails with the cause of the close"):
     for
