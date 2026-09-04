@@ -162,7 +162,7 @@ lazy val genRules =
     .in(file("gen/rules"))
     .settings(
       moduleName   := "clue-generator",
-      scalaVersion := "2.13.18",
+      scalaVersion := "3.9.0",
       libraryDependencies ++=
         Settings.Libraries.Grackle.value ++
           Settings.Libraries.ScalaFix.value ++
