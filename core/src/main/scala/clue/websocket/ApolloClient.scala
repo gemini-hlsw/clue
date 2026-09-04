@@ -264,6 +264,10 @@ class ApolloClient[F[_], P, S](
   // </WebSocketHandler>
 
   // <ApolloClient Helpers>
+  /** Closes the socket without blocking the caller, which owns another transition. */
+  private def closeInBackground(connection: WebSocketConnection[F]): F[Unit] =
+    connection.closeInternal(none).start.void
+
   private def handleRetry(
     t:                Throwable,
     oldConnection:    Option[WebSocketConnection[F]],
@@ -273,15 +277,15 @@ class ApolloClient[F[_], P, S](
     newLatch:         Latch[F, JsonObject],
     attempt:          Int
   ): (State[F], F[Unit]) = {
-    val disconnectBackend: F[Unit] =
-      oldConnection.map(_.closeInternal(none).start.void).getOrElse(F.unit)
+    val disconnectBackend: F[Unit] = oldConnection.traverse_(closeInBackground)
 
     val errorSubscriptions: F[Unit] = crashSubscriptions(subscriptions, t)
 
     reconnectionStrategy(attempt, t.asLeft) match
       case None       =>
+        // The latch is shared with connect() callers. The error must reach it or a caller waits forever.
         Disconnected(nextConnectionId, t.some) ->
-          (errorSubscriptions >> disconnectBackend >> t.logAndRaiseF)
+          (newLatch.error(t) >> errorSubscriptions >> disconnectBackend >> t.logAndRaiseF)
       case Some(wait) =>
         Connecting(nextConnectionId, none, payload, subscriptions, newLatch) ->
           (t.warnF(s"Error in connect() after attempt #[$attempt]. Retrying.") >>
@@ -298,14 +302,19 @@ class ApolloClient[F[_], P, S](
         .attempt
         .flatMap: connectionAttempt =>
           stateModify:
-            case Connecting(connectionId, None, payload, subscriptions, latch) =>
+            case Connecting(stateConnectionId, None, payload, subscriptions, latch)
+                if connectionId === stateConnectionId =>
               connectionAttempt match
                 case Left(t)           =>
                   handleRetry(t, none, connectionId.next, payload, subscriptions, latch, attempt)
                 case Right(connection) =>
                   Connecting(connectionId, connection.some, payload, subscriptions, latch) ->
-                    doInitialize(connection, payload, latch, attempt)
-            case s                                                             =>
+                    doInitialize(connectionId, connection, payload, latch, attempt)
+            // The state moved to another connection, so this result is stale. Close the socket.
+            case s if s.connectionId =!= connectionId =>
+              s -> (s"Discarding connect() result of a replaced connection.".debugF >>
+                connectionAttempt.toOption.traverse_(closeInBackground))
+            case s                                    =>
               s -> (s"Unexpected state in connect().".errorF >> s"State Is: [$s]".traceF >>
                 InvalidInvocationException(
                   s"Unexpected state in connect(). Unblocking clients, but state may be inconsistent."
@@ -315,10 +324,11 @@ class ApolloClient[F[_], P, S](
           case Outcome.Canceled()                        => disconnect().start.void // Cleanup
 
   private def doInitialize(
-    connection: WebSocketConnection[F],
-    payload:    F[JsonObject],
-    latch:      Latch[F, JsonObject],
-    attempt:    Int
+    connectionId: ConnectionId,
+    connection:   WebSocketConnection[F],
+    payload:      F[JsonObject],
+    latch:        Latch[F, JsonObject],
+    attempt:      Int
   ): F[Unit] =
     (for
       p        <- payload
@@ -327,12 +337,18 @@ class ApolloClient[F[_], P, S](
       result   <- latch.resolve.attempt // Sync up with server response.
       newLatch <- Latch[F, JsonObject]
       _        <- stateModify {
-                    case Connecting(connectionId, Some(connection), payload, subscriptions, _) =>
+                    case Connecting(
+                          stateConnectionId,
+                          Some(stateConnection),
+                          payload,
+                          subscriptions,
+                          _
+                        ) if connectionId === stateConnectionId =>
                       result match
                         case Left(t)  =>
                           handleRetry(
                             t,
-                            connection.some,
+                            stateConnection.some,
                             connectionId.next,
                             payload,
                             subscriptions,
@@ -340,12 +356,16 @@ class ApolloClient[F[_], P, S](
                             attempt
                           )
                         case Right(_) =>
-                          Connected(connectionId, connection, payload, subscriptions) ->
-                            startSubscriptions(connection, subscriptions)
-                    case s @ Disconnected(_, _) if result.isLeft                               =>
+                          Connected(connectionId, stateConnection, payload, subscriptions) ->
+                            startSubscriptions(stateConnection, subscriptions)
+                    // The state moved to another connection, so this result is stale.
+                    // Replaced connections usually end in Disconnected state.
+                    case s if s.connectionId =!= connectionId    =>
+                      s -> s"Discarding initialization result of a replaced connection.".debugF
+                    case s @ Disconnected(_, _) if result.isLeft =>
                       s -> (s"Disconnected while initializing.".debugF >>
                         RemoteInitializationException(result.swap.toOption.get).raiseF)
-                    case s                                                                     =>
+                    case s                                       =>
                       s -> (s"Unexpected state when initializing.".errorF >> s"State Is: [$s]".traceF >>
                         InvalidInvocationException(
                           s"Unexpected state when initializing. State may be inconsistent."

@@ -3,8 +3,8 @@
 
 package clue.sbt
 
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt._
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
+import sbt.*
 
 /**
  * sbt 1.x half of the compatibility shim. See `src/main/scala-3` for the sbt 2.x half.

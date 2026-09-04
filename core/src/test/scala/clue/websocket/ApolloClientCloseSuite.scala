@@ -117,6 +117,19 @@ final class ApolloClientCloseSuite extends ApolloClientSuite:
       done    <- reader.join.as(true).timeoutTo(Timeout, IO.pure(false))
     yield assert(done, "The subscription stream did not end.")
 
+  test("A connect() call fails when the reconnection gives up"):
+    for
+      backend <- TestWebSocketBackend[IO](autoAck = false)
+      client  <- clientOn(backend, retryOnce, connect = false)
+      // The caller waits for the acknowledgement of the first connection.
+      fiber   <- client.connect().attempt.start
+      _       <- backend.awaitConnectionInits(1).timeout(Timeout)
+      // The reconnection cannot open a socket. The strategy gives up on a connect error.
+      _       <- backend.failConnects(true)
+      _       <- backend.closeFromServer(CloseParams(1000, "retry").asRight).start
+      outcome <- fiber.joinWithNever.timeout(Timeout)
+    yield assertEquals(outcome.leftMap(_.getMessage), "connect failed".asLeft)
+
   test("A subscription that waits for a connection fails with the cause of the close"):
     for
       backend <- TestWebSocketBackend[IO](autoAck = false)
