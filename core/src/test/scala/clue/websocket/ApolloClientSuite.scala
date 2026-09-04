@@ -40,10 +40,11 @@ trait ApolloClientSuite extends CatsEffectSuite:
   /** Builds a client with a logger that the test can inspect. */
   protected def clientWithLogger(
     backend:  TestWebSocketBackend[IO],
-    strategy: ReconnectionStrategy = ReconnectionStrategy.never
+    strategy: ReconnectionStrategy = ReconnectionStrategy.never,
+    connect:  Boolean = true
   ): IO[(ApolloClient[IO, String, Unit], TestingLogger[IO])] =
     val logger = TestingLogger.impl[IO]()
-    clientOn(backend, strategy)(using logger).tupleRight(logger)
+    clientOn(backend, strategy, connect)(using logger).tupleRight(logger)
 
   /** Reconnects on a close with the reason "retry", and gives up on any other. */
   protected val retryOnce: ReconnectionStrategy = (_, reason) =>

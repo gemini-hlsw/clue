@@ -21,24 +21,44 @@ import io.circe.syntax.*
  * messages that the client sends. It feeds server messages and close events to the client.
  */
 final class TestWebSocketBackend[F[_]: Async] private (
-  sentRef:      SignallingRef[F, Vector[StreamingMessage.FromClient]],
-  currentRef:   Ref[F, Option[(PersistentBackendHandler[F, CloseEvent], ConnectionId)]],
-  closesRef:    Ref[F, Vector[Option[CloseParams]]],
-  autoAckRef:   Ref[F, Boolean],
-  failSendsRef: Ref[F, Boolean]
+  sentRef:         SignallingRef[F, Vector[StreamingMessage.FromClient]],
+  currentRef:      Ref[F, Option[(PersistentBackendHandler[F, CloseEvent], ConnectionId)]],
+  closesRef:       SignallingRef[F, Vector[Option[CloseParams]]],
+  autoAckRef:      Ref[F, Boolean],
+  failSendsRef:    Ref[F, Boolean],
+  failConnectsRef: Ref[F, Boolean],
+  gatesRef:        Ref[F, List[Deferred[F, Unit]]]
 ) extends WebSocketBackend[F, String]:
 
   /** Turns the automatic `connection_ack` answer on or off. */
   def autoAck(enabled: Boolean): F[Unit] = autoAckRef.set(enabled)
 
+  /**
+   * Makes the first `count` connections wait for returned gates. Gate at index `i` belongs to
+   * connection id `i`.
+   */
+  def gateConnects(count: Int): F[List[Deferred[F, Unit]]] =
+    List.fill(count)(Deferred[F, Unit]).sequence.flatTap(gatesRef.set)
+
+  /** Waits for the gate of this connection, if the test set one. */
+  private def awaitGate(connectionId: ConnectionId): F[Unit] =
+    gatesRef.get.flatMap(_.lift(connectionId.value).traverse_(_.get))
+
   /** Makes every further `send` raise, like a socket that died without a close event. */
   def failSends(enabled: Boolean): F[Unit] = failSendsRef.set(enabled)
+
+  /** Makes every further `connect` raise, like a socket that cannot open. */
+  def failConnects(enabled: Boolean): F[Unit] = failConnectsRef.set(enabled)
 
   /** The messages that the client sent, in order. */
   val sent: F[List[StreamingMessage.FromClient]] = sentRef.get.map(_.toList)
 
   /** The close parameters of every `closeInternal` call, in order. */
   val closes: F[List[Option[CloseParams]]] = closesRef.get.map(_.toList)
+
+  /** Waits until the client closed at least `count` connections. */
+  def awaitCloses(count: Int): F[Unit] =
+    closesRef.discrete.find(_.sizeIs >= count).compile.drain
 
   /** The subscribe messages that the client sent, in order. */
   val subscribes: F[List[StreamingMessage.FromClient.Subscribe]] =
@@ -87,8 +107,11 @@ final class TestWebSocketBackend[F[_]: Async] private (
     handler:          PersistentBackendHandler[F, CloseEvent],
     connectionId:     ConnectionId
   ): F[WebSocketConnection[F]] =
-    currentRef
-      .set((handler, connectionId).some)
+    (awaitGate(connectionId) >>
+      failConnectsRef.get.ifM(
+        Async[F].raiseError(new RuntimeException("connect failed")),
+        currentRef.set((handler, connectionId).some)
+      ))
       .as(
         new PersistentConnection[F, CloseParams]:
           override def send(msg: StreamingMessage.FromClient): F[Unit] =
@@ -116,9 +139,11 @@ final class TestWebSocketBackend[F[_]: Async] private (
 object TestWebSocketBackend:
   def apply[F[_]: Async](autoAck: Boolean = true): F[TestWebSocketBackend[F]] =
     for
-      sent   <- SignallingRef.of[F, Vector[StreamingMessage.FromClient]](Vector.empty)
-      cur    <- Ref.of[F, Option[(PersistentBackendHandler[F, CloseEvent], ConnectionId)]](none)
-      closes <- Ref.of[F, Vector[Option[CloseParams]]](Vector.empty)
-      ack    <- Ref.of[F, Boolean](autoAck)
-      fail   <- Ref.of[F, Boolean](false)
-    yield new TestWebSocketBackend(sent, cur, closes, ack, fail)
+      sent        <- SignallingRef.of[F, Vector[StreamingMessage.FromClient]](Vector.empty)
+      cur         <- Ref.of[F, Option[(PersistentBackendHandler[F, CloseEvent], ConnectionId)]](none)
+      closes      <- SignallingRef.of[F, Vector[Option[CloseParams]]](Vector.empty)
+      ack         <- Ref.of[F, Boolean](autoAck)
+      failSend    <- Ref.of[F, Boolean](false)
+      failConnect <- Ref.of[F, Boolean](false)
+      gates       <- Ref.of[F, List[Deferred[F, Unit]]](Nil)
+    yield new TestWebSocketBackend(sent, cur, closes, ack, failSend, failConnect, gates)
