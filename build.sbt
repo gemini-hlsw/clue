@@ -1,12 +1,7 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-ThisBuild / tlBaseVersion               := "0.58"
-ThisBuild / tlJdkRelease                := Some(17)
-ThisBuild / githubWorkflowJavaVersions  := Seq("25", "17").map(JavaSpec.temurin(_))
-ThisBuild / scalaVersion                := "3.8.4"
-ThisBuild / crossScalaVersions          := Seq("3.8.4")
-ThisBuild / githubWorkflowScalaVersions := Seq("3.8.4")
-Global / onChangedBuildSource           := ReloadOnSourceChanges
+ThisBuild / tlBaseVersion     := "0.58"
+Global / onChangedBuildSource := ReloadOnSourceChanges
 
 // The CI matrix covers Scala 3 only, which builds `sbt-clue` for sbt 2.x. Run the scripted tests
 // of the sbt 1.x cross-build (Scala 2.12) in a separate step.
@@ -29,14 +24,14 @@ ThisBuild / githubWorkflowAddedJobs ~= { jobs =>
         "validate-steward",
         "Validate Steward Config",
         WorkflowStep.Checkout ::
-          WorkflowStep.SetupJava(List(JavaSpec.temurin("17")), false) :::
+          WorkflowStep.SetupJava(List(JavaSpec.temurin("25")), false) :::
           WorkflowStep.Use(
-            UseRef.Public("coursier", "setup-action", "v1"),
+            UseRef.Public("coursier", "setup-action", "v3"),
             Map("apps" -> "scala-steward")
           ) ::
           WorkflowStep.Run(List("scala-steward validate-repo-config .scala-steward.conf")) :: Nil,
         scalas = List.empty,
-        javas = List(JavaSpec.temurin("17"))
+        javas = List(JavaSpec.temurin("25"))
       )
     else job
   }
