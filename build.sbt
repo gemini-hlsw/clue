@@ -105,8 +105,7 @@ lazy val scalaJS =
     .in(file("scalajs"))
     .enablePlugins(ScalaJSPlugin)
     .settings(
-      moduleName      := "clue-scalajs",
-      coverageEnabled := false,
+      moduleName := "clue-scalajs",
       libraryDependencies ++=
         Settings.Libraries.ScalaJsDom.value ++
           Settings.Libraries.ScalaJsMacrotaskExecutor.value ++
