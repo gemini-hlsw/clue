@@ -66,6 +66,10 @@ jobs:
         if: matrix.java == 'temurin@25' && matrix.os == 'ubuntu-22.04'
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' 'scalafixAll --check'
 
+      - name: scalaJSLink
+        if: matrix.project == 'rootJS'
+        run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' Test/scalaJSLinkerResult
+
       - name: Test affected projects
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' lucumaTestAffected
 
