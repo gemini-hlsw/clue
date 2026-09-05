@@ -218,7 +218,7 @@ lazy val sbtPlugin =
     .settings(
       moduleName                           := "sbt-clue",
       scalaVersion                         := "2.12.20",
-      crossScalaVersions                   := List("2.12.20", "3.8.4"),
+      crossScalaVersions                   := List("2.12.20", "3.9.0"),
       scalacOptions                        := Nil,
       (pluginCrossBuild / sbtVersion)      := {
         scalaBinaryVersion.value match {
