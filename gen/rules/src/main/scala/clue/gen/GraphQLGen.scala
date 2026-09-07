@@ -168,7 +168,7 @@ class GraphQLGen(val config: GraphQLGenConfig)
                     withSchema(schemaType.value, obj.pos) { schema =>
                       // Validate the document against the schema first, reporting all problems as
                       // diagnostics (errors at the document, warnings at the definition).
-                      val validation: Result[Unit] = validateDocument(schema, document.render)
+                      val validation: Result[Unit] = validateDocument(schema, document)
                       val diagnostics: Patch       =
                         lintResult(
                           validation,
@@ -280,7 +280,7 @@ class GraphQLGen(val config: GraphQLGenConfig)
                       // Validate the subquery against its root type first, reporting all problems
                       // as diagnostics (errors at the subquery, warnings at the definition).
                       val validation: Result[Unit]             =
-                        validateSubquery(schema, rootTypeName, variableDefs, subquery.render)
+                        validateSubquery(schema, rootTypeName, variableDefs, subquery)
                       val diagnostics: Patch                   =
                         lintResult(
                           validation,

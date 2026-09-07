@@ -10,11 +10,10 @@ package test
 
 import clue.GraphQLOperation
 
-// Unused-variable detection is disabled because grackle's `collectValueRefs` overwrites instead of
-// accumulating variable references, falsely flagging variables that appear alongside others (e.g.
-// several `$var` fields in one input object). So even this genuinely-unused `$unused` must NOT
-// produce a diagnostic.
+// The operation declares `$unused` but never references it. Per the GraphQL spec (All Variables
+// Used) this is a validation error, so the validation pass must report a diagnostic. Unused
+// detection is only skipped for documents that splice subqueries (see `validateParsed`).
 trait StarWarsUnusedVariable extends GraphQLOperation[StarWars] {
-  override val document = gql"query ($$unused: ID!) { hero(episode: NEWHOPE) { id } }"
+  override val document = gql"query ($$unused: ID!) { hero(episode: NEWHOPE) { id } }" // assert: GraphQLGen
 }
 // format: on

@@ -131,7 +131,7 @@ trait GraphQLValidation extends QueryGen {
         else
           withSchema(schemaType.value, defnPos) { schema =>
             lintResult(
-              validateDocument(schema, document.render),
+              validateDocument(schema, document),
               gqlValuePos("document", stats).getOrElse(defnPos),
               defnPos
             )
@@ -169,7 +169,7 @@ trait GraphQLValidation extends QueryGen {
                                          subquery.render,
                                          infer = generating
                     ),
-                    subquery.render
+                    subquery
                   ),
                   gqlValuePos("subquery", stats).getOrElse(defnPos),
                   defnPos
