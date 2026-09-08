@@ -371,44 +371,61 @@ trait QueryGen extends Generator {
    * needs a stable `groupBy` for other reasons.
    *
    * Same-type fragments are unwrapped by recursing into this same function (not into the caller's
-   * own walk), so a bare fragment routed here by the caller can't loop forever.
+   * own walk), so a bare fragment routed here by the caller can't loop forever. `conditional`
+   * accumulates whether any same-type fragment/spread unwrapped along the way (including this
+   * call's own ancestors) carried `@skip`/`@include`; a same-type fragment's own directives are
+   * folded in before recursing into its children, so a `__typename` (or anything else) that
+   * flattens to base-level through such a fragment is marked conditional even though it looks
+   * unconditional once flattened — see `validateTypenameSelections`, which requires the
+   * discriminator to be selected unconditionally.
    */
   private def flattenSelections(
     schema:       Schema,
     fragmentsMap: Map[String, UntypedFragment],
     selections:   List[Query],
-    currentType:  Option[GType]
-  ): List[(Option[String], Query)] = {
+    currentType:  Option[GType],
+    conditional:  Boolean = false
+  ): List[FlatSelection] = {
     def isSameType(tpnme: Option[String]): Boolean =
       tpnme.forall(t => currentType.forall(ct => schema.definition(t).forall(td => ct <:< td)))
 
     selections.flatMap {
-      case Query.Group(inner)                                                =>
-        flattenSelections(schema, fragmentsMap, inner, currentType)
-      case Query.UntypedFragmentSpread(name, _)                              =>
+      case Query.Group(inner)                                                         =>
+        flattenSelections(schema, fragmentsMap, inner, currentType, conditional)
+      case Query.UntypedFragmentSpread(name, directives)                              =>
         fragmentsMap.get(name).toList.flatMap { frag =>
           flattenSelections(
             schema,
             fragmentsMap,
-            List(Query.UntypedInlineFragment(frag.tpnme.some, Nil, frag.child)),
-            currentType
+            List(Query.UntypedInlineFragment(frag.tpnme.some, directives, frag.child)),
+            currentType,
+            conditional
           )
         }
-      case Query.UntypedInlineFragment(tpnme, _, child) if isSameType(tpnme) =>
-        flattenSelections(schema, fragmentsMap, selectionsOf(child), currentType)
-      case Query.UntypedInlineFragment(tpnme, _, child)                      =>
-        List((tpnme, child))
-      case other                                                             =>
-        List((none, other))
+      case Query.UntypedInlineFragment(tpnme, directives, child) if isSameType(tpnme) =>
+        flattenSelections(
+          schema,
+          fragmentsMap,
+          selectionsOf(child),
+          currentType,
+          conditional || hasConditionalDirective(directives)
+        )
+      case Query.UntypedInlineFragment(tpnme, _, child)                               =>
+        List(FlatSelection(tpnme, child, conditional))
+      case other                                                                      =>
+        List(FlatSelection(none, other, conditional))
     }
   }
 
   /**
    * Per-operation check that every selection set with at least one variant fragment (see
-   * [[flattenSelections]]) also selects `__typename` at the base level (possibly aliased), so
-   * `resolveData`'s generated decoder (see `Generator.addModuleDefs`, `TypeType.Sum`) can tell
-   * which subtype a response is. Mirrors [[inferVariableVars]]'s walk through fields/fragments,
-   * tracking the current type as it goes.
+   * [[flattenSelections]]) also selects `__typename` at the base level (possibly aliased)
+   * unconditionally, so `resolveData`'s generated decoder (see `Generator.addModuleDefs`,
+   * `TypeType.Sum`) can tell which subtype a response is. A `__typename` guarded by `@skip`/
+   * `@include` — directly, or via an enclosing same-type fragment/spread carrying the directive
+   * (see `FlatSelection.conditional`) — may be absent from the response even though the field
+   * itself isn't, so it is rejected just like a missing `__typename`. Mirrors
+   * [[inferVariableVars]]'s walk through fields/fragments, tracking the current type as it goes.
    */
   private def validateTypenameSelections(
     schema:    Schema,
@@ -417,19 +434,26 @@ trait QueryGen extends Generator {
     query:     Query
   ): List[Problem] = {
     def check(selections: List[Query], currentType: Option[GType]): List[Problem] = {
-      val flat: List[(Option[String], Query)] =
+      val flat: List[FlatSelection] =
         flattenSelections(schema, fragments, selections, currentType)
 
-      val variantTypeNames: List[String] = flat.collect { case (Some(t), _) => t }.distinct
+      val variantTypeNames: List[String] = flat.collect { case FlatSelection(Some(t), _, _) =>
+        t
+      }.distinct
 
-      val hasTypename: Boolean = flat.exists {
-        case (None, Query.UntypedSelect(TypeSelect, _, _, _, _)) => true
-        case _                                                   => false
+      // Whether each base-level `__typename` select is conditional: directly guarded by
+      // `@skip`/`@include`, or unwrapped from a same-type fragment/spread that was.
+      val typenames: List[Boolean] = flat.collect {
+        case FlatSelection(None,
+                           Query.UntypedSelect(TypeSelect, _, _, directives, _),
+                           conditional
+            ) =>
+          conditional || hasConditionalDirective(directives)
       }
 
       val here: List[Problem] =
-        if (variantTypeNames.isEmpty || hasTypename) List.empty
-        else {
+        if (variantTypeNames.isEmpty) List.empty
+        else if (typenames.isEmpty) {
           val ctName = currentType.flatMap(_.asNamed).fold("?")(_.name)
           List(
             Problem(
@@ -438,19 +462,29 @@ trait QueryGen extends Generator {
                 "them so the response can be decoded to the right subtype."
             )
           )
-        }
+        } else if (typenames.forall(identity)) {
+          val ctName = currentType.flatMap(_.asNamed).fold("?")(_.name)
+          List(
+            Problem(
+              s"Selection on [$ctName] has fragments on subtypes [${variantTypeNames
+                  .mkString(", ")}] but its `__typename` is selected with `@skip`/`@include` " +
+                "(directly or via an enclosing fragment). The discriminator must be selected " +
+                "unconditionally so every response can be decoded to the right subtype."
+            )
+          )
+        } else List.empty
 
       val nested: List[Problem] = flat.flatMap {
-        case (None, Query.UntypedSelect(name, _, _, _, child)) =>
+        case FlatSelection(None, Query.UntypedSelect(name, _, _, _, child), _) =>
           val next =
             MetaTypes
               .get(name)
               .orElse(currentType.flatMap(_.field(name)))
               .flatMap(_.underlyingObject)
           check(selectionsOf(child), next)
-        case (Some(t), child)                                  =>
+        case FlatSelection(Some(t), child, _)                                  =>
           check(selectionsOf(child), schema.definition(t))
-        case _                                                 =>
+        case _                                                                 =>
           List.empty
       }
 
@@ -828,22 +862,26 @@ trait QueryGen extends Generator {
           // (grouping only, e.g. for `@include`) into a flat, ordered list of base-level selects
           // and variant inline fragments (fragments on a proper subtype of `currentType`). See
           // `flattenSelections` for the classification rule.
-          val flatSelections: List[(Option[String], Query)] =
+          val flatSelections: List[FlatSelection] =
             flattenSelections(schema, fragmentsMap, selections, currentType)
 
           val hierarchyAccumulators
             : List[(Option[String], List[(Accumulator[Class, ClassParam, Sum], Int)])] =
             flatSelections.zipWithIndex // We want to preserve order of appeareance
-              .groupBy(_._1._1)         // Group by discriminator (None = base group)
+              .groupBy(_._1.variant)    // Group by discriminator (None = base group)
               .toList
               .sortBy(_._2.head._2)     // Sort by first appeareance of each subtype
               .map { // Resolve groups
                 case (Some(typeName), items) =>
                   (typeName.some,
-                   items.map { case ((_, child), idx) => (go(child, getType(typeName).some), idx) }
+                   items.map { case (FlatSelection(_, child, _), idx) =>
+                     (go(child, getType(typeName).some), idx)
+                   }
                   )
                 case (None, items)           =>
-                  (none, items.map { case ((_, q), idx) => (go(q, currentType), idx) })
+                  (none,
+                   items.map { case (FlatSelection(_, q, _), idx) => (go(q, currentType), idx) }
+                  )
               }
 
           val baseAccumulators    = hierarchyAccumulators.collectFirst { case (None, accumulators) =>
@@ -872,8 +910,9 @@ trait QueryGen extends Generator {
               // `__typename` select whenever there is at least one variant.
               val (discriminatorKey, discriminatorIsAliased): (String, Boolean) =
                 flatSelections
-                  .collectFirst { case (None, UntypedSelect(TypeSelect, alias, _, _, _)) =>
-                    (alias.getOrElse(TypeSelect), alias.isDefined)
+                  .collectFirst {
+                    case FlatSelection(None, UntypedSelect(TypeSelect, alias, _, _, _), _) =>
+                      (alias.getOrElse(TypeSelect), alias.isDefined)
                   }
                   .getOrElse(
                     // Unreachable: validateTypenameSelections rejects variants without a base
@@ -1185,3 +1224,14 @@ trait QueryGen extends Generator {
         .getOrElse(parentBody)
 
 }
+
+// One base-level item of a flattened selection set (see `QueryGen.flattenSelections`). `variant` is
+// the type condition for a fragment on a proper subtype, `None` for a base-level select.
+// `conditional` is true when an enclosing same-type fragment/spread that was unwrapped carried
+// `@skip`/`@include`, so the item may be absent from the response even though it looks unconditional
+// here. Top-level (not nested in the trait) so pattern matches on it need no outer-reference check.
+private[gen] final case class FlatSelection(
+  variant:     Option[String],
+  query:       Query,
+  conditional: Boolean
+)

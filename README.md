@@ -158,7 +158,11 @@ object Character {
 ```
 
 The selection **must** include `__typename` at the same level as the fragments; the generated
-decoder switches on it to pick the case class to decode into. Omitting it is a generation error: "Selection on [...] has fragments on subtypes [...] but does not select `__typename`".
+decoder switches on it to pick the case class to decode into. Omitting it is a generation error: "Selection on [...] has fragments on subtypes [...] but does not select `__typename`". It must also
+be selected **unconditionally**: with `@skip`/`@include` on it, or on a fragment that encloses it,
+generation fails with "... its `__typename` is selected with `@skip`/`@include`". A `__typename`
+inside a fragment on the field's own type (plain grouping, e.g. `... on Character { __typename }`)
+counts, as long as neither it nor the fragment is conditional.
 
 A bare `__typename` is consumed by the decoder and is not generated as a field. Aliased (e.g.
 `kind: __typename`), it is both the decoder key and a regular `String` field on the trait and every
