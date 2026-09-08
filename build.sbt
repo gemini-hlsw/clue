@@ -1,6 +1,6 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-ThisBuild / tlBaseVersion     := "0.58"
+ThisBuild / tlBaseVersion     := "0.59"
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 // The CI matrix covers Scala 3 only, which builds `sbt-clue` for sbt 2.x. Run the scripted tests
