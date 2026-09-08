@@ -21,6 +21,7 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
           nodes {
             id
             observationTarget {
+              __typename
               ... on Target {
                 target_id: id
                 target_name: name
@@ -67,7 +68,16 @@ object LucumaQuery3 extends GraphQLOperation[LucumaODB] {
           val asterism: monocle.Prism[Data.Observations.Nodes.ObservationTarget, Data.Observations.Nodes.ObservationTarget.Asterism] = monocle.macros.GenPrism[Data.Observations.Nodes.ObservationTarget, Data.Observations.Nodes.ObservationTarget.Asterism]
           implicit val eqObservationTarget: cats.Eq[Data.Observations.Nodes.ObservationTarget] = cats.Eq.fromUniversalEquals
           implicit val showObservationTarget: cats.Show[Data.Observations.Nodes.ObservationTarget] = cats.Show.fromToString
-          implicit val jsonDecoderObservationTarget: io.circe.Decoder[Data.Observations.Nodes.ObservationTarget] = List[io.circe.Decoder[Data.Observations.Nodes.ObservationTarget]](io.circe.Decoder[Data.Observations.Nodes.ObservationTarget.Target].asInstanceOf[io.circe.Decoder[Data.Observations.Nodes.ObservationTarget]], io.circe.Decoder[Data.Observations.Nodes.ObservationTarget.Asterism].asInstanceOf[io.circe.Decoder[Data.Observations.Nodes.ObservationTarget]]).reduceLeft(_ or _)
+          implicit val jsonDecoderObservationTarget: io.circe.Decoder[Data.Observations.Nodes.ObservationTarget] = io.circe.Decoder.instance {
+            c => c.downField("__typename").as[String].flatMap {
+              case "Target" =>
+                io.circe.Decoder[Data.Observations.Nodes.ObservationTarget.Target].tryDecode(c)
+              case "Asterism" =>
+                io.circe.Decoder[Data.Observations.Nodes.ObservationTarget.Asterism].tryDecode(c)
+              case other =>
+                Left(io.circe.DecodingFailure("Unexpected __typename [" + other + "] for ObservationTarget", c.history))
+            }
+          }
         }
         val id: monocle.Lens[Data.Observations.Nodes, ObservationId] = monocle.macros.GenLens[Data.Observations.Nodes](_.id)
         val observationTarget: monocle.Lens[Data.Observations.Nodes, Option[Data.Observations.Nodes.ObservationTarget]] = monocle.macros.GenLens[Data.Observations.Nodes](_.observationTarget)

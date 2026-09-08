@@ -14,6 +14,7 @@ trait StarWarsQuery extends GraphQLOperation[StarWars] {
   override val document = gql"""
         query ($$charId: ID!) {
           character(id: $$charId) {
+            __typename
             id
             name
             ... on Human {

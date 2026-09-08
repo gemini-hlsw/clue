@@ -12,26 +12,17 @@ import clue.GraphQLSubquery
 import clue.annotation.GraphQL
 import clue.annotation.GraphQLType
 
-@GraphQL // assert: GraphQLGen
-@GraphQLType("Character")
-abstract class StarWarsNestedSubquery extends GraphQLSubquery[StarWars] {
+@GraphQL
+@GraphQLType("Human")
+abstract class StarWarsHumanSubquery extends GraphQLSubquery[StarWars] {
 
   override val subquery = gql"""
         {
-          __typename
-          id
-          name
-          ... on Human {
-            homePlanet
-          }
-          contacts:friends $StarWarsSubquery
-          ... on Droid {
-            primaryFunction
-          }
+          homePlanet
         }
       """
 }
 
 @clue.annotation.GraphQLStub
-object StarWarsNestedSubquery
+object StarWarsHumanSubquery
 // format: on

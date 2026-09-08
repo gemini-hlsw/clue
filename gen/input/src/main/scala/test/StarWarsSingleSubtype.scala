@@ -11,22 +11,18 @@ package test
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
-@GraphQL // assert: GraphQLGen
-trait StarWarsQuery extends GraphQLOperation[StarWars] {
+// A single fragment on a subtype (`Human`), leaving `Droid` uncovered: `Character` has exactly
+// two implementors, so this must still generate a fallback `Other` instance (no special-casing
+// for "just one variant").
+@GraphQL
+trait StarWarsSingleSubtype extends GraphQLOperation[StarWars] {
   override val document = gql"""
-        query ($$charId: ID!) {
-          character(id: $$charId) {
+        query ($$ep: Episode!) {
+          hero(episode: $$ep) {
             __typename
-            id
             name
             ... on Human {
               homePlanet
-            }
-            friends {
-              name
-            }
-            ... on Droid {
-              primaryFunction
             }
           }
         }

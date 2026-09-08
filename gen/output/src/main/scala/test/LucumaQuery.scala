@@ -25,6 +25,7 @@ object LucumaQuery extends GraphQLOperation[LucumaODB] {
               id
               name
               tracking {
+                __typename
                 ... on Sidereal {
                   epoch
                 }
@@ -70,7 +71,16 @@ object LucumaQuery extends GraphQLOperation[LucumaODB] {
             val nonsidereal: monocle.Prism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Nonsidereal] = monocle.macros.GenPrism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Nonsidereal]
             implicit val eqTracking: cats.Eq[Data.Program.Targets.Nodes.Tracking] = cats.Eq.fromUniversalEquals
             implicit val showTracking: cats.Show[Data.Program.Targets.Nodes.Tracking] = cats.Show.fromToString
-            implicit val jsonDecoderTracking: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking] = List[io.circe.Decoder[Data.Program.Targets.Nodes.Tracking]](io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Sidereal].asInstanceOf[io.circe.Decoder[Data.Program.Targets.Nodes.Tracking]], io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Nonsidereal].asInstanceOf[io.circe.Decoder[Data.Program.Targets.Nodes.Tracking]]).reduceLeft(_ or _)
+            implicit val jsonDecoderTracking: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking] = io.circe.Decoder.instance {
+              c => c.downField("__typename").as[String].flatMap {
+                case "Sidereal" =>
+                  io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Sidereal].tryDecode(c)
+                case "Nonsidereal" =>
+                  io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Nonsidereal].tryDecode(c)
+                case other =>
+                  Left(io.circe.DecodingFailure("Unexpected __typename [" + other + "] for Tracking", c.history))
+              }
+            }
           }
           val id: monocle.Lens[Data.Program.Targets.Nodes, TargetId] = monocle.macros.GenLens[Data.Program.Targets.Nodes](_.id)
           val name: monocle.Lens[Data.Program.Targets.Nodes, NonEmptyString] = monocle.macros.GenLens[Data.Program.Targets.Nodes](_.name)

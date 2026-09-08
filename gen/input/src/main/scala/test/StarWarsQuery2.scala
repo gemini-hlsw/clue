@@ -18,6 +18,7 @@ object Wrapper /* gql: extends Something */ {
   trait StarWarsQuery2 extends GraphQLOperation[StarWars] {
   override val document = gql"""
         fragment fields on Character {
+          __typename
           id
           name
           ... on Human {

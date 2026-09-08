@@ -19,13 +19,18 @@ interface Character {
   appearsIn: [Episode!]
 }
 
-type Human implements Character {
+interface Pilot {
+  vehicle: String
+}
+
+type Human implements Character & Pilot {
   id: String!
   name: String
   friends: [Character!]
   more_friends: [Character!]
   appearsIn: [Episode!]
   homePlanet: String
+  vehicle: String
 }
 
 type Droid implements Character {

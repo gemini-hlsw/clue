@@ -18,6 +18,7 @@ object StarWarsQuery extends GraphQLOperation[StarWars] {
   override val document = gql"""
         query ($$charId: ID!) {
           character(id: $$charId) {
+            __typename
             id
             name
             ... on Human {
@@ -102,7 +103,16 @@ object StarWarsQuery extends GraphQLOperation[StarWars] {
       val droid: monocle.Prism[Data.Character, Data.Character.Droid] = monocle.macros.GenPrism[Data.Character, Data.Character.Droid]
       implicit val eqCharacter: cats.Eq[Data.Character] = cats.Eq.fromUniversalEquals
       implicit val showCharacter: cats.Show[Data.Character] = cats.Show.fromToString
-      implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = List[io.circe.Decoder[Data.Character]](io.circe.Decoder[Data.Character.Human].asInstanceOf[io.circe.Decoder[Data.Character]], io.circe.Decoder[Data.Character.Droid].asInstanceOf[io.circe.Decoder[Data.Character]]).reduceLeft(_ or _)
+      implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = io.circe.Decoder.instance {
+        c => c.downField("__typename").as[String].flatMap {
+          case "Human" =>
+            io.circe.Decoder[Data.Character.Human].tryDecode(c)
+          case "Droid" =>
+            io.circe.Decoder[Data.Character.Droid].tryDecode(c)
+          case other =>
+            Left(io.circe.DecodingFailure("Unexpected __typename [" + other + "] for Character", c.history))
+        }
+      }
     }
     val character: monocle.Iso[Data, Option[Data.Character]] = monocle.Focus[Data](_.character)
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
