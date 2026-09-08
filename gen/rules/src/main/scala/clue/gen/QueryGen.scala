@@ -870,10 +870,10 @@ trait QueryGen extends Generator {
               // instance per variant, discriminated on `__typename`. Validation (see
               // `validateParsed`/`validateTypenameSelections`) already guarantees a base-level
               // `__typename` select whenever there is at least one variant.
-              val discriminatorKey: String =
+              val (discriminatorKey, discriminatorIsAliased): (String, Boolean) =
                 flatSelections
                   .collectFirst { case (None, UntypedSelect(TypeSelect, alias, _, _, _)) =>
-                    alias.getOrElse(TypeSelect)
+                    (alias.getOrElse(TypeSelect), alias.isDefined)
                   }
                   .getOrElse(
                     // Unreachable: validateTypenameSelections rejects variants without a base
@@ -881,11 +881,16 @@ trait QueryGen extends Generator {
                     throw new Exception("Missing `__typename` for a validated variant selection")
                   )
 
-              // `__typename` is consumed by the discriminating decoder (see
-              // Generator.addModuleDefs), so it is not generated as a param of the trait or any
-              // instance (nor does it get a lens): strip it out of every params list we emit.
+              // A bare `__typename` carries no information beyond which case class the response
+              // decodes to, so it's noise: it is consumed by the discriminating decoder (see
+              // Generator.addModuleDefs) and stripped out of every params list we emit (dropped
+              // from the trait, every instance, and its lens). An aliased `__typename` (e.g.
+              // `kind: __typename`) is instead an explicit request for the value as a field: it is
+              // kept as the decoder key AND generated as a regular field, which lets users retain
+              // the raw type name (e.g. for logging, or for the subtypes folded into `Other`).
               def stripDiscriminator(params: List[ClassParam]): List[ClassParam] =
-                params.filterNot(_.name == discriminatorKey)
+                if (discriminatorIsAliased) params
+                else params.filterNot(_.name == discriminatorKey)
 
               val ct: NamedType =
                 currentType
