@@ -73,4 +73,70 @@ class GraphQLTextSuite extends munit.FunSuite {
     assert(!usableAs("Episode", "Episode!"))
     assert(!usableAs("String!", "Episode!"))
   }
+
+  test("stripCommentsAndStrings blanks a # comment but keeps the newline") {
+    assertEquals(stripCommentsAndStrings("a # b\nc"), "a    \nc")
+  }
+
+  test("stripCommentsAndStrings blanks a string literal with an escaped quote") {
+    val input  = "x \"a\\\"b\" y"
+    val output = stripCommentsAndStrings(input)
+    assertEquals(output, "x        y")
+    assertEquals(output.length, input.length)
+  }
+
+  test("stripCommentsAndStrings blanks a block string containing a quote") {
+    val input  = "pre \"\"\"xxx \" yyy\nzzz\"\"\" post"
+    val output = stripCommentsAndStrings(input)
+    assertEquals(output.length, input.length)
+    assert(!output.contains("x"))
+    assert(!output.contains("y"))
+    assert(!output.contains("z"))
+  }
+
+  test("stripCommentsAndStrings: a # inside a string is not a comment") {
+    assertEquals(stripCommentsAndStrings("\"#\" z"), "    z")
+  }
+
+  test("a fragment definition inside a comment is not a definition") {
+    assertEquals(
+      unusedFragments(
+        parse(List("query { hero { name } } # fragment fields on Character { id }")).body
+      ),
+      Nil
+    )
+  }
+
+  test("a fragment definition inside a string literal is not a definition") {
+    assertEquals(
+      unusedFragments(
+        parse(
+          List("query { hero(name: \"fragment fields on Character\") { name } }")
+        ).body
+      ),
+      Nil
+    )
+  }
+
+  test("a $name inside a string literal is not a usage") {
+    val Parsed(vars, body) =
+      parse(List("query ($$id: ID!) { hero(name: \"$$id\") { name } }"))
+    assertEquals(unusedVariables(vars.keySet, body, Set.empty), List("id"))
+  }
+
+  test("a ...spread inside a comment does not count") {
+    assertEquals(
+      unusedFragments(
+        parse(List(" { hero { name } } fragment f on C { id } # ...f")).body
+      ),
+      List("f")
+    )
+  }
+
+  test("header default value containing ) does not break the header scan") {
+    val Parsed(vars, body) =
+      parse(List("query ($$s: String = \")\") { hero(name: $$s) }"))
+    assertEquals(vars, Map("s" -> "String"))
+    assertEquals(unusedVariables(Set("s"), body, Set.empty), Nil)
+  }
 }

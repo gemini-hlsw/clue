@@ -9,12 +9,17 @@ package clue
  *
  * This is deliberately not a GraphQL parser: `core` has no grackle dependency, and the macro only
  * sees literal fragments with holes where subqueries are spliced. The scans are just precise enough
- * for the variable and fragment checks, and only ever err on the side of silence (e.g. a `$name`
- * inside a GraphQL string literal counts as a usage).
+ * for the variable and fragment checks, and only ever err on the side of silence: comments and
+ * string literals are blanked out before anything else runs (see `stripCommentsAndStrings`), so
+ * outside of them `fragment X on` is always a fragment definition and `$name` is always a variable
+ * reference.
  */
 private[clue] object GraphQLText {
 
-  /** A document's literal parts split into the header's declarations and the body text. */
+  /**
+   * A document's literal parts split into the header's declarations and the body text. `body` has
+   * had its comments and string literals blanked out (see `stripCommentsAndStrings`).
+   */
   final case class Parsed(operationVars: Map[String, String], body: String)
 
   /**
@@ -23,17 +28,79 @@ private[clue] object GraphQLText {
    * header is excluded from the body so its `$name` declarations don't count as usages.
    */
   def parse(parts: List[String]): Parsed = {
-    val firstPart = parts.headOption.getOrElse("").replace("$$", "$")
-    val header    = headerSpan(firstPart)
+    val strippedParts = parts.map(p => stripCommentsAndStrings(p.replace("$$", "$")))
+    val firstPart     = strippedParts.headOption.getOrElse("")
+    val header        = headerSpan(firstPart)
 
     val operationVars = header.fold(Map.empty[String, String]) { case (open, end) =>
       parseVarDefs(firstPart.substring(open, end + 1))
     }
     val body          =
       header.fold(firstPart) { case (_, end) => firstPart.substring(end + 1) } +
-        parts.drop(1).map(_.replace("$$", "$")).mkString(" ")
+        strippedParts.drop(1).mkString(" ")
 
     Parsed(operationVars, body)
+  }
+
+  /**
+   * Blank out GraphQL comments (`#` to end of line) and string literals (`"..."` with `\"` escapes,
+   * and `"""..."""` block strings), replacing every character of them with a space so positions and
+   * line structure are preserved. Applied before any scan, so text inside them can neither declare
+   * nor use anything.
+   */
+  def stripCommentsAndStrings(text: String): String = {
+    val n   = text.length
+    val out = new Array[Char](n)
+
+    def isTripleQuoteAt(pos: Int): Boolean =
+      pos + 3 <= n && text.charAt(pos) == '"' && text.charAt(pos + 1) == '"' &&
+        text.charAt(pos + 2) == '"'
+
+    def isEscapedTripleQuoteAt(pos: Int): Boolean =
+      pos + 4 <= n && text.charAt(pos) == '\\' && isTripleQuoteAt(pos + 1)
+
+    var i = 0
+    while (i < n) {
+      val c = text.charAt(i)
+      if (c == '#') {
+        // Line comment: blank up to (but not including) the newline, so line structure survives.
+        while (i < n && text.charAt(i) != '\n') { out(i) = ' '; i += 1 }
+      } else if (isTripleQuoteAt(i)) {
+        // Block string: blank the opening `"""`, then scan for the closing one, treating `\"""` as
+        // an escaped triple quote that doesn't close it.
+        out(i) = ' '; out(i + 1) = ' '; out(i + 2) = ' '
+        i += 3
+        var closed = false
+        while (i < n && !closed)
+          if (isEscapedTripleQuoteAt(i)) {
+            out(i) = ' '; out(i + 1) = ' '; out(i + 2) = ' '; out(i + 3) = ' '
+            i += 4
+          } else if (isTripleQuoteAt(i)) {
+            out(i) = ' '; out(i + 1) = ' '; out(i + 2) = ' '
+            i += 3
+            closed = true
+          } else {
+            out(i) = ' '; i += 1
+          }
+      } else if (c == '"') {
+        // Single-line string: a backslash escapes the next char (whatever it is); an unescaped `"`
+        // closes it. Unterminated: blanks to end of input.
+        out(i) = ' '; i += 1
+        var closed = false
+        while (i < n && !closed)
+          if (text.charAt(i) == '\\' && i + 1 < n) {
+            out(i) = ' '; out(i + 1) = ' '; i += 2
+          } else if (text.charAt(i) == '"') {
+            out(i) = ' '; i += 1
+            closed = true
+          } else {
+            out(i) = ' '; i += 1
+          }
+      } else {
+        out(i) = c; i += 1
+      }
+    }
+    new String(out)
   }
 
   /**

@@ -158,7 +158,8 @@ private[clue] object GraphQLInterpolator {
     // Unused-declaration check (GraphQL "All Variables Used" / "Fragments Must Be Used"). A variable
     // is used if the literal text references it or a spliced subquery requires it. Both are
     // validation errors server-side; here they are warnings, since text scanning can't see past a
-    // splice and the server remains the authority.
+    // splice and the server remains the authority. Fragment usage is not looked for inside splices
+    // because a spliced subquery may not spread the host's fragments (see `GraphQLSubquery`).
     GraphQLText
       .unusedVariables(declaredVars.keySet, bodyText, requiredBySplices.flatMap(_.keySet).toSet)
       .foreach { name =>
