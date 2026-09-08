@@ -193,9 +193,21 @@ private[clue] object GraphQLInterpolator {
     def hasStubAnnotation(sym: Symbol): Boolean =
       sym.annotations.exists(_.tpe =:= stubAnnotation)
 
+    // What each spliced subquery requires, by name, collected while checking each splice below and
+    // reused after the loop: a variable an operation declares but a spliced subquery requires counts
+    // as used, even when the enclosing document's own text never mentions it.
+    val spliceRequirements = scala.collection.mutable.Map.empty[Int, Set[String]]
+
+    // Whether any splice in this call was a `@GraphQLStub` placeholder. A stub has no `VariableDefs`
+    // member, so nothing is recorded for it in `spliceRequirements` above — "requires nothing" is
+    // indistinguishable from "unknown" once recorded. Set below whenever a splice is a stub, and used
+    // to skip the unused-variable warnings entirely for this document (see below).
+    var anyStubbed = false
+
     argExprs.zipWithIndex.foreach { case (arg, i) =>
       val argTpe    = arg.asTerm.tpe
       val isStubbed = hasStubAnnotation(argTpe.typeSymbol) || hasStubAnnotation(argTpe.termSymbol)
+      if (isStubbed) anyStubbed = true
       if (!argTpe.baseClasses.contains(subqueryClass) && !isStubbed)
         report.errorAndAbort(
           s"gql: only a GraphQLSubquery can be spliced into a document, found [${argTpe.show}]. " +
@@ -221,6 +233,7 @@ private[clue] object GraphQLInterpolator {
       variableDefsOf(argTpe).foreach { required =>
         val ownerName    = arg.asTerm.tpe.typeSymbol.name.stripSuffix("$")
         val requiredVars = parseVariableDefs(required, ownerName, arg.asTerm.pos)
+        spliceRequirements(i) = requiredVars.keySet
         requiredVars.foreach { case (name, reqType) =>
           declaredVars.get(name) match {
             case None                                                            =>
@@ -237,6 +250,50 @@ private[clue] object GraphQLInterpolator {
           }
         }
       }
+    }
+
+    // Unused-declaration check (GraphQL "All Variables Used" / "Fragments Must Be Used"). A variable
+    // is used when the document references it directly, when a fragment it transitively spreads
+    // references it, or when a spliced subquery requires it. Both are validation errors server-side;
+    // here they are warnings rather than errors — the document is parsed, so the scan is exact for
+    // what it can see, but a spliced subquery's own text is opaque here and the server remains the
+    // authority.
+    //
+    // When any splice was a `@GraphQLStub` placeholder, its requirements are unknowable (see
+    // `anyStubbed` above), so an operation or subquery declaring a variable that only the stubbed
+    // splice would need can't be told apart from a genuinely unused one: skip the unused-VARIABLE
+    // warnings entirely for this document. The generated form (with the real subquery spliced in)
+    // gets the real check. Unused-FRAGMENT warnings still run regardless: a subquery is
+    // self-contained and cannot spread the host's fragments, so a stub can't affect them.
+    if (!anyStubbed) {
+      // The enclosing subquery's own `type VariableDefs` (if any) is not covered by
+      // `unusedVariables`, which only looks at `Ast.OperationDefinition.Operation`s — a subquery's
+      // body parses as a `QueryShorthand`, which declares none. Check it separately here.
+      enclosingSubquery.foreach { cls =>
+        val label = s"subquery [${cls.name.stripSuffix("$")}]"
+        (enclosingVariableDefs.keySet -- GraphQLDocuments.referencedVariables(
+          doc,
+          spliceRequirements.toMap
+        )).toList.sorted.foreach { name =>
+          report.warning(
+            s"gql: $label declares variable $$$name but never uses it",
+            Position.ofMacroExpansion
+          )
+        }
+      }
+      GraphQLDocuments.unusedVariables(doc, spliceRequirements.toMap).foreach {
+        case (opLabel, name) =>
+          report.warning(
+            s"gql: $opLabel declares variable $$$name but never uses it",
+            Position.ofMacroExpansion
+          )
+      }
+    }
+    GraphQLDocuments.unusedFragments(doc).foreach { name =>
+      report.warning(
+        s"gql: fragment '$name' is defined but never spread",
+        Position.ofMacroExpansion
+      )
     }
 
     // Runtime string, identical to `s"..."`, wrapped as a GraphQLDocument.
