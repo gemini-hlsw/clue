@@ -424,8 +424,12 @@ trait QueryGen extends Generator {
    * `TypeType.Sum`) can tell which subtype a response is. A `__typename` guarded by `@skip`/
    * `@include` — directly, or via an enclosing same-type fragment/spread carrying the directive
    * (see `FlatSelection.conditional`) — may be absent from the response even though the field
-   * itself isn't, so it is rejected just like a missing `__typename`. Mirrors
-   * [[inferVariableVars]]'s walk through fields/fragments, tracking the current type as it goes.
+   * itself isn't, so it is rejected just like a missing `__typename`. Also, when two or more
+   * variant types share a concrete type (`__typename` in an actual response is always concrete,
+   * e.g. an interface variant covering a type also covered by another variant), a response of that
+   * concrete type could only ever decode to one of them, silently losing the other's fields, so
+   * that combination is rejected too. Mirrors [[inferVariableVars]]'s walk through
+   * fields/fragments, tracking the current type as it goes.
    */
   private def validateTypenameSelections(
     schema:    Schema,
@@ -451,10 +455,11 @@ trait QueryGen extends Generator {
           conditional || hasConditionalDirective(directives)
       }
 
-      val here: List[Problem] =
+      val ctName: String = currentType.flatMap(_.asNamed).fold("?")(_.name)
+
+      val typenameProblems: List[Problem] =
         if (variantTypeNames.isEmpty) List.empty
         else if (typenames.isEmpty) {
-          val ctName = currentType.flatMap(_.asNamed).fold("?")(_.name)
           List(
             Problem(
               s"Selection on [$ctName] has fragments on subtypes [${variantTypeNames
@@ -463,7 +468,6 @@ trait QueryGen extends Generator {
             )
           )
         } else if (typenames.forall(identity)) {
-          val ctName = currentType.flatMap(_.asNamed).fold("?")(_.name)
           List(
             Problem(
               s"Selection on [$ctName] has fragments on subtypes [${variantTypeNames
@@ -473,6 +477,40 @@ trait QueryGen extends Generator {
             )
           )
         } else List.empty
+
+      // Two variant types that share a concrete type would make that concrete type's response
+      // decode to whichever variant appears first, silently losing the other's fields (see
+      // `resolveData`'s `discriminatorCases`). Report each overlapping pair once, in order of
+      // appearance.
+      val overlapProblems: List[Problem] =
+        if (variantTypeNames.sizeIs < 2) List.empty
+        else {
+          val concreteByVariant: List[(String, Set[String])] =
+            variantTypeNames.map(t =>
+              t -> schema.definition(t).fold(Set.empty[String])(concreteTypeNames(schema, _))
+            )
+
+          def pairs[A](xs: List[A]): List[(A, A)] =
+            xs match {
+              case Nil       => List.empty
+              case x :: rest => rest.map(x -> _) ++ pairs(rest)
+            }
+
+          pairs(concreteByVariant).flatMap { case ((a, aTypes), (b, bTypes)) =>
+            val shared = aTypes.intersect(bTypes)
+            Option.when(shared.nonEmpty)(
+              Problem(
+                s"Selection on [$ctName] has fragments on [$a] and [$b] that overlap on " +
+                  s"concrete type(s) [${shared.toList.sorted
+                      .mkString(", ")}]: a response of that type can only decode to one of " +
+                  "them, so the other's fields would be lost. Merge them into a single " +
+                  "fragment (e.g. on the concrete type)."
+              )
+            )
+          }
+        }
+
+      val here: List[Problem] = typenameProblems ++ overlapProblems
 
       val nested: List[Problem] = flat.flatMap {
         case FlatSelection(None, Query.UntypedSelect(name, _, _, _, child), _) =>
@@ -696,6 +734,80 @@ trait QueryGen extends Generator {
   private def hasConditionalDirective(directives: List[Directive]): Boolean =
     directives.exists(d => d.name == "include" || d.name == "skip")
 
+  // The concrete (object) type names covered by `t`: itself if it's already concrete, every
+  // implementor if it's an interface, or the (dealiased, recursively resolved) concrete members if
+  // it's a union.
+  private def concreteTypeNames(schema: Schema, t: NamedType): Set[String] =
+    t.dealias match {
+      case o: ObjectType    => Set(o.name)
+      case i: InterfaceType =>
+        schema.types
+          .map(_.dealias)
+          .collect { case o: ObjectType if o <:< i => o.name }
+          .toSet
+      case u: UnionType     => u.members.flatMap(m => concreteTypeNames(schema, m)).toSet
+      case other            => Set(other.name)
+    }
+
+  // Structural equality for `ClassParam`, ignoring `overrides`. Plain case-class `==` doesn't work
+  // here: `tpe` is a scalameta `Type`, and scalameta trees compare by identity, not structure, so
+  // two independently-built trees with the same shape (e.g. two `Type.Name("String")`) are never
+  // `==`. `.structure` is scalameta's structural-equality string, so it's used instead.
+  private def sameSelection(a: ClassParam, b: ClassParam): Boolean =
+    a.name == b.name && a.tpe.structure == b.tpe.structure && a.deprecation == b.deprecation
+
+  // Structural equality for `Class`/`Sum`, for the same reason as [[sameSelection]]: their
+  // `ClassParam`s (and, transitively, nested classes) embed scalameta `Type`s, so plain `==`
+  // can't be used to tell two independently-built but identical classes apart.
+  private def sameClass(a: Class, b: Class): Boolean =
+    (a, b) match {
+      case (CaseClass(n1, p1, nested1), CaseClass(n2, p2, nested2)) =>
+        n1 == n2 && sameParams(p1, p2) && sameClasses(nested1, nested2)
+      case (SumClass(n1, s1, o1), SumClass(n2, s2, o2))             =>
+        n1 == n2 && o1 == o2 && sameSum(s1, s2)
+      case _                                                        =>
+        false
+    }
+
+  private def sameParams(a: List[ClassParam], b: List[ClassParam]): Boolean =
+    a.sizeIs == b.size && a.zip(b).forall { case (x, y) =>
+      sameSelection(x, y) && x.overrides == y.overrides
+    }
+
+  private def sameClasses(a: List[Class], b: List[Class]): Boolean =
+    a.sizeIs == b.size && a.zip(b).forall { case (x, y) => sameClass(x, y) }
+
+  private def sameSum(a: Sum, b: Sum): Boolean =
+    sameParams(a.params, b.params) && sameClasses(a.nested, b.nested) &&
+      sameClasses(a.instances, b.instances) && a.discriminator == b.discriminator
+
+  // `classes`, deduplicated with [[sameClass]] (see there for why plain `.distinct` doesn't work).
+  private def distinctClasses(classes: List[Class]): List[Class] =
+    classes.foldLeft(List.empty[Class]) { (acc, c) =>
+      if (acc.exists(sameClass(_, c))) acc else acc :+ c
+    }
+
+  // Merge params that GraphQL itself merges: the same response name selected more than once (e.g.
+  // at the base level and again inside a fragment). Identical selections (ignoring the
+  // `overrides` flag) collapse to the first occurrence; if any occurrence was a base-level
+  // (override) param the merged one stays `override`. Same name with different content is left
+  // alone (it surfaces as a compile error in the generated code, as before). Identical nested
+  // classes are deduplicated too.
+  private def mergeDuplicateSelections(acc: ClassAccumulator): ClassAccumulator = {
+    val order: List[String]                   = acc.parAccum.map(_.name).distinct
+    val byName: Map[String, List[ClassParam]] = acc.parAccum.groupBy(_.name)
+
+    val mergedParAccum: List[ClassParam] = order.flatMap { name =>
+      val group = byName(name)
+      if (group.tail.forall(sameSelection(_, group.head)))
+        List(group.head.copy(overrides = group.exists(_.overrides)))
+      else
+        group
+    }
+
+    acc.copy(classes = distinctClasses(acc.classes), parAccum = mergedParAccum)
+  }
+
   protected type ClassAccumulator = Accumulator[Class, ClassParam, Sum]
 
   protected object ClassAccumulator {
@@ -890,15 +1002,17 @@ trait QueryGen extends Generator {
           val subTypeAccumulators = hierarchyAccumulators.collect {
             case (Some(typeName), accumulators) =>
               (typeName,
-               ClassAccumulator(
-                 accumulators.map(_._1).combineAll.classes,
-                 (baseAccumulators.map { case (accumlator, idx) =>
-                   (accumlator.withOverrideParams, idx)
-                 } ++ accumulators).sortBy(_._2).map(_._1).combineAll.parAccum
+               mergeDuplicateSelections(
+                 ClassAccumulator(
+                   accumulators.map(_._1).combineAll.classes,
+                   (baseAccumulators.map { case (accumlator, idx) =>
+                     (accumlator.withOverrideParams, idx)
+                   } ++ accumulators).sortBy(_._2).map(_._1).combineAll.parAccum
+                 )
                )
               )
           }
-          val baseAccumulator     = baseAccumulators.map(_._1).combineAll
+          val baseAccumulator     = mergeDuplicateSelections(baseAccumulators.map(_._1).combineAll)
 
           subTypeAccumulators match {
             case Nil      => baseAccumulator // No variants.
@@ -939,37 +1053,24 @@ trait QueryGen extends Generator {
                     throw new Exception("Variant fragment without a known current type")
                   )
 
-              // The concrete (object) type names covered by `t`: itself if it's already concrete,
-              // every implementor if it's an interface, or the (dealiased, recursively resolved)
-              // concrete members if it's a union.
-              def concreteTypeNames(t: NamedType): Set[String] =
-                t.dealias match {
-                  case o: ObjectType    => Set(o.name)
-                  case i: InterfaceType =>
-                    schema.types
-                      .map(_.dealias)
-                      .collect { case o: ObjectType if o <:< i => o.name }
-                      .toSet
-                  case u: UnionType     => u.members.flatMap(m => concreteTypeNames(m)).toSet
-                  case other            => Set(other.name)
-                }
-
               val coveredConcreteTypes: Set[String] =
                 variants.flatMap { case (typeName, _) =>
-                  concreteTypeNames(getType(typeName))
+                  concreteTypeNames(schema, getType(typeName))
                 }.toSet
-              val missingConcreteTypes: Set[String] = concreteTypeNames(ct) -- coveredConcreteTypes
+              val missingConcreteTypes: Set[String] =
+                concreteTypeNames(schema, ct) -- coveredConcreteTypes
 
               // `__typename` in a response is always a *concrete* object type, so a variant on an
               // interface/union type condition (e.g. `... on Pilot { ... }`) must be matched by
               // every concrete type it covers, not by its own (non-concrete) name. Build the
               // explicit `(concrete type name, instance name)` mapping the decoder needs: one
-              // entry per concrete name, in variant order; if two variants cover the same concrete
-              // type, the earlier one wins.
+              // entry per concrete name, in variant order. Overlap between variants (two variants
+              // covering the same concrete type) is rejected by `validateTypenameSelections`
+              // before we ever get here, so each concrete name maps to exactly one variant.
               val discriminatorCases: List[(String, String)] = {
                 val seen = scala.collection.mutable.LinkedHashMap.empty[String, String]
                 variants.foreach { case (typeName, _) =>
-                  concreteTypeNames(getType(typeName)).toList.sorted.foreach(concreteName =>
+                  concreteTypeNames(schema, getType(typeName)).toList.sorted.foreach(concreteName =>
                     seen.getOrElseUpdate(concreteName, typeName)
                   )
                 }

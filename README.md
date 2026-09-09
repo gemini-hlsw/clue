@@ -168,6 +168,14 @@ A bare `__typename` is consumed by the decoder and is not generated as a field. 
 `kind: __typename`), it is both the decoder key and a regular `String` field on the trait and every
 case class — the way to keep the raw type name around, e.g. for the types folded into `Other`.
 
+Fragments whose type conditions overlap on a concrete type (e.g. an interface `Pilot` implemented
+only by `Human`, alongside a fragment on `Human` itself) are rejected: a response of that concrete
+type could only ever decode to one of them, silently losing the other's fields. Merge the
+overlapping fragments into one (e.g. on the concrete type they share).
+
+A field selected both at the base level and inside a fragment (which GraphQL merges into a single
+response value) is likewise generated once, not duplicated in the fragment's case class.
+
 Fragments whose type condition is the field's own type or one of its supertypes are plain grouping
 (e.g. for `@include`), not subtypes, and are flattened rather than turned into cases.
 
