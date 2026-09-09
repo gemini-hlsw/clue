@@ -225,6 +225,15 @@ trait QueryGen extends Generator {
              for {
                rootType <- rootTypeOf(op)
                varDefs  <- compiler.compileVarDefs(op.variables)
+               // A selection with fragments on subtypes must select `__typename` next to them, so
+               // the generated decoder (see Generator.addModuleDefs) can tell subtypes apart.
+               _        <- Result.fromProblems(
+                             validateTypenameSelections(schema, fragMap, rootType, op.query)
+                           )
+               // A spliced subquery (rendered as `{ subqueryN: __typename }`, see
+               // InterpolatedGql.render) is only recognized by `resolveData` as the whole
+               // selection set of a field; anywhere else it silently fails to splice.
+               _        <- Result.fromProblems(validateSubqueryPlacement(fragMap, op.query))
                _        <- phases
                              .foldLeftM(op.query)((acc, phase) =>
                                phase.transformFragments *> phase.transform(acc)
@@ -334,6 +343,197 @@ trait QueryGen extends Generator {
       }
 
     go(query, rootType.some)
+  }
+
+  // The immediate children of a selection set, as a list. grackle's parser collapses a
+  // single-element selection set to a bare node instead of wrapping it in a `Group` (so
+  // `{ a }` parses as a bare `UntypedSelect`, not `Group(List(UntypedSelect(...)))`); this undoes
+  // that collapse uniformly so callers can always treat a selection set as a `List[Query]`.
+  private def selectionsOf(q: Query): List[Query] =
+    q match {
+      case Query.Group(qs) => qs
+      case Query.Empty     => List.empty
+      case other           => List(other)
+    }
+
+  /**
+   * Classify the immediate items of a selection set (whose current GraphQL type is `currentType`)
+   * into base-level selects and variant inline fragments, recursively expanding nested `Group`s and
+   * normalizing named fragment spreads into inline fragments along the way.
+   *
+   * A fragment (inline or, once normalized, a spread) is "same-type" when its type condition is
+   * absent, `currentType` is unknown, or `currentType <:< ` its type condition (grackle's
+   * `Type.<:<`: same type, an interface `currentType` implements, or a union containing it) — such
+   * a fragment is just grouping (e.g. for `@include`), so its children are unwrapped directly into
+   * the result. Anything else is a "variant" fragment (a proper subtype of `currentType`): it is
+   * kept as one flat item per occurrence, tagged with its type condition; merging same-typed
+   * variants together (accumulating their children, in order) is left to the caller, which already
+   * needs a stable `groupBy` for other reasons.
+   *
+   * Same-type fragments are unwrapped by recursing into this same function (not into the caller's
+   * own walk), so a bare fragment routed here by the caller can't loop forever. `conditional`
+   * accumulates whether any same-type fragment/spread unwrapped along the way (including this
+   * call's own ancestors) carried `@skip`/`@include`; a same-type fragment's own directives are
+   * folded in before recursing into its children, so a `__typename` (or anything else) that
+   * flattens to base-level through such a fragment is marked conditional even though it looks
+   * unconditional once flattened — see `validateTypenameSelections`, which requires the
+   * discriminator to be selected unconditionally.
+   */
+  private def flattenSelections(
+    schema:       Schema,
+    fragmentsMap: Map[String, UntypedFragment],
+    selections:   List[Query],
+    currentType:  Option[GType],
+    conditional:  Boolean = false
+  ): List[FlatSelection] = {
+    def isSameType(tpnme: Option[String]): Boolean =
+      tpnme.forall(t => currentType.forall(ct => schema.definition(t).forall(td => ct <:< td)))
+
+    selections.flatMap {
+      case Query.Group(inner)                                                         =>
+        flattenSelections(schema, fragmentsMap, inner, currentType, conditional)
+      case Query.UntypedFragmentSpread(name, directives)                              =>
+        fragmentsMap.get(name).toList.flatMap { frag =>
+          flattenSelections(
+            schema,
+            fragmentsMap,
+            List(Query.UntypedInlineFragment(frag.tpnme.some, directives, frag.child)),
+            currentType,
+            conditional
+          )
+        }
+      case Query.UntypedInlineFragment(tpnme, directives, child) if isSameType(tpnme) =>
+        flattenSelections(
+          schema,
+          fragmentsMap,
+          selectionsOf(child),
+          currentType,
+          conditional || hasConditionalDirective(directives)
+        )
+      case Query.UntypedInlineFragment(tpnme, _, child)                               =>
+        List(FlatSelection(tpnme, child, conditional))
+      case other                                                                      =>
+        List(FlatSelection(none, other, conditional))
+    }
+  }
+
+  /**
+   * Per-operation check that every selection set with at least one variant fragment (see
+   * [[flattenSelections]]) also selects `__typename` at the base level (possibly aliased)
+   * unconditionally, so `resolveData`'s generated decoder (see `Generator.addModuleDefs`,
+   * `TypeType.Sum`) can tell which subtype a response is. A `__typename` guarded by `@skip`/
+   * `@include` — directly, or via an enclosing same-type fragment/spread carrying the directive
+   * (see `FlatSelection.conditional`) — may be absent from the response even though the field
+   * itself isn't, so it is rejected just like a missing `__typename`. Mirrors
+   * [[inferVariableVars]]'s walk through fields/fragments, tracking the current type as it goes.
+   */
+  private def validateTypenameSelections(
+    schema:    Schema,
+    fragments: Map[String, UntypedFragment],
+    rootType:  GType,
+    query:     Query
+  ): List[Problem] = {
+    def check(selections: List[Query], currentType: Option[GType]): List[Problem] = {
+      val flat: List[FlatSelection] =
+        flattenSelections(schema, fragments, selections, currentType)
+
+      val variantTypeNames: List[String] = flat.collect { case FlatSelection(Some(t), _, _) =>
+        t
+      }.distinct
+
+      // Whether each base-level `__typename` select is conditional: directly guarded by
+      // `@skip`/`@include`, or unwrapped from a same-type fragment/spread that was.
+      val typenames: List[Boolean] = flat.collect {
+        case FlatSelection(None,
+                           Query.UntypedSelect(TypeSelect, _, _, directives, _),
+                           conditional
+            ) =>
+          conditional || hasConditionalDirective(directives)
+      }
+
+      val here: List[Problem] =
+        if (variantTypeNames.isEmpty) List.empty
+        else if (typenames.isEmpty) {
+          val ctName = currentType.flatMap(_.asNamed).fold("?")(_.name)
+          List(
+            Problem(
+              s"Selection on [$ctName] has fragments on subtypes [${variantTypeNames
+                  .mkString(", ")}] but does not select `__typename`. Add `__typename` next to " +
+                "them so the response can be decoded to the right subtype."
+            )
+          )
+        } else if (typenames.forall(identity)) {
+          val ctName = currentType.flatMap(_.asNamed).fold("?")(_.name)
+          List(
+            Problem(
+              s"Selection on [$ctName] has fragments on subtypes [${variantTypeNames
+                  .mkString(", ")}] but its `__typename` is selected with `@skip`/`@include` " +
+                "(directly or via an enclosing fragment). The discriminator must be selected " +
+                "unconditionally so every response can be decoded to the right subtype."
+            )
+          )
+        } else List.empty
+
+      val nested: List[Problem] = flat.flatMap {
+        case FlatSelection(None, Query.UntypedSelect(name, _, _, _, child), _) =>
+          val next =
+            MetaTypes
+              .get(name)
+              .orElse(currentType.flatMap(_.field(name)))
+              .flatMap(_.underlyingObject)
+          check(selectionsOf(child), next)
+        case FlatSelection(Some(t), child, _)                                  =>
+          check(selectionsOf(child), schema.definition(t))
+        case _                                                                 =>
+          List.empty
+      }
+
+      here ++ nested
+    }
+
+    check(selectionsOf(query), rootType.some)
+  }
+
+  // A subquery is spliced by rendering it as `{ subqueryN: __typename }` (see
+  // `InterpolatedGql.render`); `resolveData` only recognizes it in that shape when it is the
+  // *whole* selection set of a field (`UntypedSelect(_, _, _, _, UntypedSelect(_, Some(alias), ...))`
+  // with `alias` starting with "subquery"). Anywhere else — inside a fragment (inline or spread),
+  // or alongside sibling selections in a `Group` — it silently fails to splice, so report it.
+  private val subqueryPlacementMessage: String =
+    "A subquery can only be spliced as the whole selection set of a field (`field $Subquery`), " +
+      "not inside a fragment or next to other selections. Splice it on a field of the " +
+      "subquery's type, or move the fragment into the subquery."
+
+  private def validateSubqueryPlacement(
+    fragments: Map[String, UntypedFragment],
+    query:     Query
+  ): List[Problem] = {
+    def isSubqueryMarker(q: Query): Boolean =
+      q match {
+        case Query.UntypedSelect(TypeSelect, Some(alias), _, _, _) => alias.startsWith("subquery")
+        case _                                                     => false
+      }
+
+    // `wholeChild` is true exactly when `q` is the entire (unwrapped) selection set of a field;
+    // that's the only legal position for a subquery marker.
+    def check(q: Query, wholeChild: Boolean): List[Problem] =
+      if (isSubqueryMarker(q))
+        if (wholeChild) List.empty else List(Problem(subqueryPlacementMessage))
+      else
+        q match {
+          case Query.UntypedSelect(_, _, _, _, child)   =>
+            check(child, wholeChild = true)
+          case Query.UntypedInlineFragment(_, _, child) =>
+            check(child, wholeChild = false)
+          case Query.UntypedFragmentSpread(name, _)     =>
+            fragments.get(name).fold(List.empty[Problem])(f => check(f.child, wholeChild = false))
+          case Query.Group(items)                       =>
+            items.flatMap(check(_, wholeChild = false))
+          case _                                        =>
+            List.empty
+        }
+
+    check(query, wholeChild = false)
   }
 
   // Render a grackle type back to GraphQL type syntax (e.g. `Episode!`, `[String!]`, `ID`). grackle
@@ -551,7 +751,7 @@ trait QueryGen extends Generator {
     subqueries: List[Term],
     fragments:  List[UntypedFragment],
     rootType:   Option[GType]
-  ): CaseClass = {
+  ): Class = {
     import Query._
 
     val fragmentsMap: Map[String, UntypedFragment] = fragments.map(f => f.name -> f).toMap
@@ -569,8 +769,13 @@ trait QueryGen extends Generator {
       currentType:    Option[GType]
     ): ClassAccumulator =
       currentAlgebra match {
-        case UntypedSelect(name, alias, _, directives, UntypedSelect(_, Some(subAlias), _, _, _))
-            if subAlias.startsWith("subquery") =>
+        case UntypedSelect(
+              name,
+              alias,
+              _,
+              directives,
+              UntypedSelect(TypeSelect, Some(subAlias), _, _, _)
+            ) if subAlias.startsWith("subquery") =>
           val isConditional: Boolean = hasConditionalDirective(directives)
 
           val param = MetaTypes
@@ -644,51 +849,39 @@ trait QueryGen extends Generator {
                 )
               )
             }
-        case UntypedInlineFragment(typeName, _, child)        =>
-          // Single element in inline fragment
-          go(child, typeName.map(getType).orElse(currentType))
-        case UntypedFragmentSpread(name, _)                   =>
-          val fragment: UntypedFragment = fragmentsMap(name)
-          go(fragment.child, getType(fragment.tpnme).some)
+        case UntypedInlineFragment(_, _, _)                   =>
+          // grackle's parser collapses a selection set with a single inline fragment to a bare
+          // node instead of wrapping it in a `Group`, so route it through the same
+          // flatten-and-classify logic as the `Group` case below (it may itself be a variant).
+          go(Group(List(currentAlgebra)), currentType)
+        case UntypedFragmentSpread(_, _)                      =>
+          // Same reasoning as the bare-inline-fragment case above.
+          go(Group(List(currentAlgebra)), currentType)
         case Group(selections)                                =>
-          // A Group in an inline fragment "... on X" will be represented as Group(List(UntypedInlineFragment(X, ...), UntypedInlineFragment(X, ...))).
-          // We fix that to UntypedInlineFragment(X, Group(List(..., ...)))
-          val fixedSelections = selections.map(_ match {
-            // We flatly assume that if the first element of a group is UntypedInlineFragment(X, ...), then all elements are.
-            case Group(list @ UntypedInlineFragment(typeName, _, _) +: _) =>
-              UntypedInlineFragment(
-                typeName,
-                List.empty,
-                Group(list.collect { case UntypedInlineFragment(_, _, child) =>
-                  child
-                })
-              )
-            case other                                                    => other
-          })
+          // Normalize named-fragment spreads to inline fragments and unwrap same-type fragments
+          // (grouping only, e.g. for `@include`) into a flat, ordered list of base-level selects
+          // and variant inline fragments (fragments on a proper subtype of `currentType`). See
+          // `flattenSelections` for the classification rule.
+          val flatSelections: List[FlatSelection] =
+            flattenSelections(schema, fragmentsMap, selections, currentType)
 
-          // (Also, check what Grackle is returning when there's an interface)
           val hierarchyAccumulators
             : List[(Option[String], List[(Accumulator[Class, ClassParam, Sum], Int)])] =
-            fixedSelections.zipWithIndex // We want to preserve order of appeareance
-              .groupBy {
-                _._1 match {
-                  case UntypedInlineFragment(typeName, _, _) =>
-                    typeName // Selection in inline fragment, group by discriminator
-                  case _ =>
-                    none // Selection in base group, group by none
-                }
-              }
+            flatSelections.zipWithIndex // We want to preserve order of appeareance
+              .groupBy(_._1.variant)    // Group by discriminator (None = base group)
               .toList
-              .sortBy(_._2.head._2)      // Sort by first appeareance of each subtype
+              .sortBy(_._2.head._2)     // Sort by first appeareance of each subtype
               .map { // Resolve groups
-                case (Some(typeName), subQueries) =>
-                  (typeName.some, // Unwrap inline fragment selections
-                   subQueries.collect { case (UntypedInlineFragment(_, _, child), idx) =>
+                case (Some(typeName), items) =>
+                  (typeName.some,
+                   items.map { case (FlatSelection(_, child, _), idx) =>
                      (go(child, getType(typeName).some), idx)
                    }
                   )
-                case (None, subQueries)           =>
-                  (none, subQueries.map { case (q, idx) => (go(q, currentType), idx) })
+                case (None, items)           =>
+                  (none,
+                   items.map { case (FlatSelection(_, q, _), idx) => (go(q, currentType), idx) }
+                  )
               }
 
           val baseAccumulators    = hierarchyAccumulators.collectFirst { case (None, accumulators) =>
@@ -708,23 +901,113 @@ trait QueryGen extends Generator {
           val baseAccumulator     = baseAccumulators.map(_._1).combineAll
 
           subTypeAccumulators match {
-            case Nil                  => baseAccumulator // No subtypes.
-            case singleSubType :: Nil =>                 // Treat single subtype as regular group.
-              ClassAccumulator(
-                baseAccumulator.classes ++ singleSubType._2.classes,
-                singleSubType._2.parAccum
-              )
-            case _                    =>
-              val baseParams = baseAccumulator.parAccum
+            case Nil      => baseAccumulator // No variants.
+            case variants =>
+              // Every inline fragment / named-fragment spread on a proper subtype of
+              // `currentType` is a variant (no special single-variant case): build a sum with one
+              // instance per variant, discriminated on `__typename`. Validation (see
+              // `validateParsed`/`validateTypenameSelections`) already guarantees a base-level
+              // `__typename` select whenever there is at least one variant.
+              val (discriminatorKey, discriminatorIsAliased): (String, Boolean) =
+                flatSelections
+                  .collectFirst {
+                    case FlatSelection(None, UntypedSelect(TypeSelect, alias, _, _, _), _) =>
+                      (alias.getOrElse(TypeSelect), alias.isDefined)
+                  }
+                  .getOrElse(
+                    // Unreachable: validateTypenameSelections rejects variants without a base
+                    // `__typename` select before we ever get here.
+                    throw new Exception("Missing `__typename` for a validated variant selection")
+                  )
 
-              val subTypes = subTypeAccumulators.collect { case (typeName, accumulator) =>
-                CaseClass(typeName, accumulator.parAccum, accumulator.classes)
+              // A bare `__typename` carries no information beyond which case class the response
+              // decodes to, so it's noise: it is consumed by the discriminating decoder (see
+              // Generator.addModuleDefs) and stripped out of every params list we emit (dropped
+              // from the trait, every instance, and its lens). An aliased `__typename` (e.g.
+              // `kind: __typename`) is instead an explicit request for the value as a field: it is
+              // kept as the decoder key AND generated as a regular field, which lets users retain
+              // the raw type name (e.g. for logging, or for the subtypes folded into `Other`).
+              def stripDiscriminator(params: List[ClassParam]): List[ClassParam] =
+                if (discriminatorIsAliased) params
+                else params.filterNot(_.name == discriminatorKey)
+
+              val ct: NamedType =
+                currentType
+                  .flatMap(_.asNamed)
+                  .getOrElse(
+                    // Unreachable: a variant fragment is only classified relative to a known type.
+                    throw new Exception("Variant fragment without a known current type")
+                  )
+
+              // The concrete (object) type names covered by `t`: itself if it's already concrete,
+              // every implementor if it's an interface, or the (dealiased, recursively resolved)
+              // concrete members if it's a union.
+              def concreteTypeNames(t: NamedType): Set[String] =
+                t.dealias match {
+                  case o: ObjectType    => Set(o.name)
+                  case i: InterfaceType =>
+                    schema.types
+                      .map(_.dealias)
+                      .collect { case o: ObjectType if o <:< i => o.name }
+                      .toSet
+                  case u: UnionType     => u.members.flatMap(m => concreteTypeNames(m)).toSet
+                  case other            => Set(other.name)
+                }
+
+              val coveredConcreteTypes: Set[String] =
+                variants.flatMap { case (typeName, _) =>
+                  concreteTypeNames(getType(typeName))
+                }.toSet
+              val missingConcreteTypes: Set[String] = concreteTypeNames(ct) -- coveredConcreteTypes
+
+              // `__typename` in a response is always a *concrete* object type, so a variant on an
+              // interface/union type condition (e.g. `... on Pilot { ... }`) must be matched by
+              // every concrete type it covers, not by its own (non-concrete) name. Build the
+              // explicit `(concrete type name, instance name)` mapping the decoder needs: one
+              // entry per concrete name, in variant order; if two variants cover the same concrete
+              // type, the earlier one wins.
+              val discriminatorCases: List[(String, String)] = {
+                val seen = scala.collection.mutable.LinkedHashMap.empty[String, String]
+                variants.foreach { case (typeName, _) =>
+                  concreteTypeNames(getType(typeName)).toList.sorted.foreach(concreteName =>
+                    seen.getOrElseUpdate(concreteName, typeName)
+                  )
+                }
+                seen.toList
               }
+
+              if (missingConcreteTypes.nonEmpty && variants.exists(_._1 == "Other"))
+                // Unreachable in practice: no schema in the wild names a concrete type `Other`.
+                throw new Exception(
+                  "Cannot add a fallback `Other` instance: a variant is already named `Other`."
+                )
+
+              val subTypes: List[CaseClass]        = variants.map { case (typeName, accumulator) =>
+                CaseClass(typeName, stripDiscriminator(accumulator.parAccum), accumulator.classes)
+              }
+              // Not every concrete type is covered by a variant: add a fallback instance so the
+              // decoder (and the sealed trait) still account for every possible response.
+              val otherInstance: Option[CaseClass] =
+                Option.when(missingConcreteTypes.nonEmpty)(
+                  CaseClass("Other",
+                            stripDiscriminator(baseAccumulator.withOverrideParams.parAccum)
+                  )
+                )
+
+              val baseParams: List[ClassParam] = stripDiscriminator(baseAccumulator.parAccum)
 
               ClassAccumulator(
                 baseAccumulator.classes,
                 baseParams,
-                Sum(baseParams, baseAccumulator.classes, subTypes).some
+                Sum(
+                  baseParams,
+                  baseAccumulator.classes,
+                  subTypes ++ otherInstance.toList,
+                  SumDiscriminator(discriminatorKey,
+                                   discriminatorCases,
+                                   otherInstance.map(_ => "Other")
+                  ).some
+                ).some
               )
           }
         case Empty                                            => ClassAccumulator()
@@ -736,7 +1019,12 @@ trait QueryGen extends Generator {
 
     val algebraTypes = go(algebra, rootType.flatMap(_.underlyingObject))
 
-    CaseClass("Data", algebraTypes.parAccum, algebraTypes.classes)
+    // The root of a query is normally a plain object type (Query/Mutation/Subscription), but a
+    // subquery (`@GraphQLType`) can root directly at an interface/union, in which case its own
+    // "Data" is itself the sum (rather than a field somewhere inside it wrapping one).
+    algebraTypes.sum.fold[Class](CaseClass("Data", algebraTypes.parAccum, algebraTypes.classes))(
+      sum => SumClass("Data", sum)
+    )
   }
 
   protected def addData(
@@ -936,3 +1224,14 @@ trait QueryGen extends Generator {
         .getOrElse(parentBody)
 
 }
+
+// One base-level item of a flattened selection set (see `QueryGen.flattenSelections`). `variant` is
+// the type condition for a fragment on a proper subtype, `None` for a base-level select.
+// `conditional` is true when an enclosing same-type fragment/spread that was unwrapped carried
+// `@skip`/`@include`, so the item may be absent from the response even though it looks unconditional
+// here. Top-level (not nested in the trait) so pattern matches on it need no outer-reference check.
+private[gen] final case class FlatSelection(
+  variant:     Option[String],
+  query:       Query,
+  conditional: Boolean
+)

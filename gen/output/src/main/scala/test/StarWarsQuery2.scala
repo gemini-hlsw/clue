@@ -19,6 +19,7 @@ object Wrapper extends Something {
     ignoreUnusedImportTypes()
     override val document = gql"""
           fragment fields on Character {
+            __typename
             id
             name
             ... on Human {
@@ -119,7 +120,16 @@ object Wrapper extends Something {
         implicit val reuseCharacter: japgolly.scalajs.react.Reusability[Data.Character] = {
           japgolly.scalajs.react.Reusability.derive
         }
-        implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = List[io.circe.Decoder[Data.Character]](io.circe.Decoder[Data.Character.Human].asInstanceOf[io.circe.Decoder[Data.Character]], io.circe.Decoder[Data.Character.Droid].asInstanceOf[io.circe.Decoder[Data.Character]]).reduceLeft(_ or _)
+        implicit val jsonDecoderCharacter: io.circe.Decoder[Data.Character] = io.circe.Decoder.instance {
+          c => c.downField("__typename").as[String].flatMap {
+            case "Human" =>
+              io.circe.Decoder[Data.Character.Human].tryDecode(c)
+            case "Droid" =>
+              io.circe.Decoder[Data.Character.Droid].tryDecode(c)
+            case other =>
+              Left(io.circe.DecodingFailure("Unexpected __typename [" + other + "] for Character", c.history))
+          }
+        }
       }
       val character: monocle.Iso[Data, Option[Data.Character]] = monocle.Focus[Data](_.character)
       implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals

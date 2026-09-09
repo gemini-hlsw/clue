@@ -23,6 +23,7 @@ trait LucumaQuery2 extends GraphQLOperation[LucumaODB] {
               id
               name
               tracking {
+                __typename
                 ... on Sidereal {
                   epoch
                 }

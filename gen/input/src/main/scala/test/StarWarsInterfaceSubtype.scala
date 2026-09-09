@@ -11,22 +11,18 @@ package test
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
-@GraphQL // assert: GraphQLGen
-trait StarWarsQuery extends GraphQLOperation[StarWars] {
+// A fragment on an interface (`Pilot`, implemented only by `Human`): `__typename` in a response is
+// always the concrete object type name (`Human`), never the interface name, so the decoder must
+// map every concrete implementor to the `Pilot` instance, not match on `"Pilot"` itself.
+@GraphQL
+trait StarWarsInterfaceSubtype extends GraphQLOperation[StarWars] {
   override val document = gql"""
-        query ($$charId: ID!) {
-          character(id: $$charId) {
+        query ($$ep: Episode!) {
+          hero(episode: $$ep) {
             __typename
-            id
             name
-            ... on Human {
-              homePlanet
-            }
-            friends {
-              name
-            }
-            ... on Droid {
-              primaryFunction
+            ... on Pilot {
+              vehicle
             }
           }
         }

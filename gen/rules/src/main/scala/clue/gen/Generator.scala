@@ -336,10 +336,30 @@ trait Generator {
       }
   }
 
+  // How a query-side `Sum`'s decoder picks the right subtype, as opposed to trying every
+  // subtype's decoder in turn (which can't tell "wrong subtype" from "field genuinely missing").
+  // `key` is the response key of the base-level `__typename` select (its alias, if aliased).
+  // `__typename` in an actual response is always a *concrete* object type name, so a variant
+  // whose type condition is an interface or union (e.g. `... on Pilot { ... }`) can't be matched
+  // by its own name: `cases` is instead the explicit `(concrete type name, instance name)`
+  // mapping (one entry per concrete type covered by some variant; see `resolveData`), each
+  // becoming one `case "<concrete type name>" => ...` in the generated decoder. `fallback` is the
+  // instance name to fall back to (`Other`, see `Sum.instances`) when the value read at `key`
+  // doesn't match any entry in `cases`, if such a fallback was generated. Named at this level,
+  // rather than nested under `Sum`, because `TypeType.Sum` shadows `Sum` inside `object TypeType`.
+  protected case class SumDiscriminator(
+    key:      String,
+    cases:    List[(String, String)],
+    fallback: Option[String]
+  )
+
   protected case class Sum(
-    params:    List[ClassParam],
-    nested:    List[Class] = List.empty,
-    instances: List[CaseClass]
+    params:        List[ClassParam],
+    nested:        List[Class] = List.empty,
+    instances:     List[CaseClass],
+    // `None` for SchemaGen's oneOf input sums, which have no `__typename` to discriminate on and
+    // keep the original `or`-chaining decoder.
+    discriminator: Option[SumDiscriminator] = None
   )
 
   protected def paramToVal(param: Term.Param): Stat =
@@ -460,7 +480,7 @@ trait Generator {
             scalaJsReactReuse,
             circeEncoder,
             circeDecoder,
-            TypeType.Sum(sum.instances.map(_.name)),
+            TypeType.Sum(sum.instances.map(_.name), sum.discriminator),
             bodyMod = scala.Function.chain(addDefinitions ++ addLenses),
             nestPath = nestPath,
             isOneOfInput = isOneOfInput
@@ -559,9 +579,10 @@ trait Generator {
 
   protected sealed trait TypeType
   protected object TypeType {
-    case object CaseClass                      extends TypeType
-    case class Enum(values: List[EnumValue])   extends TypeType
-    case class Sum(subtypeNames: List[String]) extends TypeType
+    case object CaseClass                    extends TypeType
+    case class Enum(values: List[EnumValue]) extends TypeType
+    case class Sum(subtypeNames: List[String], discriminator: Option[SumDiscriminator])
+        extends TypeType
   }
 
   protected def modifyModuleStatements(
@@ -633,11 +654,11 @@ trait Generator {
     )
 
     val encoderDef = Option.when(circeEncoder)(typeType match {
-      case TypeType.CaseClass                         =>
+      case TypeType.CaseClass                            =>
         q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder.AsObject[$n] = io.circe.generic.semiauto.deriveEncoder[$n].mapJsonObject(clue.data.Input.dropIgnores)"
-      case TypeType.Enum(_)                           =>
+      case TypeType.Enum(_)                              =>
         q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder[$n] = io.circe.Encoder.encodeString.contramap[$n](_.asString)"
-      case TypeType.Sum(subtypeNames) if isOneOfInput =>
+      case TypeType.Sum(subtypeNames, _) if isOneOfInput =>
         val subTypesCases =
           subtypeNames.map(subType =>
             Case(
@@ -649,7 +670,7 @@ trait Generator {
               q"${subType.head.toLower +: subType.tail} -> value.asJson"
             )
           )
-        q"""implicit val ${valName("jsonEncoder")}: io.circe.Encoder.AsObject[$n] = 
+        q"""implicit val ${valName("jsonEncoder")}: io.circe.Encoder.AsObject[$n] =
           io.circe.Encoder.AsObject.instance[$n] {
             instance => io.circe.JsonObject.empty.+: {
               import io.circe.syntax._
@@ -658,29 +679,57 @@ trait Generator {
               }
             }
           }"""
-      case TypeType.Sum(_)                            =>
+      case TypeType.Sum(_, _)                            =>
         q"implicit val ${valName("jsonEncoder")}: io.circe.Encoder.AsObject[$n] = io.circe.generic.semiauto.deriveEncoder[$n]"
     })
 
     val decoderDef = Option.when(circeDecoder)(typeType match {
-      case TypeType.CaseClass         =>
+      case TypeType.CaseClass                        =>
         q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.generic.semiauto.deriveDecoder[$n]"
-      case TypeType.Enum(_)           =>
+      case TypeType.Enum(_)                          =>
         q"implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = io.circe.Decoder.decodeString.emap(fromString(_))"
-      case TypeType.Sum(subtypeNames) =>
+      case TypeType.Sum(subtypeNames, discriminator) =>
         val baseTerm: Term.Ref =
           nestPath.fold[Term.Ref](Term.Name(name))(t => Term.Select(t, Term.Name(name)))
 
-        def subtypeDecoder(subtypeName: String): Term = {
-          val subType = Type.Select(baseTerm, Type.Name(subtypeName))
-          q"io.circe.Decoder[$subType].asInstanceOf[io.circe.Decoder[$n]]"
-        }
+        def subtypeType(subtypeName: String): Type = Type.Select(baseTerm, Type.Name(subtypeName))
 
-        q"""implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] = 
-               List[io.circe.Decoder[$n]](
-                ..${subtypeNames.map(subtypeDecoder)}
-               ).reduceLeft(_ or _)
-        """
+        discriminator match {
+          case None                                         =>
+            // SchemaGen's oneOf input sums: no `__typename` to discriminate on, so keep trying
+            // each subtype's decoder in turn.
+            def subtypeDecoder(subtypeName: String): Term =
+              q"io.circe.Decoder[${subtypeType(subtypeName)}].asInstanceOf[io.circe.Decoder[$n]]"
+
+            q"""implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] =
+                   List[io.circe.Decoder[$n]](
+                    ..${subtypeNames.map(subtypeDecoder)}
+                   ).reduceLeft(_ or _)
+            """
+          case Some(SumDiscriminator(key, cases, fallback)) =>
+            // A response for an interface/union field only decodes correctly when read as the
+            // right concrete subtype, so discriminate on `__typename` (or its alias) up front
+            // instead of trying every subtype's decoder in turn (which can't tell "wrong
+            // subtype" from "field genuinely missing"). `__typename` in a response is always a
+            // concrete object type name, so `cases` maps each of those to the instance that
+            // covers it (an interface/union-typed variant covers several concrete names, all
+            // decoding as that same instance).
+            val concreteCases = cases.map { case (typeName, instanceName) =>
+              p"case $typeName => io.circe.Decoder[${subtypeType(instanceName)}].tryDecode(c)"
+            }
+            val fallbackCase  = fallback.fold(
+              p"""case other => Left(io.circe.DecodingFailure("Unexpected __typename [" + other + ${Lit
+                  .String(s"] for $name")}, c.history))"""
+            )(fb => p"case _ => io.circe.Decoder[${subtypeType(fb)}].tryDecode(c)")
+
+            q"""implicit val ${valName("jsonDecoder")}: io.circe.Decoder[$n] =
+                  io.circe.Decoder.instance { c =>
+                    c.downField(${Lit.String(key)}).as[String].flatMap {
+                      ..case ${concreteCases :+ fallbackCase}
+                    }
+                  }
+             """
+        }
     })
 
     modifyModuleStatements(

@@ -11,22 +11,17 @@ package test
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
-@GraphQL // assert: GraphQLGen
-trait StarWarsQuery extends GraphQLOperation[StarWars] {
+// `__typename` inside an unconditional same-type fragment is pure grouping and lands flat in the
+// response, so it satisfies the discriminator requirement.
+@GraphQL
+trait StarWarsTypenameInFragment extends GraphQLOperation[StarWars] {
   override val document = gql"""
-        query ($$charId: ID!) {
-          character(id: $$charId) {
-            __typename
-            id
+        query ($$ep: Episode!) {
+          hero(episode: $$ep) {
+            ... on Character { __typename }
             name
             ... on Human {
               homePlanet
-            }
-            friends {
-              name
-            }
-            ... on Droid {
-              primaryFunction
             }
           }
         }

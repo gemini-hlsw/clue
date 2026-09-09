@@ -25,6 +25,7 @@ object LucumaQuery2 extends GraphQLOperation[LucumaODB] {
               id
               name
               tracking {
+                __typename
                 ... on Sidereal {
                   epoch
                 }
@@ -47,12 +48,33 @@ object LucumaQuery2 extends GraphQLOperation[LucumaODB] {
       object Targets {
         case class Nodes(val id: TargetId, val name: NonEmptyString, val tracking: Data.Program.Targets.Nodes.Tracking)
         object Nodes {
-          case class Tracking(val epoch: EpochString)
+          sealed trait Tracking
           object Tracking {
-            val epoch: monocle.Iso[Data.Program.Targets.Nodes.Tracking, EpochString] = monocle.Focus[Data.Program.Targets.Nodes.Tracking](_.epoch)
+            case class Sidereal(val epoch: EpochString) extends Tracking()
+            object Sidereal {
+              val epoch: monocle.Iso[Data.Program.Targets.Nodes.Tracking.Sidereal, EpochString] = monocle.Focus[Data.Program.Targets.Nodes.Tracking.Sidereal](_.epoch)
+              implicit val eqSidereal: cats.Eq[Data.Program.Targets.Nodes.Tracking.Sidereal] = cats.Eq.fromUniversalEquals
+              implicit val showSidereal: cats.Show[Data.Program.Targets.Nodes.Tracking.Sidereal] = cats.Show.fromToString
+              implicit val jsonDecoderSidereal: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Sidereal] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets.Nodes.Tracking.Sidereal]
+            }
+            case class Other() extends Tracking()
+            object Other {
+              implicit val eqOther: cats.Eq[Data.Program.Targets.Nodes.Tracking.Other] = cats.Eq.fromUniversalEquals
+              implicit val showOther: cats.Show[Data.Program.Targets.Nodes.Tracking.Other] = cats.Show.fromToString
+              implicit val jsonDecoderOther: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Other] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets.Nodes.Tracking.Other]
+            }
+            val sidereal: monocle.Prism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Sidereal] = monocle.macros.GenPrism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Sidereal]
+            val other: monocle.Prism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Other] = monocle.macros.GenPrism[Data.Program.Targets.Nodes.Tracking, Data.Program.Targets.Nodes.Tracking.Other]
             implicit val eqTracking: cats.Eq[Data.Program.Targets.Nodes.Tracking] = cats.Eq.fromUniversalEquals
             implicit val showTracking: cats.Show[Data.Program.Targets.Nodes.Tracking] = cats.Show.fromToString
-            implicit val jsonDecoderTracking: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking] = io.circe.generic.semiauto.deriveDecoder[Data.Program.Targets.Nodes.Tracking]
+            implicit val jsonDecoderTracking: io.circe.Decoder[Data.Program.Targets.Nodes.Tracking] = io.circe.Decoder.instance {
+              c => c.downField("__typename").as[String].flatMap {
+                case "Sidereal" =>
+                  io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Sidereal].tryDecode(c)
+                case _ =>
+                  io.circe.Decoder[Data.Program.Targets.Nodes.Tracking.Other].tryDecode(c)
+              }
+            }
           }
           val id: monocle.Lens[Data.Program.Targets.Nodes, TargetId] = monocle.macros.GenLens[Data.Program.Targets.Nodes](_.id)
           val name: monocle.Lens[Data.Program.Targets.Nodes, NonEmptyString] = monocle.macros.GenLens[Data.Program.Targets.Nodes](_.name)

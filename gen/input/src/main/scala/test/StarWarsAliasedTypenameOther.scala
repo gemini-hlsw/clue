@@ -11,22 +11,17 @@ package test
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
-@GraphQL // assert: GraphQLGen
-trait StarWarsQuery extends GraphQLOperation[StarWars] {
+// Combines an ALIASED `__typename` discriminator with a fallback `Other` instance (`Droid` is
+// left uncovered): `kind` must still be generated as a regular field on `Other` too.
+@GraphQL
+trait StarWarsAliasedTypenameOther extends GraphQLOperation[StarWars] {
   override val document = gql"""
-        query ($$charId: ID!) {
-          character(id: $$charId) {
-            __typename
-            id
+        query ($$ep: Episode!) {
+          hero(episode: $$ep) {
+            kind: __typename
             name
             ... on Human {
               homePlanet
-            }
-            friends {
-              name
-            }
-            ... on Droid {
-              primaryFunction
             }
           }
         }

@@ -11,19 +11,18 @@ package test
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
+// Checks that an ALIASED `__typename` (`kind: __typename`) is used as the decoder
+// discriminator key, AND is also generated as a regular field (`kind: String`) on the trait
+// and every instance.
 @GraphQL // assert: GraphQLGen
-trait StarWarsQuery extends GraphQLOperation[StarWars] {
+trait StarWarsAliasedTypename extends GraphQLOperation[StarWars] {
   override val document = gql"""
-        query ($$charId: ID!) {
-          character(id: $$charId) {
-            __typename
-            id
+        query ($$ep: Episode!) {
+          hero(episode: $$ep) {
+            kind: __typename
             name
             ... on Human {
               homePlanet
-            }
-            friends {
-              name
             }
             ... on Droid {
               primaryFunction

@@ -7,14 +7,15 @@ Experimental GraphQL client for Scala and Scala.js.
 ### 1) Create a client
 
 Either:
-  * A `FetchClient[F[_], S]` (supporting queries and mutations), or
-  * A `StreamingClient[F[_], S]` (supporting queries, mutations and subscriptions).
 
-  `S` is a type denoting the schema. It can be any type, even a phantom type. It's only used to type-match clients and operations.
+- A `FetchClient[F[_], S]` (supporting queries and mutations), or
+- A `StreamingClient[F[_], S]` (supporting queries, mutations and subscriptions).
+
+`S` is a type denoting the schema. It can be any type, even a phantom type. It's only used to type-match clients and operations.
 
 #### Example
 
-``` scala
+```scala
   import clue.*
   import cats.effect.IO
 
@@ -59,7 +60,7 @@ Either:
 
 They must extend `GraphQLOperation[S]`, defining the following members:
 
-``` scala
+```scala
   val document: GraphQLDocument   // built with the `gql` interpolator (see below)
 
   type Variables
@@ -78,7 +79,7 @@ subqueries correctly (see [Subquery variables](#subquery-variables) below). `.st
 
 #### Example
 
-``` scala
+```scala
   import io.circe._
   import io.circe.generic.semiauto._
 
@@ -114,7 +115,7 @@ generator — no code generation involved. Any definition extending `GraphQLOper
 `GraphQLOperation.Typed[S, ...]` (checked via its `document`) or `GraphQLSubquery[S]` /
 `GraphQLSubquery.Typed[S, ...]` (checked via its `subquery`) is validated; fields, arguments,
 variables and deprecations that don't typecheck against schema `S` are reported as scalafix
-diagnostics. Operations that *are* generated (annotated with `@GraphQL`) are validated during
+diagnostics. Operations that _are_ generated (annotated with `@GraphQL`) are validated during
 generation.
 
 A subquery declares the GraphQL root type(s) its selection applies to with a
@@ -133,6 +134,47 @@ A subquery's `subquery` is a `GraphQLDocument` too, so it is built with `gql` fo
 Hand-written subqueries may declare **multiple** types (the selection is validated against each:
 `@GraphQLType("Human", "Droid")`). A subquery processed by the generator (`@GraphQL`) must declare
 **exactly one** type. `@GraphQLType` is only valid on a subquery, not on a `GraphQLOperation`.
+
+#### Interfaces and unions
+
+When a selection on an interface or union field has inline fragments (or fragment spreads) on its
+subtypes, the generator emits a `sealed trait` for the field, one case class per fragment type
+carrying the shared fields plus the fragment's own, and, if the schema has concrete types none of
+the fragments cover, a case class `Other` with just the shared fields. For example, the StarWars
+selection
+
+```graphql
+character { __typename id name ... on Human { homePlanet } }
+```
+
+(`character`'s type is an interface implemented by `Human` and `Droid`) generates roughly:
+
+```scala
+sealed trait Character { val id: String; val name: Option[String] }
+object Character {
+  case class Human(id: String, name: Option[String], homePlanet: Option[String]) extends Character
+  case class Other(id: String, name: Option[String]) extends Character // Droid, uncovered
+}
+```
+
+The selection **must** include `__typename` at the same level as the fragments; the generated
+decoder switches on it to pick the case class to decode into. Omitting it is a generation error: "Selection on [...] has fragments on subtypes [...] but does not select `__typename`". It must also
+be selected **unconditionally**: with `@skip`/`@include` on it, or on a fragment that encloses it,
+generation fails with "... its `__typename` is selected with `@skip`/`@include`". A `__typename`
+inside a fragment on the field's own type (plain grouping, e.g. `... on Character { __typename }`)
+counts, as long as neither it nor the fragment is conditional.
+
+A bare `__typename` is consumed by the decoder and is not generated as a field. Aliased (e.g.
+`kind: __typename`), it is both the decoder key and a regular `String` field on the trait and every
+case class — the way to keep the raw type name around, e.g. for the types folded into `Other`.
+
+Fragments whose type condition is the field's own type or one of its supertypes are plain grouping
+(e.g. for `@include`), not subtypes, and are flattened rather than turned into cases.
+
+A subquery is spliced as the whole selection set of a field (`field $Subquery`); splicing one inside
+a fragment (`... on Human $HumanFields`) is rejected. A subquery may itself be rooted at an
+interface/union (`@GraphQLType("Character")`) and use fragments in its own selection, in which case
+its `Data` is the sealed trait.
 
 ##### Subquery variables
 
@@ -165,7 +207,7 @@ without declaring it reads as "requires nothing" to callers. That omission is an
 subquery is validated (it needs `@GraphQLType` and a configured schema), so keep validation enabled
 on projects that publish subqueries.
 
-To splice a subquery into an operation *and* have the operation's variables checked against it, build
+To splice a subquery into an operation _and_ have the operation's variables checked against it, build
 the `document` with the `gql` interpolator (from `clue`) instead of `s`:
 
 ```scala
@@ -225,7 +267,7 @@ this is reported as a warning rather than silently skipped.
 
 #### Example
 
-``` scala
+```scala
 fetchClient.request(CharacterQuery)(CharacterQuery.Variables("0001"))
   .forEach(println).unsafeRunSync()
 
@@ -240,17 +282,18 @@ A `SpanKind.Client` span is emitted per HTTP request or subscription.
 W3C trace context is automatically propagated to the server:
 
 - **HTTP requests**: the current span's `traceparent` (and `tracestate`) is injected into outgoing
-request headers, thus client spans can propagate to the server
+  request headers, thus client spans can propagate to the server
 - **WebSocket requests**: `traceparent` is included in the `extensions` field, so the server can
-create child reading `extensions.traceparent`.
+  create child reading `extensions.traceparent`.
 
 Some span attributes recorded automatically:
-* `clue.version`
-* `http.request.method`
-* `graphql.operation.type`
-* `graphql.operation.name`
-* `graphql.document`
-* `clue.response.hasData`
+
+- `clue.version`
+- `http.request.method`
+- `graphql.operation.type`
+- `graphql.operation.name`
+- `graphql.document`
+- `clue.response.hasData`
 
 And on errors `clue.response.hasErrors`, `clue.response.errorCount`, `clue.response.errors`.
 
