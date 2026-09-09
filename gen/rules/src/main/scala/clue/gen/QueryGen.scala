@@ -418,14 +418,16 @@ trait QueryGen extends Generator {
   }
 
   /**
-   * Per-operation check that every selection set with at least one variant fragment (see
-   * [[flattenSelections]]) also selects `__typename` at the base level (possibly aliased)
-   * unconditionally, so `resolveData`'s generated decoder (see `Generator.addModuleDefs`,
-   * `TypeType.Sum`) can tell which subtype a response is. A `__typename` guarded by `@skip`/
-   * `@include` — directly, or via an enclosing same-type fragment/spread carrying the directive
-   * (see `FlatSelection.conditional`) — may be absent from the response even though the field
-   * itself isn't, so it is rejected just like a missing `__typename`. Mirrors
-   * [[inferVariableVars]]'s walk through fields/fragments, tracking the current type as it goes.
+   * Per-operation check that every selection set with two or more variant types (see
+   * [[flattenSelections]]; fragments on the same type count as one) also selects `__typename` at
+   * the base level (possibly aliased) unconditionally, so `resolveData`'s generated decoder (see
+   * `Generator.addModuleDefs`, `TypeType.Sum`) can tell which subtype a response is. A single
+   * variant type is instead flattened into the parent by `resolveData` and needs no `__typename`
+   * (see README). A `__typename` guarded by `@skip`/`@include` — directly, or via an enclosing
+   * same-type fragment/spread carrying the directive (see `FlatSelection.conditional`) — may be
+   * absent from the response even though the field itself isn't, so it is rejected just like a
+   * missing `__typename`. Mirrors [[inferVariableVars]]'s walk through fields/fragments, tracking
+   * the current type as it goes.
    */
   private def validateTypenameSelections(
     schema:    Schema,
@@ -452,7 +454,7 @@ trait QueryGen extends Generator {
       }
 
       val here: List[Problem] =
-        if (variantTypeNames.isEmpty) List.empty
+        if (variantTypeNames.sizeIs < 2) List.empty
         else if (typenames.isEmpty) {
           val ctName = currentType.flatMap(_.asNamed).fold("?")(_.name)
           List(
@@ -901,13 +903,21 @@ trait QueryGen extends Generator {
           val baseAccumulator     = baseAccumulators.map(_._1).combineAll
 
           subTypeAccumulators match {
-            case Nil      => baseAccumulator // No variants.
-            case variants =>
+            case Nil                  => baseAccumulator // No variants.
+            case (typeName, _) :: Nil =>
+              // Exactly one subtype: flatten it into the parent (see README). Base and variant
+              // items are re-merged from `hierarchyAccumulators` in order of appearance, without
+              // `override` params, since no trait is generated.
+              val variantItems = hierarchyAccumulators.collectFirst {
+                case (Some(`typeName`), items) => items
+              }.orEmpty
+              (baseAccumulators ++ variantItems).sortBy(_._2).map(_._1).combineAll
+            case variants             =>
               // Every inline fragment / named-fragment spread on a proper subtype of
-              // `currentType` is a variant (no special single-variant case): build a sum with one
-              // instance per variant, discriminated on `__typename`. Validation (see
+              // `currentType` is a variant when there are two or more variant types: build a sum
+              // with one instance per variant, discriminated on `__typename`. Validation (see
               // `validateParsed`/`validateTypenameSelections`) already guarantees a base-level
-              // `__typename` select whenever there is at least one variant.
+              // `__typename` select whenever there are two or more.
               val (discriminatorKey, discriminatorIsAliased): (String, Boolean) =
                 flatSelections
                   .collectFirst {

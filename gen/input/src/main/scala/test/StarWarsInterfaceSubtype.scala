@@ -11,10 +11,11 @@ package test
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
-// A fragment on an interface (`Pilot`, implemented only by `Human`): `__typename` in a response is
-// always the concrete object type name (`Human`), never the interface name, so the decoder must
-// map every concrete implementor to the `Pilot` instance, not match on `"Pilot"` itself.
-@GraphQL
+// A fragment on an interface (`Pilot`, implemented only by `Human`) plus one on `Droid`, so both
+// implementors of `Character` are covered (no `Other`): `__typename` in a response is always the
+// concrete object type name (`Human`), never the interface name, so the decoder must map every
+// concrete implementor to the `Pilot` instance, not match on `"Pilot"` itself.
+@GraphQL // assert: GraphQLGen
 trait StarWarsInterfaceSubtype extends GraphQLOperation[StarWars] {
   override val document = gql"""
         query ($$ep: Episode!) {
@@ -23,6 +24,9 @@ trait StarWarsInterfaceSubtype extends GraphQLOperation[StarWars] {
             name
             ... on Pilot {
               vehicle
+            }
+            ... on Droid {
+              primaryFunction
             }
           }
         }

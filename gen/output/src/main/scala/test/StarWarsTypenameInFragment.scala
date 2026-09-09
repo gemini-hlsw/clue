@@ -8,7 +8,8 @@ package test
 import clue.GraphQLOperation
 
 // `__typename` inside an unconditional same-type fragment is pure grouping and lands flat in the
-// response, so it satisfies the discriminator requirement.
+// response, so it satisfies the discriminator requirement. Two variant types (`Human` and `Droid`)
+// keep this a sum, so `Other` is not generated.
 
 object StarWarsTypenameInFragment extends GraphQLOperation[StarWars] {
   import StarWars.Scalars._
@@ -24,6 +25,9 @@ object StarWarsTypenameInFragment extends GraphQLOperation[StarWars] {
             name
             ... on Human {
               homePlanet
+            }
+            ... on Droid {
+              primaryFunction
             }
           }
         }
@@ -47,31 +51,34 @@ object StarWarsTypenameInFragment extends GraphQLOperation[StarWars] {
         implicit val showHuman: cats.Show[Data.Hero.Human] = cats.Show.fromToString
         implicit val jsonDecoderHuman: io.circe.Decoder[Data.Hero.Human] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Human]
       }
-      case class Other(override val name: Option[String] = None) extends Hero()
-      object Other {
-        val name: monocle.Iso[Data.Hero.Other, Option[String]] = monocle.Focus[Data.Hero.Other](_.name)
-        implicit val eqOther: cats.Eq[Data.Hero.Other] = cats.Eq.fromUniversalEquals
-        implicit val showOther: cats.Show[Data.Hero.Other] = cats.Show.fromToString
-        implicit val jsonDecoderOther: io.circe.Decoder[Data.Hero.Other] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Other]
+      case class Droid(override val name: Option[String] = None, @deprecated("Use 'functions' instead") val primaryFunction: Option[String] = None) extends Hero()
+      object Droid {
+        val name: monocle.Lens[Data.Hero.Droid, Option[String]] = monocle.macros.GenLens[Data.Hero.Droid](_.name)
+        @deprecated("Use 'functions' instead") val primaryFunction: monocle.Lens[Data.Hero.Droid, Option[String]] = monocle.macros.GenLens[Data.Hero.Droid](_.primaryFunction)
+        implicit val eqDroid: cats.Eq[Data.Hero.Droid] = cats.Eq.fromUniversalEquals
+        implicit val showDroid: cats.Show[Data.Hero.Droid] = cats.Show.fromToString
+        implicit val jsonDecoderDroid: io.circe.Decoder[Data.Hero.Droid] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Droid]
       }
       val name: monocle.Lens[Data.Hero, Option[String]] = monocle.Lens[Data.Hero, Option[String]](_.name) {
         v => _ match {
           case s: Data.Hero.Human =>
             s.copy(name = v)
-          case s: Data.Hero.Other =>
+          case s: Data.Hero.Droid =>
             s.copy(name = v)
         }
       }
       val human: monocle.Prism[Data.Hero, Data.Hero.Human] = monocle.macros.GenPrism[Data.Hero, Data.Hero.Human]
-      val other: monocle.Prism[Data.Hero, Data.Hero.Other] = monocle.macros.GenPrism[Data.Hero, Data.Hero.Other]
+      val droid: monocle.Prism[Data.Hero, Data.Hero.Droid] = monocle.macros.GenPrism[Data.Hero, Data.Hero.Droid]
       implicit val eqHero: cats.Eq[Data.Hero] = cats.Eq.fromUniversalEquals
       implicit val showHero: cats.Show[Data.Hero] = cats.Show.fromToString
       implicit val jsonDecoderHero: io.circe.Decoder[Data.Hero] = io.circe.Decoder.instance {
         c => c.downField("__typename").as[String].flatMap {
           case "Human" =>
             io.circe.Decoder[Data.Hero.Human].tryDecode(c)
-          case _ =>
-            io.circe.Decoder[Data.Hero.Other].tryDecode(c)
+          case "Droid" =>
+            io.circe.Decoder[Data.Hero.Droid].tryDecode(c)
+          case other =>
+            Left(io.circe.DecodingFailure("Unexpected __typename [" + other + "] for Hero", c.history))
         }
       }
     }

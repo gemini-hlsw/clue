@@ -7,9 +7,10 @@ package test
 
 import clue.GraphQLOperation
 
-// A fragment on an interface (`Pilot`, implemented only by `Human`): `__typename` in a response is
-// always the concrete object type name (`Human`), never the interface name, so the decoder must
-// map every concrete implementor to the `Pilot` instance, not match on `"Pilot"` itself.
+// A fragment on an interface (`Pilot`, implemented only by `Human`) plus one on `Droid`, so both
+// implementors of `Character` are covered (no `Other`): `__typename` in a response is always the
+// concrete object type name (`Human`), never the interface name, so the decoder must map every
+// concrete implementor to the `Pilot` instance, not match on `"Pilot"` itself.
 
 object StarWarsInterfaceSubtype extends GraphQLOperation[StarWars] {
   import StarWars.Scalars._
@@ -25,6 +26,9 @@ object StarWarsInterfaceSubtype extends GraphQLOperation[StarWars] {
             name
             ... on Pilot {
               vehicle
+            }
+            ... on Droid {
+              primaryFunction
             }
           }
         }
@@ -48,31 +52,34 @@ object StarWarsInterfaceSubtype extends GraphQLOperation[StarWars] {
         implicit val showPilot: cats.Show[Data.Hero.Pilot] = cats.Show.fromToString
         implicit val jsonDecoderPilot: io.circe.Decoder[Data.Hero.Pilot] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Pilot]
       }
-      case class Other(override val name: Option[String] = None) extends Hero()
-      object Other {
-        val name: monocle.Iso[Data.Hero.Other, Option[String]] = monocle.Focus[Data.Hero.Other](_.name)
-        implicit val eqOther: cats.Eq[Data.Hero.Other] = cats.Eq.fromUniversalEquals
-        implicit val showOther: cats.Show[Data.Hero.Other] = cats.Show.fromToString
-        implicit val jsonDecoderOther: io.circe.Decoder[Data.Hero.Other] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Other]
+      case class Droid(override val name: Option[String] = None, @deprecated("Use 'functions' instead") val primaryFunction: Option[String] = None) extends Hero()
+      object Droid {
+        val name: monocle.Lens[Data.Hero.Droid, Option[String]] = monocle.macros.GenLens[Data.Hero.Droid](_.name)
+        @deprecated("Use 'functions' instead") val primaryFunction: monocle.Lens[Data.Hero.Droid, Option[String]] = monocle.macros.GenLens[Data.Hero.Droid](_.primaryFunction)
+        implicit val eqDroid: cats.Eq[Data.Hero.Droid] = cats.Eq.fromUniversalEquals
+        implicit val showDroid: cats.Show[Data.Hero.Droid] = cats.Show.fromToString
+        implicit val jsonDecoderDroid: io.circe.Decoder[Data.Hero.Droid] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Droid]
       }
       val name: monocle.Lens[Data.Hero, Option[String]] = monocle.Lens[Data.Hero, Option[String]](_.name) {
         v => _ match {
           case s: Data.Hero.Pilot =>
             s.copy(name = v)
-          case s: Data.Hero.Other =>
+          case s: Data.Hero.Droid =>
             s.copy(name = v)
         }
       }
       val pilot: monocle.Prism[Data.Hero, Data.Hero.Pilot] = monocle.macros.GenPrism[Data.Hero, Data.Hero.Pilot]
-      val other: monocle.Prism[Data.Hero, Data.Hero.Other] = monocle.macros.GenPrism[Data.Hero, Data.Hero.Other]
+      val droid: monocle.Prism[Data.Hero, Data.Hero.Droid] = monocle.macros.GenPrism[Data.Hero, Data.Hero.Droid]
       implicit val eqHero: cats.Eq[Data.Hero] = cats.Eq.fromUniversalEquals
       implicit val showHero: cats.Show[Data.Hero] = cats.Show.fromToString
       implicit val jsonDecoderHero: io.circe.Decoder[Data.Hero] = io.circe.Decoder.instance {
         c => c.downField("__typename").as[String].flatMap {
           case "Human" =>
             io.circe.Decoder[Data.Hero.Pilot].tryDecode(c)
-          case _ =>
-            io.circe.Decoder[Data.Hero.Other].tryDecode(c)
+          case "Droid" =>
+            io.circe.Decoder[Data.Hero.Droid].tryDecode(c)
+          case other =>
+            Left(io.circe.DecodingFailure("Unexpected __typename [" + other + "] for Hero", c.history))
         }
       }
     }

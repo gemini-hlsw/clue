@@ -11,11 +11,11 @@ package test
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
-// A fragment on a subtype (`Human`) without a base-level `__typename`: the generated decoder
-// couldn't tell a `Human` response from any other `Character`, so this must be rejected.
+// Two subtypes (`Human`, `Droid`) without a base-level `__typename`: the generated decoder
+// couldn't tell which `Character` subtype a response is, so this must be rejected.
 @GraphQL
 trait StarWarsSubtypeNoTypename extends GraphQLOperation[StarWars] {
   override val document =
-    gql"query ($$ep: Episode!) { hero(episode: $$ep) { name ... on Human { homePlanet } } }" // assert: GraphQLGen
+    gql"query ($$ep: Episode!) { hero(episode: $$ep) { name ... on Human { homePlanet } ... on Droid { primaryFunction } } }" // assert: GraphQLGen
 }
 // format: on

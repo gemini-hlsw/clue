@@ -11,8 +11,10 @@ package test
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
-// Combines an ALIASED `__typename` discriminator with a fallback `Other` instance (`Droid` is
-// left uncovered): `kind` must still be generated as a regular field on `Other` too.
+// Combines an ALIASED `__typename` discriminator with a fallback `Other` instance. Two variant
+// types are selected (`Human` and the `Pilot` interface, implemented only by `Human`), so `Droid`
+// stays uncovered and `Other` is still generated; `kind` must be generated as a regular field on
+// every case, `Other` included.
 @GraphQL
 trait StarWarsAliasedTypenameOther extends GraphQLOperation[StarWars] {
   override val document = gql"""
@@ -22,6 +24,9 @@ trait StarWarsAliasedTypenameOther extends GraphQLOperation[StarWars] {
             name
             ... on Human {
               homePlanet
+            }
+            ... on Pilot {
+              vehicle
             }
           }
         }

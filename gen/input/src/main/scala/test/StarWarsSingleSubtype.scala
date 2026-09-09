@@ -11,15 +11,14 @@ package test
 import clue.GraphQLOperation
 import clue.annotation.GraphQL
 
-// A single fragment on a subtype (`Human`), leaving `Droid` uncovered: `Character` has exactly
-// two implementors, so this must still generate a fallback `Other` instance (no special-casing
-// for "just one variant").
+// A single fragment on a subtype (`Human`): its fields are flattened into the parent class (no
+// `sealed trait`, no `Other`), and `__typename` is not required. A response of another subtype
+// (`Droid`) then fails to decode with a missing-field error.
 @GraphQL
 trait StarWarsSingleSubtype extends GraphQLOperation[StarWars] {
   override val document = gql"""
         query ($$ep: Episode!) {
           hero(episode: $$ep) {
-            __typename
             name
             ... on Human {
               homePlanet

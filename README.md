@@ -137,14 +137,15 @@ Hand-written subqueries may declare **multiple** types (the selection is validat
 
 #### Interfaces and unions
 
-When a selection on an interface or union field has inline fragments (or fragment spreads) on its
-subtypes, the generator emits a `sealed trait` for the field, one case class per fragment type
-carrying the shared fields plus the fragment's own, and, if the schema has concrete types none of
-the fragments cover, a case class `Other` with just the shared fields. For example, the StarWars
-selection
+When a selection on an interface or union field has inline fragments (or fragment spreads) on
+**two or more** distinct subtypes (counting distinct type conditions — two fragments on the same
+type still count as one), the generator emits a `sealed trait` for the field, one case class per
+fragment type carrying the shared fields plus the fragment's own, and, if the schema has concrete
+types none of the fragments cover, a case class `Other` with just the shared fields. For example,
+the StarWars selection
 
 ```graphql
-character { __typename id name ... on Human { homePlanet } }
+character { __typename id name ... on Human { homePlanet } ... on Droid { primaryFunction } }
 ```
 
 (`character`'s type is an interface implemented by `Human` and `Droid`) generates roughly:
@@ -153,9 +154,12 @@ character { __typename id name ... on Human { homePlanet } }
 sealed trait Character { val id: String; val name: Option[String] }
 object Character {
   case class Human(id: String, name: Option[String], homePlanet: Option[String]) extends Character
-  case class Other(id: String, name: Option[String]) extends Character // Droid, uncovered
+  case class Droid(id: String, name: Option[String], primaryFunction: Option[String]) extends Character
 }
 ```
+
+(had `Droid` been left uncovered, a case class `Other` with just the shared fields would have been
+added instead.)
 
 The selection **must** include `__typename` at the same level as the fragments; the generated
 decoder switches on it to pick the case class to decode into. Omitting it is a generation error: "Selection on [...] has fragments on subtypes [...] but does not select `__typename`". It must also
@@ -167,6 +171,26 @@ counts, as long as neither it nor the fragment is conditional.
 A bare `__typename` is consumed by the decoder and is not generated as a field. Aliased (e.g.
 `kind: __typename`), it is both the decoder key and a regular `String` field on the trait and every
 case class — the way to keep the raw type name around, e.g. for the types folded into `Other`.
+
+With a fragment on a **single** subtype, none of the above applies: the fragment's fields are
+flattened directly into the parent class instead — no `sealed trait`, no `Other`, and `__typename`
+is not required. For example
+
+```graphql
+character { id name ... on Human { homePlanet } }
+```
+
+generates a single flat class, with no discriminator needed:
+
+```scala
+case class Character(id: String, name: Option[String], homePlanet: Option[String])
+```
+
+This is for "I only care about one subtype" queries: it assumes the response is that subtype, and a
+response of another subtype (`Droid`, here) then fails to decode with a missing-field error — so use
+it only when the surrounding context guarantees the subtype (e.g. a filtered subscription). Since a
+`__typename` selected here isn't a discriminator, it is not stripped by the generator either: bare or
+aliased, it is generated as a plain `String` field like any other selection.
 
 Fragments whose type condition is the field's own type or one of its supertypes are plain grouping
 (e.g. for `@include`), not subtypes, and are flattened rather than turned into cases.

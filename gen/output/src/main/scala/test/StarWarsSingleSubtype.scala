@@ -7,9 +7,9 @@ package test
 
 import clue.GraphQLOperation
 
-// A single fragment on a subtype (`Human`), leaving `Droid` uncovered: `Character` has exactly
-// two implementors, so this must still generate a fallback `Other` instance (no special-casing
-// for "just one variant").
+// A single fragment on a subtype (`Human`): its fields are flattened into the parent class (no
+// `sealed trait`, no `Other`), and `__typename` is not required. A response of another subtype
+// (`Droid`) then fails to decode with a missing-field error.
 
 object StarWarsSingleSubtype extends GraphQLOperation[StarWars] {
   import StarWars.Scalars._
@@ -21,7 +21,6 @@ object StarWarsSingleSubtype extends GraphQLOperation[StarWars] {
   override val document = gql"""
         query ($$ep: Episode!) {
           hero(episode: $$ep) {
-            __typename
             name
             ... on Human {
               homePlanet
@@ -38,43 +37,13 @@ object StarWarsSingleSubtype extends GraphQLOperation[StarWars] {
   }
   case class Data(val hero: Data.Hero)
   object Data {
-    sealed trait Hero { val name: Option[String] }
+    case class Hero(val name: Option[String] = None, val homePlanet: Option[String] = None)
     object Hero {
-      case class Human(override val name: Option[String] = None, val homePlanet: Option[String] = None) extends Hero()
-      object Human {
-        val name: monocle.Lens[Data.Hero.Human, Option[String]] = monocle.macros.GenLens[Data.Hero.Human](_.name)
-        val homePlanet: monocle.Lens[Data.Hero.Human, Option[String]] = monocle.macros.GenLens[Data.Hero.Human](_.homePlanet)
-        implicit val eqHuman: cats.Eq[Data.Hero.Human] = cats.Eq.fromUniversalEquals
-        implicit val showHuman: cats.Show[Data.Hero.Human] = cats.Show.fromToString
-        implicit val jsonDecoderHuman: io.circe.Decoder[Data.Hero.Human] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Human]
-      }
-      case class Other(override val name: Option[String] = None) extends Hero()
-      object Other {
-        val name: monocle.Iso[Data.Hero.Other, Option[String]] = monocle.Focus[Data.Hero.Other](_.name)
-        implicit val eqOther: cats.Eq[Data.Hero.Other] = cats.Eq.fromUniversalEquals
-        implicit val showOther: cats.Show[Data.Hero.Other] = cats.Show.fromToString
-        implicit val jsonDecoderOther: io.circe.Decoder[Data.Hero.Other] = io.circe.generic.semiauto.deriveDecoder[Data.Hero.Other]
-      }
-      val name: monocle.Lens[Data.Hero, Option[String]] = monocle.Lens[Data.Hero, Option[String]](_.name) {
-        v => _ match {
-          case s: Data.Hero.Human =>
-            s.copy(name = v)
-          case s: Data.Hero.Other =>
-            s.copy(name = v)
-        }
-      }
-      val human: monocle.Prism[Data.Hero, Data.Hero.Human] = monocle.macros.GenPrism[Data.Hero, Data.Hero.Human]
-      val other: monocle.Prism[Data.Hero, Data.Hero.Other] = monocle.macros.GenPrism[Data.Hero, Data.Hero.Other]
+      val name: monocle.Lens[Data.Hero, Option[String]] = monocle.macros.GenLens[Data.Hero](_.name)
+      val homePlanet: monocle.Lens[Data.Hero, Option[String]] = monocle.macros.GenLens[Data.Hero](_.homePlanet)
       implicit val eqHero: cats.Eq[Data.Hero] = cats.Eq.fromUniversalEquals
       implicit val showHero: cats.Show[Data.Hero] = cats.Show.fromToString
-      implicit val jsonDecoderHero: io.circe.Decoder[Data.Hero] = io.circe.Decoder.instance {
-        c => c.downField("__typename").as[String].flatMap {
-          case "Human" =>
-            io.circe.Decoder[Data.Hero.Human].tryDecode(c)
-          case _ =>
-            io.circe.Decoder[Data.Hero.Other].tryDecode(c)
-        }
-      }
+      implicit val jsonDecoderHero: io.circe.Decoder[Data.Hero] = io.circe.generic.semiauto.deriveDecoder[Data.Hero]
     }
     val hero: monocle.Iso[Data, Data.Hero] = monocle.Focus[Data](_.hero)
     implicit val eqData: cats.Eq[Data] = cats.Eq.fromUniversalEquals
