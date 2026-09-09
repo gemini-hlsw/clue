@@ -5,26 +5,25 @@ import sbt.librarymanagement._
 object Settings {
 
   object LibraryVersions {
-    val cats                     = "2.13.0"
-    val catsEffect               = "3.7.1"
-    val circe                    = "0.14.16"
-    val disciplineMUnit          = "2.0.0"
-    val fs2                      = "3.14.0"
-    val grackle                  = "0.30.0"
-    val http4s                   = "0.23.37"
-    val http4sDom                = "0.2.7"
-    val http4sJDKClient          = "0.10.0"
-    val jawn                     = "1.3.2"
-    val kittens                  = "3.5.0"
-    val log4Cats                 = "2.8.0"
-    val monocle                  = "3.3.0"
-    val munit                    = "1.3.6"
-    val munitCatsEffect          = "2.2.0"
-    val otel4s                   = "1.1.0"
-    val http4sOtel4sMiddleware   = "0.19.0"
-    val scalaFix                 = scalafix.sbt.BuildInfo.scalafixVersion
-    val scalaJsDom               = "2.8.1"
-    val scalaJsMacrotaskExecutor = "1.1.1"
+    val cats                   = "2.13.0"
+    val catsEffect             = "3.7.1"
+    val circe                  = "0.14.16"
+    val disciplineMUnit        = "2.0.0"
+    val fs2                    = "3.14.0"
+    val grackle                = "0.30.0"
+    val http4s                 = "0.23.37"
+    val http4sDom              = "0.2.7"
+    val http4sJDKClient        = "0.10.0"
+    val jawn                   = "1.3.2"
+    val kittens                = "3.5.0"
+    val log4Cats               = "2.8.0"
+    val monocle                = "3.3.0"
+    val munit                  = "1.3.6"
+    val munitCatsEffect        = "2.2.0"
+    val otel4s                 = "1.1.0"
+    val http4sOtel4sMiddleware = "0.19.0"
+    val scalaFix               = scalafix.sbt.BuildInfo.scalafixVersion
+    val scalaJsDom             = "2.8.1"
   }
 
   object Libraries {
@@ -184,12 +183,6 @@ object Settings {
     val ScalaJsDom = Def.setting(
       Seq(
         "org.scala-js" %%% "scalajs-dom" % scalaJsDom
-      )
-    )
-
-    val ScalaJsMacrotaskExecutor = Def.setting(
-      Seq(
-        "org.scala-js" %%% "scala-js-macrotask-executor" % scalaJsMacrotaskExecutor
       )
     )
 
