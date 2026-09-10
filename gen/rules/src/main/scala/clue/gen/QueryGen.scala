@@ -480,14 +480,20 @@ trait QueryGen extends Generator {
 
       // Two variant types that share a concrete type would make that concrete type's response
       // decode to whichever variant appears first, silently losing the other's fields (see
-      // `resolveData`'s `discriminatorCases`). Report each overlapping pair once, in order of
-      // appearance.
+      // `resolveData`'s `discriminatorCases`). Only concrete types the current type can actually
+      // return count: two interface fragments may overlap on an object outside the current union,
+      // which can never show up here. Report each overlapping pair once, in order of appearance.
       val overlapProblems: List[Problem] =
         if (variantTypeNames.sizeIs < 2) List.empty
         else {
+          val reachable: Set[String] =
+            currentType.flatMap(_.asNamed).fold(Set.empty[String])(concreteTypeNames(schema, _))
+
           val concreteByVariant: List[(String, Set[String])] =
             variantTypeNames.map(t =>
-              t -> schema.definition(t).fold(Set.empty[String])(concreteTypeNames(schema, _))
+              t -> schema
+                .definition(t)
+                .fold(Set.empty[String])(concreteTypeNames(schema, _).intersect(reachable))
             )
 
           def pairs[A](xs: List[A]): List[(A, A)] =
@@ -749,12 +755,32 @@ trait QueryGen extends Generator {
       case other            => Set(other.name)
     }
 
-  // Structural equality for `ClassParam`, ignoring `overrides`. Plain case-class `==` doesn't work
-  // here: `tpe` is a scalameta `Type`, and scalameta trees compare by identity, not structure, so
-  // two independently-built trees with the same shape (e.g. two `Type.Name("String")`) are never
-  // `==`. `.structure` is scalameta's structural-equality string, so it's used instead.
+  // `tpe` without a top-level `Option` wrapper, if any.
+  private def stripOption(tpe: Type): Type =
+    tpe match {
+      case Type.Apply.Initial(Type.Name("Option"), List(inner)) => inner
+      case other                                                => other
+    }
+
+  private def isOptional(tpe: Type): Boolean =
+    tpe match {
+      case Type.Apply.Initial(Type.Name("Option"), _) => true
+      case _                                          => false
+    }
+
+  // Whether two `ClassParam`s are the same GraphQL selection, so GraphQL would merge them into a
+  // single response value. Ignores:
+  //  - `overrides`: only says whether the param came from the base level.
+  //  - `deprecation`: schema metadata, not part of the response shape (an interface field may be
+  //    deprecated while an object's implementation of it is not, or vice versa).
+  //  - a top-level `Option`: added by `@include`/`@skip` (`forceOptional`), or by an object type
+  //    narrowing a nullable interface field to non-null; the selection is the same either way.
+  // Plain case-class `==` doesn't work here: `tpe` is a scalameta `Type`, and scalameta trees
+  // compare by identity, not structure, so two independently-built trees with the same shape (e.g.
+  // two `Type.Name("String")`) are never `==`. `.structure` is scalameta's structural-equality
+  // string, so it's used instead.
   private def sameSelection(a: ClassParam, b: ClassParam): Boolean =
-    a.name == b.name && a.tpe.structure == b.tpe.structure && a.deprecation == b.deprecation
+    a.name == b.name && stripOption(a.tpe).structure == stripOption(b.tpe).structure
 
   // Structural equality for `Class`/`Sum`, for the same reason as [[sameSelection]]: their
   // `ClassParam`s (and, transitively, nested classes) embed scalameta `Type`s, so plain `==`
@@ -771,7 +797,8 @@ trait QueryGen extends Generator {
 
   private def sameParams(a: List[ClassParam], b: List[ClassParam]): Boolean =
     a.sizeIs == b.size && a.zip(b).forall { case (x, y) =>
-      sameSelection(x, y) && x.overrides == y.overrides
+      x.name == y.name && x.tpe.structure == y.tpe.structure && x.overrides == y.overrides &&
+      x.deprecation == y.deprecation
     }
 
   private def sameClasses(a: List[Class], b: List[Class]): Boolean =
@@ -781,31 +808,60 @@ trait QueryGen extends Generator {
     sameParams(a.params, b.params) && sameClasses(a.nested, b.nested) &&
       sameClasses(a.instances, b.instances) && a.discriminator == b.discriminator
 
-  // `classes`, deduplicated with [[sameClass]] (see there for why plain `.distinct` doesn't work).
-  private def distinctClasses(classes: List[Class]): List[Class] =
-    classes.foldLeft(List.empty[Class]) { (acc, c) =>
-      if (acc.exists(sameClass(_, c))) acc else acc :+ c
-    }
+  // The single param a group of [[sameSelection]] params collapses to.
+  //  - Type: a base-level (override) occurrence wins, since the trait it overrides is typed by the
+  //    base level; otherwise a non-optional one, since an unconditional occurrence means the
+  //    field is always present, however many conditional ones there are besides.
+  //  - `override` if any occurrence was base-level; deprecated if any occurrence was.
+  private def mergeGroup(group: List[ClassParam]): ClassParam = {
+    val representative: ClassParam =
+      group
+        .find(_.overrides)
+        .orElse(group.find(p => !isOptional(p.tpe)))
+        .getOrElse(group.head)
+    representative.copy(
+      overrides = group.exists(_.overrides),
+      deprecation = group.flatMap(_.deprecation).headOption
+    )
+  }
 
   // Merge params that GraphQL itself merges: the same response name selected more than once (e.g.
-  // at the base level and again inside a fragment). Identical selections (ignoring the
-  // `overrides` flag) collapse to the first occurrence; if any occurrence was a base-level
-  // (override) param the merged one stays `override`. Same name with different content is left
-  // alone (it surfaces as a compile error in the generated code, as before). Identical nested
-  // classes are deduplicated too.
-  private def mergeDuplicateSelections(acc: ClassAccumulator): ClassAccumulator = {
-    val order: List[String]                   = acc.parAccum.map(_.name).distinct
-    val byName: Map[String, List[ClassParam]] = acc.parAccum.groupBy(_.name)
+  // at the base level and again inside a fragment). A group of [[sameSelection]] params whose
+  // nested classes (if the field is an object) are all identical collapses to one param (see
+  // [[mergeGroup]]) and one nested class. Same name with different content (different type, or
+  // different sub-selections) is left alone: it surfaces as a compile error in the generated code,
+  // as before.
+  //
+  // `inherited` are the nested classes of the enclosing base level, when `acc` is a variant of a
+  // sum: they are emitted once in the sum's companion and referenced from every variant, so a
+  // variant's own identical copy is dropped (it would otherwise shadow the base one and give the
+  // `override val` a different type than the trait's).
+  private def mergeDuplicateSelections(
+    acc:       ClassAccumulator,
+    inherited: List[Class] = List.empty
+  ): ClassAccumulator = {
+    val order: List[String]                     = acc.parAccum.map(_.name).distinct
+    val byName: Map[String, List[ClassParam]]   = acc.parAccum.groupBy(_.name)
+    val classesByName: Map[String, List[Class]] = acc.classes.groupBy(_.name)
 
-    val mergedParAccum: List[ClassParam] = order.flatMap { name =>
-      val group = byName(name)
-      if (group.tail.forall(sameSelection(_, group.head)))
-        List(group.head.copy(overrides = group.exists(_.overrides)))
-      else
-        group
-    }
+    val (mergedParAccum, mergedClasses): (List[List[ClassParam]], List[List[Class]]) =
+      order.map { name =>
+        val group: List[ClassParam]   = byName(name)
+        val own: List[Class]          = classesByName.getOrElse(name, List.empty)
+        val inheritedOwn: List[Class] = inherited.filter(_.name == name)
+        val nested: List[Class]       = inheritedOwn ++ own
 
-    acc.copy(classes = distinctClasses(acc.classes), parAccum = mergedParAccum)
+        val mergeable: Boolean =
+          group.tail.forall(sameSelection(_, group.head)) &&
+            nested.drop(1).forall(sameClass(_, nested.head))
+
+        if (mergeable)
+          (List(mergeGroup(group)), if (inheritedOwn.nonEmpty) List.empty else own.take(1))
+        else
+          (group, own)
+      }.unzip
+
+    acc.copy(classes = mergedClasses.flatten, parAccum = mergedParAccum.flatten)
   }
 
   protected type ClassAccumulator = Accumulator[Class, ClassParam, Sum]
@@ -999,6 +1055,7 @@ trait QueryGen extends Generator {
           val baseAccumulators    = hierarchyAccumulators.collectFirst { case (None, accumulators) =>
             accumulators
           }.orEmpty
+          val baseAccumulator     = mergeDuplicateSelections(baseAccumulators.map(_._1).combineAll)
           val subTypeAccumulators = hierarchyAccumulators.collect {
             case (Some(typeName), accumulators) =>
               (typeName,
@@ -1008,11 +1065,11 @@ trait QueryGen extends Generator {
                    (baseAccumulators.map { case (accumlator, idx) =>
                      (accumlator.withOverrideParams, idx)
                    } ++ accumulators).sortBy(_._2).map(_._1).combineAll.parAccum
-                 )
+                 ),
+                 inherited = baseAccumulator.classes
                )
               )
           }
-          val baseAccumulator     = mergeDuplicateSelections(baseAccumulators.map(_._1).combineAll)
 
           subTypeAccumulators match {
             case Nil      => baseAccumulator // No variants.
@@ -1053,12 +1110,18 @@ trait QueryGen extends Generator {
                     throw new Exception("Variant fragment without a known current type")
                   )
 
+              val reachableConcreteTypes: Set[String] = concreteTypeNames(schema, ct)
+
+              // Only the concrete types `ct` can actually return: a variant on an interface may
+              // also cover objects outside `ct` (e.g. outside the current union), which never
+              // show up here.
+              def coveredBy(typeName: String): Set[String] =
+                concreteTypeNames(schema, getType(typeName)).intersect(reachableConcreteTypes)
+
               val coveredConcreteTypes: Set[String] =
-                variants.flatMap { case (typeName, _) =>
-                  concreteTypeNames(schema, getType(typeName))
-                }.toSet
+                variants.flatMap { case (typeName, _) => coveredBy(typeName) }.toSet
               val missingConcreteTypes: Set[String] =
-                concreteTypeNames(schema, ct) -- coveredConcreteTypes
+                reachableConcreteTypes -- coveredConcreteTypes
 
               // `__typename` in a response is always a *concrete* object type, so a variant on an
               // interface/union type condition (e.g. `... on Pilot { ... }`) must be matched by
@@ -1070,7 +1133,7 @@ trait QueryGen extends Generator {
               val discriminatorCases: List[(String, String)] = {
                 val seen = scala.collection.mutable.LinkedHashMap.empty[String, String]
                 variants.foreach { case (typeName, _) =>
-                  concreteTypeNames(schema, getType(typeName)).toList.sorted.foreach(concreteName =>
+                  coveredBy(typeName).toList.sorted.foreach(concreteName =>
                     seen.getOrElseUpdate(concreteName, typeName)
                   )
                 }
