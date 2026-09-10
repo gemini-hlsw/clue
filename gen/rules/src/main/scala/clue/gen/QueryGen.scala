@@ -773,8 +773,8 @@ trait QueryGen extends Generator {
   //  - `overrides`: only says whether the param came from the base level.
   //  - `deprecation`: schema metadata, not part of the response shape (an interface field may be
   //    deprecated while an object's implementation of it is not, or vice versa).
-  //  - a top-level `Option`: added by `@include`/`@skip` (`forceOptional`), or by an object type
-  //    narrowing a nullable interface field to non-null; the selection is the same either way.
+  //  - a top-level `Option`: added by `@include`/`@skip` (`forceOptional`); the selection is the
+  //    same either way.
   // Plain case-class `==` doesn't work here: `tpe` is a scalameta `Type`, and scalameta trees
   // compare by identity, not structure, so two independently-built trees with the same shape (e.g.
   // two `Type.Name("String")`) are never `==`. `.structure` is scalameta's structural-equality
@@ -800,15 +800,22 @@ trait QueryGen extends Generator {
         false
     }
 
-  // Same size, and every param in `a` has a same-named param in `b` with the same type and
-  // `overrides`. Names are unique within a selection set, so a name lookup is enough. Ignores
-  // `deprecation`: schema metadata, not part of the response shape (an interface field may be
-  // deprecated while an object's implementation of it is not, or vice versa).
+  // Same size, and every param in `a` has a same-named param in `b` with the same type (ignoring a
+  // top-level `Option`, as in [[sameSelection]]) and `overrides`. Names are unique within a
+  // selection set, so a name lookup is enough. Ignores `deprecation`: schema metadata, not part of
+  // the response shape (an interface field may be deprecated while an object's implementation of it
+  // is not, or vice versa).
+  //
+  // A top-level `Option` is ignored because a nested field selected unconditionally in one
+  // occurrence and with `@include`/`@skip` in the other is still one selection: directives don't
+  // affect GraphQL field mergeability. The emitted nested class is always the first occurrence's, so
+  // its param may be `Option` even when another occurrence guarantees presence: imprecise, not
+  // wrong.
   private def sameParams(a: List[ClassParam], b: List[ClassParam]): Boolean = {
     val byName: Map[String, ClassParam] = b.map(p => p.name -> p).toMap
     a.sizeIs == b.size && a.forall { x =>
       byName.get(x.name).exists { y =>
-        x.tpe.structure == y.tpe.structure && x.overrides == y.overrides
+        stripOption(x.tpe).structure == stripOption(y.tpe).structure && x.overrides == y.overrides
       }
     }
   }
@@ -821,21 +828,38 @@ trait QueryGen extends Generator {
     }
   }
 
+  // Same discriminator: both `None`, or both defined with equal `key`, equal `fallback`, and the
+  // same `cases` as a set. The case list follows fragment order of appearance, which is not part of
+  // the response shape.
+  private def sameDiscriminator(a: Option[SumDiscriminator], b: Option[SumDiscriminator]): Boolean =
+    (a, b) match {
+      case (None, None)       => true
+      case (Some(x), Some(y)) =>
+        x.key == y.key && x.fallback == y.fallback && x.cases.toMap == y.cases.toMap
+      case _                  => false
+    }
+
   private def sameSum(a: Sum, b: Sum): Boolean =
     sameParams(a.params, b.params) && sameClasses(a.nested, b.nested) &&
-      sameClasses(a.instances, b.instances) && a.discriminator == b.discriminator
+      sameClasses(a.instances, b.instances) && sameDiscriminator(a.discriminator, b.discriminator)
 
   // The single param that a group of [[sameSelection]]-equal params collapses to.
-  //  - Type: a base-level (override) occurrence wins, since the trait it overrides is typed by the
-  //    base level; otherwise a non-optional one, since an unconditional occurrence means the
-  //    field is always present, however many conditional ones there are besides.
+  //  - Type: when the group has any base-level (override) occurrence, the representative is
+  //    chosen among *those* only (preferring a non-optional one, else the first): the base-level
+  //    occurrences are exactly the params the trait's abstract val is merged from (see the base
+  //    merge, i.e. this same function called with no `override` params), so choosing among them
+  //    with the same preference keeps the variant's `override val` type equal to the trait's — a
+  //    fragment-only duplicate can't be preferred over a base-level one even when it is tighter.
+  //    With no base-level occurrence, preference falls back to a non-optional one, else the first,
+  //    since an unconditional occurrence means the field is always present, however many
+  //    conditional ones there are besides.
   //  - `override` if any occurrence was base-level; deprecated if any occurrence was.
   private def mergeGroup(group: List[ClassParam]): ClassParam = {
     val representative: ClassParam =
-      group
-        .find(_.overrides)
-        .orElse(group.find(p => !isOptional(p.tpe)))
-        .getOrElse(group.head)
+      group.filter(_.overrides) match {
+        case Nil       => group.find(p => !isOptional(p.tpe)).getOrElse(group.head)
+        case overrides => overrides.find(p => !isOptional(p.tpe)).getOrElse(overrides.head)
+      }
     representative.copy(
       overrides = group.exists(_.overrides),
       deprecation = group.flatMap(_.deprecation).headOption
@@ -878,7 +902,12 @@ trait QueryGen extends Generator {
           (group, own)
       }.unzip
 
-    acc.copy(classes = mergedClasses.flatten, parAccum = mergedParAccum.flatten)
+    // Classes are emitted 1:1 with object-typed params, so every class name is expected to have a
+    // same-named param in `order`; the fallback below keeps any stray class instead of silently
+    // dropping it if that invariant is ever violated.
+    val strayClasses: List[Class] = acc.classes.filterNot(c => order.contains(c.name))
+
+    acc.copy(classes = mergedClasses.flatten ++ strayClasses, parAccum = mergedParAccum.flatten)
   }
 
   protected type ClassAccumulator = Accumulator[Class, ClassParam, Sum]

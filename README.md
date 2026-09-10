@@ -175,11 +175,10 @@ fields. Merge the overlapping fragments into one (e.g. on the concrete type they
 
 A field selected both at the base level and inside a fragment (which GraphQL merges into a single
 response value) is likewise generated once, not duplicated in the fragment's case class, as long as
-both selections are the same: same type (a top-level `@include`/`@skip`, or an object type
-narrowing a nullable interface field to non-null, doesn't count as different; the base level's
-type wins) and, for object fields, the same sub-selection (then the nested class is generated once,
-in the enclosing companion). Selecting the same field with *different* sub-selections at the two
-levels is not merged and fails to compile.
+both selections are the same: same type (a top-level `@include`/`@skip` doesn't count as different;
+the base level's type wins) and, for object fields, the same sub-selection (then the nested class
+is generated once, in the enclosing companion). Selecting the same field with *different*
+sub-selections at the two levels is not merged and fails to compile.
 
 Fragments whose type condition is the field's own type or one of its supertypes are plain grouping
 (e.g. for `@include`), not subtypes, and are flattened rather than turned into cases.
