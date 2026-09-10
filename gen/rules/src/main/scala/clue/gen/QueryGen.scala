@@ -785,6 +785,11 @@ trait QueryGen extends Generator {
   // Structural equality for `Class`/`Sum`, for the same reason as [[sameSelection]]: their
   // `ClassParam`s (and, transitively, nested classes) embed scalameta `Type`s, so plain `==`
   // can't be used to tell two independently-built but identical classes apart.
+  //
+  // Comparison is by response name, not position: GraphQL selection sets are unordered for field
+  // merging purposes, so `friends { id name }` at one level and `friends { name id }` at another
+  // are the same selection even though their `ClassParam`/`Class` lists are built in different
+  // orders. It's also deprecation-insensitive (see [[sameParams]]).
   private def sameClass(a: Class, b: Class): Boolean =
     (a, b) match {
       case (CaseClass(n1, p1, nested1), CaseClass(n2, p2, nested2)) =>
@@ -795,20 +800,32 @@ trait QueryGen extends Generator {
         false
     }
 
-  private def sameParams(a: List[ClassParam], b: List[ClassParam]): Boolean =
-    a.sizeIs == b.size && a.zip(b).forall { case (x, y) =>
-      x.name == y.name && x.tpe.structure == y.tpe.structure && x.overrides == y.overrides &&
-      x.deprecation == y.deprecation
+  // Same size, and every param in `a` has a same-named param in `b` with the same type and
+  // `overrides`. Names are unique within a selection set, so a name lookup is enough. Ignores
+  // `deprecation`: schema metadata, not part of the response shape (an interface field may be
+  // deprecated while an object's implementation of it is not, or vice versa).
+  private def sameParams(a: List[ClassParam], b: List[ClassParam]): Boolean = {
+    val byName: Map[String, ClassParam] = b.map(p => p.name -> p).toMap
+    a.sizeIs == b.size && a.forall { x =>
+      byName.get(x.name).exists { y =>
+        x.tpe.structure == y.tpe.structure && x.overrides == y.overrides
+      }
     }
+  }
 
-  private def sameClasses(a: List[Class], b: List[Class]): Boolean =
-    a.sizeIs == b.size && a.zip(b).forall { case (x, y) => sameClass(x, y) }
+  // Same size, and every class in `a` has a same-named class in `b` for which [[sameClass]] holds.
+  private def sameClasses(a: List[Class], b: List[Class]): Boolean = {
+    val byName: Map[String, Class] = b.map(c => c.name -> c).toMap
+    a.sizeIs == b.size && a.forall { x =>
+      byName.get(x.name).exists(y => sameClass(x, y))
+    }
+  }
 
   private def sameSum(a: Sum, b: Sum): Boolean =
     sameParams(a.params, b.params) && sameClasses(a.nested, b.nested) &&
       sameClasses(a.instances, b.instances) && a.discriminator == b.discriminator
 
-  // The single param a group of [[sameSelection]] params collapses to.
+  // The single param that a group of [[sameSelection]]-equal params collapses to.
   //  - Type: a base-level (override) occurrence wins, since the trait it overrides is typed by the
   //    base level; otherwise a non-optional one, since an unconditional occurrence means the
   //    field is always present, however many conditional ones there are besides.
