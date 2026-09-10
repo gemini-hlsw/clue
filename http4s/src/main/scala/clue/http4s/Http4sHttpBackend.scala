@@ -26,11 +26,8 @@ final class Http4sHttpBackend[F[_]: Concurrent](val client: Client[F])
 
   object dsl extends Http4sClientDsl[F]
 
-  private val GraphQLResponseMediaType =
-    new MediaType("application", "graphql-response+json", compressible = true)
-
   private val AcceptHeader = Accept(
-    GraphQLResponseMediaType.withQValue(QValue.One),
+    MediaType.`application/graphql-response+json`.withQValue(QValue.One),
     MediaType.application.json.withQValue(qValue"0.9")
   )
 

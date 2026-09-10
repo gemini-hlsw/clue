@@ -20,11 +20,9 @@ class Http4sHttpBackendSuite extends CatsEffectSuite:
 
   private val SpecAccept = "application/graphql-response+json, application/json;q=0.9"
 
-  private val GraphQLResponseMediaType =
-    new MediaType("application", "graphql-response+json", compressible = true)
-
   private val JsonContentType    = `Content-Type`(MediaType.application.json)
-  private val GraphQLContentType = `Content-Type`(GraphQLResponseMediaType, Charset.`UTF-8`)
+  private val GraphQLContentType =
+    `Content-Type`(MediaType.`application/graphql-response+json`, Charset.`UTF-8`)
   private val HtmlContentType    = `Content-Type`(MediaType.text.html)
 
   private val graphQLRequest: GraphQLRequest[Json] =
