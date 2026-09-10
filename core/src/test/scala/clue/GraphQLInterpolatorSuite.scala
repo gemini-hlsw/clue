@@ -96,4 +96,35 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
     val doc = gql"query ($$ep: Episode!) $InterpolatorTestParent"
     assertEquals(doc.value, "query ($ep: Episode!) { friends { hero(episode: $ep) { name } } }")
   }
+
+  test("a document with a fragment before the operation still sees the declared variables") {
+    val doc =
+      gql"fragment f on Character { name } query ($$ep: Episode!) { hero $InterpolatorTestSub }"
+    assertEquals(
+      doc.value,
+      "fragment f on Character { name } query ($ep: Episode!) { hero { hero(episode: $ep) { name } } }"
+    )
+  }
+
+  test("a named operation's header is found") {
+    val doc = gql"query Foo($$ep: Episode!) $InterpolatorTestSub"
+    assertEquals(doc.value, "query Foo($ep: Episode!) { hero(episode: $ep) { name } }")
+  }
+
+  test("a lexical error is a compile error") {
+    // `StringContext.parts` are raw/undecoded for a custom interpolator (only `$$` needs our own
+    // unescaping, per `tokenizeParts`'s doc): a `\"` written inside a `gql"..."` literal reaches the
+    // lexer as a literal backslash, not a decoded quote. So to get a document that is genuinely
+    // unterminated (rather than one with a stray, invalid `\`), the embedded quote here is a bare
+    // `"` inside a triple-quoted `gql"""..."""`, which Scala itself leaves untouched.
+    val errors = compileErrors("gql\"\"\"query { hero(name: \"unterminated) }\"\"\"")
+    assert(errors.contains("unterminated string"), errors)
+  }
+
+  test("a fragment's field arguments are not mistaken for the header") {
+    val errors = compileErrors(
+      """gql"fragment f on Character { hero(episode: NEWHOPE) { name } } query { $InterpolatorTestSub }""""
+    )
+    assert(errors.contains("does not declare variable $ep"), errors)
+  }
 }
