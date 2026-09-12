@@ -1,6 +1,6 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-ThisBuild / tlBaseVersion     := "0.59"
+ThisBuild / tlBaseVersion     := "0.60"
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 // The CI matrix covers Scala 3 only, which builds `sbt-clue` for sbt 2.x. Run the scripted tests
@@ -88,6 +88,7 @@ lazy val core =
         Settings.Libraries.Cats.value ++
           Settings.Libraries.CatsEffect.value ++
           Settings.Libraries.Fs2.value ++
+          Settings.Libraries.Grackle.value ++
           Settings.Libraries.Log4Cats.value ++
           Settings.Libraries.DisciplineMUnit.value ++
           Settings.Libraries.MUnitCatsEffect.value ++
