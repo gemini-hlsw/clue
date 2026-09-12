@@ -3,6 +3,11 @@
 
 package clue
 
+import cats.syntax.foldable.*
+import grackle.Ast
+import grackle.GraphQLParser
+import grackle.Result
+
 import scala.quoted.*
 
 /**
@@ -20,17 +25,6 @@ object GraphQLDocument {
 
   extension (document: GraphQLDocument) {
     def value: String = document
-
-    /**
-     * As `String.stripMargin`. It runs on the assembled text, so it also strips margins inside
-     * spliced subqueries — the same as calling `.stripMargin` on an `s"..."` interpolation.
-     */
-    def stripMargin: GraphQLDocument = stripMargin('|')
-
-    def stripMargin(marginChar: Char): GraphQLDocument =
-      // Explicit `StringOps` because inside this file `GraphQLDocument` is `String`, so a bare
-      // `document.stripMargin` would resolve back to this extension.
-      new scala.collection.StringOps(document).stripMargin(marginChar)
   }
 }
 
@@ -39,7 +33,12 @@ extension (inline sc:         StringContext)
    * Builds an operation `document` or a subquery's `subquery`, splicing subqueries inline. At
    * runtime it produces exactly the string the standard `s"..."` interpolator would.
    *
-   * At compile time it runs the *caller-check*: for every spliced value that declares variables (a
+   * At compile time the assembled document (with each splice stood in for by a placeholder
+   * selection) is parsed with grackle's parser: a syntax error is a compile error. Fragments may
+   * precede the operation. `GraphQLDocument.unsafeFromString` remains the escape hatch for text
+   * built by other means, which skips both the parse and the check below.
+   *
+   * The macro also runs the *caller-check*: for every spliced value that declares variables (a
    * `GraphQLSubquery` with a `type VariableDefs` member), it verifies that the variables are
    * declared where the splice happens, with a compatible ("usable as") type. The declaration is
    * read from the operation's `query (...)` header, or — when the splice happens inside a
@@ -63,6 +62,10 @@ trait GraphQLTextSyntax {
 }
 
 private[clue] object GraphQLInterpolator {
+
+  // `terseError = false` so parse failures render readable, multi-line messages.
+  private val parser: GraphQLParser =
+    GraphQLParser(GraphQLParser.defaultConfig.copy(terseError = false))
 
   def gqlImpl(scExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(using
     Quotes
@@ -112,74 +115,59 @@ private[clue] object GraphQLInterpolator {
       loop(Symbol.spliceOwner)
     }
 
-    def splitTopLevel(s: String): List[String] = {
-      val out   = scala.collection.mutable.ListBuffer.empty[String]
-      val cur   = new StringBuilder
-      var depth = 0
-      s.foreach {
-        case '['               => depth += 1; cur += '['
-        case ']'               => depth -= 1; cur += ']'
-        case ',' if depth == 0 => out += cur.toString; cur.clear()
-        case c                 => cur += c
+    // Parse `text`, aborting the macro expansion at `pos` with `describe(problemMessages)` on a
+    // parse failure.
+    def parseOrAbort(text: String, pos: Position, describe: String => String): Ast.Document =
+      parser.parseText(text) match {
+        case Result.Success(doc)      => doc
+        case Result.Warning(_, doc)   => doc
+        case Result.Failure(problems) =>
+          report.errorAndAbort(
+            describe(problems.toList.map(_.message).mkString("\n")),
+            pos
+          )
+        case Result.InternalError(t)  =>
+          report.errorAndAbort(describe(s"parser error: ${t.getMessage}"), pos)
       }
-      if (cur.nonEmpty) out += cur.toString
-      out.toList
-    }
 
-    // Parse a parenthesized var-def list `($a: T, $b: U)` into name -> GraphQL type.
-    def parseVarDefs(s0: String): Map[String, String] = {
-      val s = s0.trim.stripPrefix("(").stripSuffix(")").trim.replace("$$", "$")
-      if (s.isEmpty) Map.empty
-      else
-        splitTopLevel(s).flatMap { entry =>
-          val e       = entry.trim
-          val nameEnd = e.indexOf(':')
-          if (nameEnd < 0 || !e.startsWith("$")) None
-          else {
-            val name = e.substring(1, nameEnd).trim
-            val tpe  = e.substring(nameEnd + 1).takeWhile(_ != '=').trim
-            Some(name -> tpe)
-          }
-        }.toMap
-    }
+    // The assembled document, with each splice stood in for by a placeholder selection (a spliced
+    // subquery always stands where a selection set goes, so this keeps the document parseable
+    // without knowing what's actually spliced in).
+    val doc: Ast.Document =
+      parseOrAbort(
+        GraphQLDocuments.placeholderDocument(parts),
+        Position.ofMacroExpansion,
+        msg => s"gql: $msg"
+      )
 
-    // Extract and parse the operation header `(...)` from `query (...) ...` (the first literal part).
-    def operationVars(header: String): Map[String, String] = {
-      val h    = header.replace("$$", "$")
-      val open = h.indexOf('(')
-      if (open < 0) Map.empty
-      else {
-        var depth = 0; var i = open; var end = -1
-        while (i < h.length && end < 0) {
-          h.charAt(i) match {
-            case '(' => depth += 1
-            case ')' => depth -= 1; if (depth == 0) end = i
-            case _   => ()
-          }
-          i += 1
-        }
-        if (end < 0) Map.empty else parseVarDefs(h.substring(open, end + 1))
-      }
-    }
+    // What the operation's header declares. A shorthand query, or a document with only fragments,
+    // declares none. Fragments before the operation are naturally fine, since this looks at every
+    // `Operation` in the document rather than just its first literal part.
+    val headerVariables: Map[String, Ast.Type] = GraphQLDocuments.headerVariables(doc)
 
-    // GraphQL "is variable usage allowed": the declared type must be usable where the required type
-    // is expected. Same base type, and a non-null requirement needs a non-null declared type.
-    def usableAs(declaredType: String, reqType: String): Boolean = {
-      val d = declaredType.trim; val r = reqType.trim
-      d.stripSuffix("!").trim == r.stripSuffix("!").trim && (!r.endsWith("!") || d.endsWith("!"))
-    }
+    // Parse a `VariableDefs` string (e.g. `"($ep: Episode!)"`) belonging to `ownerName`, the same
+    // way, and return its variables.
+    def parseVariableDefs(defs: String, ownerName: String, pos: Position): Map[String, Ast.Type] =
+      GraphQLDocuments.headerVariables(
+        parseOrAbort(
+          GraphQLDocuments.wrapVariableDefs(defs),
+          pos,
+          msg => s"gql: invalid VariableDefs [$defs] on $ownerName: $msg"
+        )
+      )
 
     // What the splice site declares. An operation declares its variables in the document header; a
     // subquery declares them in `type VariableDefs`. Both are read (they are never both populated in
     // practice), so a splice is checked against everything in scope where it happens.
-    val enclosingVariableDefs: Map[String, String] =
+    val enclosingVariableDefs: Map[String, Ast.Type] =
       enclosingSubquery
-        .flatMap(cls => variableDefsOf(cls.typeRef))
-        .map(parseVarDefs)
+        .flatMap(cls => variableDefsOf(cls.typeRef).map(cls -> _))
+        .map { case (cls, defs) =>
+          parseVariableDefs(defs, cls.name.stripSuffix("$"), Position.ofMacroExpansion)
+        }
         .getOrElse(Map.empty)
 
-    val declaredVars: Map[String, String] =
-      enclosingVariableDefs ++ parts.headOption.map(operationVars).getOrElse(Map.empty)
+    val declaredVars: Map[String, Ast.Type] = enclosingVariableDefs ++ headerVariables
 
     // Where the missing declaration has to be added. `name` keeps the module-class `$` suffix for an
     // `object` subquery, which would only confuse the reader.
@@ -188,19 +176,21 @@ private[clue] object GraphQLInterpolator {
 
     argExprs.foreach { arg =>
       variableDefsOf(arg.asTerm.tpe).foreach { required =>
-        parseVarDefs(required).foreach { case (name, reqType) =>
+        val ownerName    = arg.asTerm.tpe.typeSymbol.name.stripSuffix("$")
+        val requiredVars = parseVariableDefs(required, ownerName, arg.asTerm.pos)
+        requiredVars.foreach { case (name, reqType) =>
           declaredVars.get(name) match {
-            case None                                           =>
+            case None                                                            =>
               report.errorAndAbort(
-                s"gql: $declarationSite does not declare variable $$$name required by a spliced subquery (needs $reqType)",
+                s"gql: $declarationSite does not declare variable $$$name required by a spliced subquery (needs ${reqType.name})",
                 arg.asTerm.pos
               )
-            case Some(declared) if !usableAs(declared, reqType) =>
+            case Some(declared) if !GraphQLDocuments.usableAs(declared, reqType) =>
               report.errorAndAbort(
-                s"gql: $declarationSite declares $$$name: $declared but a spliced subquery requires it usable as $reqType",
+                s"gql: $declarationSite declares $$$name: ${declared.name} but a spliced subquery requires it usable as ${reqType.name}",
                 arg.asTerm.pos
               )
-            case _                                              => ()
+            case _                                                               => ()
           }
         }
       }

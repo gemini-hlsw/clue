@@ -73,9 +73,10 @@ They must extend `GraphQLOperation[S]`, defining the following members:
 The `document` is built with the `gql` string interpolator (`import clue.gql`) rather than a plain
 `String`/`s"..."`. `gql` produces the same text at runtime, but its type (`GraphQLDocument`) can only
 be obtained through `gql`, so every operation goes through the compile-time check that splices its
-subqueries correctly (see [Subquery variables](#subquery-variables) below). `.stripMargin` works on a
-`GraphQLDocument` as it does on a `String`. For a document built by other means,
-`GraphQLDocument.unsafeFromString(...)` is the explicit (check-skipping) escape hatch.
+subqueries correctly (see [Subquery variables](#subquery-variables) below). Documents are parsed at
+compile time, so write them without margin characters (`.stripMargin` is not available on a
+`GraphQLDocument`). For a document built by other means, `GraphQLDocument.unsafeFromString(...)` is
+the explicit (check-skipping) escape hatch.
 
 #### Example
 
@@ -220,6 +221,10 @@ trait MyQuery extends GraphQLOperation[StarWars] {
 declares every variable required by each spliced subquery, with a compatible ("usable as") type. It
 reads the requirement from the subquery's `type VariableDefs` directly, so the check works even when
 the subquery comes from a dependency jar; a missing or wrong-typed variable is a compile error.
+
+`gql` documents are parsed at compile time with [grackle](https://github.com/typelevel/grackle)'s
+parser, so malformed GraphQL fails compilation; spliced subqueries are represented by a placeholder
+selection during that parse.
 
 A subquery splicing another subquery is checked the same way, against its own `VariableDefs` instead
 of an operation header:

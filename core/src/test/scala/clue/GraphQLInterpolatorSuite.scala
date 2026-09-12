@@ -24,6 +24,17 @@ object InterpolatorTestParent extends GraphQLSubquery.Typed[Unit, Json] {
   override val subquery = gql"{ friends $InterpolatorTestSub }"
 }
 
+// Declares no variables at all: exercises splicing a subquery that has nothing to check.
+object InterpolatorTestSubPlain extends GraphQLSubquery.Typed[Unit, Json] {
+  override val subquery = gql"{ name }"
+}
+
+// Declares a variable of LIST type, to exercise structural (not textual) type comparison.
+object InterpolatorTestSubList extends GraphQLSubquery.Typed[Unit, Json] {
+  type VariableDefs = "($ids: [ID!])"
+  override val subquery = gql"{ humans(ids: $$ids) { name } }"
+}
+
 class GraphQLInterpolatorSuite extends munit.FunSuite {
 
   test("gql assembles the document like s-interpolation") {
@@ -32,12 +43,12 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
   }
 
   test("gql passes through a spliced value that declares no variables") {
-    val doc = gql"query { hero } trailing ${1}"
-    assertEquals(doc.value, "query { hero } trailing 1")
+    val doc = gql"query { hero $InterpolatorTestSubPlain }"
+    assertEquals(doc.value, "query { hero { name } }")
   }
 
   test("a required variable the operation does not declare is a compile error") {
-    val errors = compileErrors("""gql"query { $InterpolatorTestSub }"""")
+    val errors = compileErrors("""gql"query $InterpolatorTestSub"""")
     assert(errors.contains("does not declare variable $ep"), errors)
   }
 
@@ -50,13 +61,6 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
     // "usable as": a non-null Episode! is usable where the subquery only needs a nullable Episode.
     val doc = gql"query ($$ep: Episode!) $InterpolatorTestSubNullable"
     assertEquals(doc.value, "query ($ep: Episode!) { heroOpt(episode: $ep) { name } }")
-  }
-
-  test("stripMargin strips the assembled document") {
-    val doc = gql"""query {
-                   |  hero
-                   |}""".stripMargin
-    assertEquals(doc.value, "query {\n  hero\n}")
   }
 
   test("a subquery splicing a subquery assembles like s-interpolation") {
@@ -90,10 +94,41 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
   test("requirements propagate transitively through a nested subquery") {
     // `InterpolatorTestParent` had to declare `$ep` to splice its child, so an operation splicing
     // the parent must declare it too.
-    val errors = compileErrors("""gql"query { $InterpolatorTestParent }"""")
+    val errors = compileErrors("""gql"query $InterpolatorTestParent"""")
     assert(errors.contains("does not declare variable $ep"), errors)
 
     val doc = gql"query ($$ep: Episode!) $InterpolatorTestParent"
     assertEquals(doc.value, "query ($ep: Episode!) { friends { hero(episode: $ep) { name } } }")
+  }
+
+  test("a fragment before the operation still sees the declared variables") {
+    val doc =
+      gql"fragment f on Character { name } query ($$ep: Episode!) { hero $InterpolatorTestSub }"
+    assertEquals(
+      doc.value,
+      "fragment f on Character { name } query ($ep: Episode!) { hero { hero(episode: $ep) { name } } }"
+    )
+  }
+
+  test("a fragment's field arguments are not mistaken for the header") {
+    val errors = compileErrors(
+      """gql"fragment f on Character { hero(episode: NEWHOPE) { name } } query $InterpolatorTestSub""""
+    )
+    assert(errors.contains("does not declare variable $ep"), errors)
+  }
+
+  test("a named operation's header is found") {
+    val doc = gql"query Foo($$ep: Episode!) $InterpolatorTestSub"
+    assertEquals(doc.value, "query Foo($ep: Episode!) { hero(episode: $ep) { name } }")
+  }
+
+  test("a syntax error is a compile error") {
+    val errors = compileErrors("""gql"query { hero "  """)
+    assert(errors.contains("gql:"), errors)
+  }
+
+  test("a list variable type is compared structurally") {
+    val doc = gql"query ($$ids: [ID!]!) $InterpolatorTestSubList"
+    assertEquals(doc.value, "query ($ids: [ID!]!) { humans(ids: $ids) { name } }")
   }
 }
