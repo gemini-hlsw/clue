@@ -50,7 +50,9 @@ class GraphQLDocumentsSuite extends munit.FunSuite {
   // headerVariables
 
   test("headerVariables of a shorthand query declares none") {
-    assertEquals(GraphQLDocuments.headerVariables(parseDoc("{ hero }")), Map.empty[String, Ast.Type])
+    assertEquals(GraphQLDocuments.headerVariables(parseDoc("{ hero }")),
+                 Map.empty[String, Ast.Type]
+    )
   }
 
   test("headerVariables of a query (...) header") {

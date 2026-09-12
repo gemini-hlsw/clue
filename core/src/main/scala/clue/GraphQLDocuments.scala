@@ -27,7 +27,9 @@ private[clue] object GraphQLDocuments {
   def placeholderDocument(parts: List[String]): String =
     parts.map(unescapeDollar).mkString(s" $TypenamePlaceholder ")
 
-  /** Wrap a parenthesized `VariableDefs` string (e.g. `"($ep: Episode!)"`) as a parseable operation. */
+  /**
+   * Wrap a parenthesized `VariableDefs` string (e.g. `"($ep: Episode!)"`) as a parseable operation.
+   */
   def wrapVariableDefs(defs: String): String = s"query $defs $TypenamePlaceholder"
 
   /**
