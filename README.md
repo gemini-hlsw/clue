@@ -224,7 +224,11 @@ the subquery comes from a dependency jar; a missing or wrong-typed variable is a
 
 `gql` documents are parsed at compile time with [grackle](https://github.com/typelevel/grackle)'s
 parser, so malformed GraphQL fails compilation; spliced subqueries are represented by a placeholder
-selection during that parse.
+selection during that parse. Only a `GraphQLSubquery` may be spliced into a `gql` document; anything
+else is a compile error, and text built another way goes through `GraphQLDocument.unsafeFromString`.
+The generator's own pre-generation placeholder (a companion object annotated `@GraphQLStub`, before
+the scalafix rule replaces it with a real subquery) is accepted too, since that is the only place
+such a placeholder is ever spliced through plain `scalac`.
 
 A subquery splicing another subquery is checked the same way, against its own `VariableDefs` instead
 of an operation header:

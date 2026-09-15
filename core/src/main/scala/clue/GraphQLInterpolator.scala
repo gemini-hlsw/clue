@@ -64,8 +64,12 @@ trait GraphQLTextSyntax {
 private[clue] object GraphQLInterpolator {
 
   // `terseError = false` so parse failures render readable, multi-line messages.
+  // `maxInputValueDepth = 16` mirrors the generator's parser config
+  // (gen/rules/src/main/scala/clue/gen/package.scala), so the two agree on what parses.
   private val parser: GraphQLParser =
-    GraphQLParser(GraphQLParser.defaultConfig.copy(terseError = false))
+    GraphQLParser(
+      GraphQLParser.defaultConfig.copy(terseError = false, maxInputValueDepth = 16)
+    )
 
   def gqlImpl(scExpr: Expr[StringContext], argsExpr: Expr[Seq[Any]])(using
     Quotes
@@ -100,12 +104,12 @@ private[clue] object GraphQLInterpolator {
         }
     }
 
+    val subqueryClass = TypeRepr.of[GraphQLSubquery[?]].typeSymbol
+
     // The `GraphQLSubquery` this splice is being expanded inside, if any: walking owners outwards,
     // the first class that is one. This is what makes subquery-into-subquery splices checkable — the
     // enclosing subquery's `VariableDefs` is the declaration the requirements are checked against.
     val enclosingSubquery: Option[Symbol] = {
-      val subqueryClass = TypeRepr.of[GraphQLSubquery[?]].typeSymbol
-
       @scala.annotation.tailrec
       def loop(sym: Symbol): Option[Symbol] =
         if (sym.isNoSymbol) None
@@ -116,17 +120,20 @@ private[clue] object GraphQLInterpolator {
     }
 
     // Parse `text`, aborting the macro expansion at `pos` with `describe(problemMessages)` on a
-    // parse failure.
+    // parse failure. Any warnings are surfaced as compile warnings at `pos` before continuing;
+    // grackle's parser does not currently produce warnings, so this is future-proofing.
     def parseOrAbort(text: String, pos: Position, describe: String => String): Ast.Document =
       parser.parseText(text) match {
-        case Result.Success(doc)      => doc
-        case Result.Warning(_, doc)   => doc
-        case Result.Failure(problems) =>
+        case Result.Success(doc)           => doc
+        case Result.Warning(problems, doc) =>
+          problems.toList.foreach(p => report.warning(describe(p.message), pos))
+          doc
+        case Result.Failure(problems)      =>
           report.errorAndAbort(
             describe(problems.toList.map(_.message).mkString("\n")),
             pos
           )
-        case Result.InternalError(t)  =>
+        case Result.InternalError(t)       =>
           report.errorAndAbort(describe(s"parser error: ${t.getMessage}"), pos)
       }
 
@@ -140,9 +147,15 @@ private[clue] object GraphQLInterpolator {
         msg => s"gql: $msg"
       )
 
-    // What the operation's header declares. A shorthand query, or a document with only fragments,
-    // declares none. Fragments before the operation are naturally fine, since this looks at every
-    // `Operation` in the document rather than just its first literal part.
+    // A document may declare more than one operation (clue's clients select one by `operationName`,
+    // see `clue.FetchClientWithPars.request`), so each splice's declared variables are read from its
+    // own enclosing operation (or, inside a fragment, the intersection of every operation's) rather
+    // than from one flattened map — see `GraphQLDocuments.spliceScopes`.
+    val scopesByIndex: Map[Int, Map[String, Ast.Type]] = GraphQLDocuments.spliceScopes(doc)
+    val sitesByIndex: Map[Int, String]                 = GraphQLDocuments.spliceSites(doc)
+
+    // Defensive fallback for a splice `spliceScopes` couldn't place (shouldn't happen): the union of
+    // every operation's variables, same as the document-wide view used elsewhere for `VariableDefs`.
     val headerVariables: Map[String, Ast.Type] = GraphQLDocuments.headerVariables(doc)
 
     // Parse a `VariableDefs` string (e.g. `"($ep: Episode!)"`) belonging to `ownerName`, the same
@@ -156,9 +169,10 @@ private[clue] object GraphQLInterpolator {
         )
       )
 
-    // What the splice site declares. An operation declares its variables in the document header; a
-    // subquery declares them in `type VariableDefs`. Both are read (they are never both populated in
-    // practice), so a splice is checked against everything in scope where it happens.
+    // What the enclosing subquery (if any) declares in its own `type VariableDefs`. This is the same
+    // for every splice in this `gql` call — it comes from the Scala class the splice is lexically
+    // inside, not from `doc`'s own structure — and is layered under each splice's own in-doc scope
+    // below.
     val enclosingVariableDefs: Map[String, Ast.Type] =
       enclosingSubquery
         .flatMap(cls => variableDefsOf(cls.typeRef).map(cls -> _))
@@ -167,15 +181,44 @@ private[clue] object GraphQLInterpolator {
         }
         .getOrElse(Map.empty)
 
-    val declaredVars: Map[String, Ast.Type] = enclosingVariableDefs ++ headerVariables
+    // `@GraphQL` + `@GraphQLStub` is the generator's pre-generation form: the companion object is a
+    // bare placeholder (no `GraphQLSubquery` supertype) that the scalafix rule replaces with a real
+    // `GraphQLSubquery` before anything downstream compiles it (downstream builds compile only the
+    // generated sources, via `clueSourceDirectory` feeding `sourceGenerators`). clue's own
+    // `gen/input` fixtures are the one place those pre-generation sources are compiled by plain
+    // scalac, so the macro must tolerate splicing the placeholder; the generated form still gets the
+    // full check above. The annotation can surface on either the module value symbol or the module
+    // class symbol, so both are checked.
+    val stubAnnotation                          = TypeRepr.of[clue.annotation.GraphQLStub]
+    def hasStubAnnotation(sym: Symbol): Boolean =
+      sym.annotations.exists(_.tpe =:= stubAnnotation)
 
-    // Where the missing declaration has to be added. `name` keeps the module-class `$` suffix for an
-    // `object` subquery, which would only confuse the reader.
-    val declarationSite: String =
-      enclosingSubquery.fold("operation")(cls => s"subquery [${cls.name.stripSuffix("$")}]")
+    argExprs.zipWithIndex.foreach { case (arg, i) =>
+      val argTpe    = arg.asTerm.tpe
+      val isStubbed = hasStubAnnotation(argTpe.typeSymbol) || hasStubAnnotation(argTpe.termSymbol)
+      if (!argTpe.baseClasses.contains(subqueryClass) && !isStubbed)
+        report.errorAndAbort(
+          s"gql: only a GraphQLSubquery can be spliced into a document, found [${argTpe.show}]. " +
+            "Build text by other means with GraphQLDocument.unsafeFromString.",
+          arg.asTerm.pos
+        )
 
-    argExprs.foreach { arg =>
-      variableDefsOf(arg.asTerm.tpe).foreach { required =>
+      // What this particular splice site declares: the enclosing subquery's `VariableDefs` (if any)
+      // plus whatever `doc`'s own structure puts in scope here (its enclosing operation's variables,
+      // or — inside a fragment — the intersection of every operation's).
+      val declaredVars: Map[String, Ast.Type] =
+        enclosingVariableDefs ++ scopesByIndex.getOrElse(i, headerVariables)
+
+      // Where the missing declaration has to be added. Inside a subquery it's always that subquery
+      // (`name` keeps the module-class `$` suffix for an `object` subquery, which would only confuse
+      // the reader), regardless of `doc`'s own internal structure; otherwise it's this splice's own
+      // enclosing operation or fragment.
+      val declarationSite: String =
+        enclosingSubquery.fold(sitesByIndex.getOrElse(i, "operation"))(cls =>
+          s"subquery [${cls.name.stripSuffix("$")}]"
+        )
+
+      variableDefsOf(argTpe).foreach { required =>
         val ownerName    = arg.asTerm.tpe.typeSymbol.name.stripSuffix("$")
         val requiredVars = parseVariableDefs(required, ownerName, arg.asTerm.pos)
         requiredVars.foreach { case (name, reqType) =>

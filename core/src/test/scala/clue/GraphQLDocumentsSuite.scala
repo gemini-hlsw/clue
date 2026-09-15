@@ -26,24 +26,24 @@ class GraphQLDocumentsSuite extends munit.FunSuite {
     assertEquals(GraphQLDocuments.placeholderDocument(List("query { hero }")), "query { hero }")
   }
 
-  test("placeholderDocument with one splice joins with a placeholder selection") {
+  test("placeholderDocument with one splice joins with an indexed placeholder selection") {
     assertEquals(
       GraphQLDocuments.placeholderDocument(List("query (", ") { hero }")),
-      "query ( { __typename } ) { hero }"
+      "query ( { clue_splice_0: __typename } ) { hero }"
     )
   }
 
-  test("placeholderDocument with two splices joins with a placeholder selection each") {
+  test("placeholderDocument with two splices joins with an indexed placeholder selection each") {
     assertEquals(
       GraphQLDocuments.placeholderDocument(List("a", "b", "c")),
-      "a { __typename } b { __typename } c"
+      "a { clue_splice_0: __typename } b { clue_splice_1: __typename } c"
     )
   }
 
   test("placeholderDocument unescapes $$ in every part") {
     assertEquals(
       GraphQLDocuments.placeholderDocument(List("has $$ep", "trailing $$id")),
-      "has $ep { __typename } trailing $id"
+      "has $ep { clue_splice_0: __typename } trailing $id"
     )
   }
 
@@ -99,5 +99,66 @@ class GraphQLDocumentsSuite extends munit.FunSuite {
 
   test("usableAs: [ID] declared, [ID!] required is false") {
     assert(!GraphQLDocuments.usableAs(tpe("[ID]"), tpe("[ID!]")))
+  }
+
+  test("usableAs: [ID!]! declared, [ID]! required is true (recurses through NonNull)") {
+    assert(GraphQLDocuments.usableAs(tpe("[ID!]!"), tpe("[ID]!")))
+  }
+
+  test("usableAs: [ID!] declared, [ID!] required is true") {
+    assert(GraphQLDocuments.usableAs(tpe("[ID!]"), tpe("[ID!]")))
+  }
+
+  test("usableAs: [[ID!]!]! declared, [[ID]] required is true (recurses through nested lists)") {
+    assert(GraphQLDocuments.usableAs(tpe("[[ID!]!]!"), tpe("[[ID]]")))
+  }
+
+  test("usableAs: ID! declared, [ID] required is false (scalar can't satisfy a list)") {
+    assert(!GraphQLDocuments.usableAs(tpe("ID!"), tpe("[ID]")))
+  }
+
+  test("usableAs: [ID] declared, ID required is false (list can't satisfy a scalar)") {
+    assert(!GraphQLDocuments.usableAs(tpe("[ID]"), tpe("ID")))
+  }
+
+  // spliceScopes
+
+  test("spliceScopes: a splice in a single operation sees that operation's variables") {
+    val doc    = parseDoc("query ($ep: Episode!) { hero { clue_splice_0: __typename } }")
+    val scopes = GraphQLDocuments.spliceScopes(doc)
+    assertEquals(scopes(0).keySet, Set("ep"))
+    assertEquals(scopes(0)("ep").name, "Episode!")
+  }
+
+  test("spliceScopes: two operations each see only their own splice's own variables") {
+    val doc    = parseDoc(
+      "query A($ep: Episode!) { clue_splice_0: __typename } " +
+        "query B($id: ID!) { clue_splice_1: __typename }"
+    )
+    val scopes = GraphQLDocuments.spliceScopes(doc)
+    assertEquals(scopes(0).keySet, Set("ep"))
+    assertEquals(scopes(1).keySet, Set("id"))
+  }
+
+  test(
+    "spliceScopes: a splice inside a fragment is in scope when every operation declares the variable identically"
+  ) {
+    val doc    = parseDoc(
+      "query A($ep: Episode!) { hero { ...f } } query B($ep: Episode!) { hero { ...f } } " +
+        "fragment f on Character { clue_splice_0: __typename }"
+    )
+    val scopes = GraphQLDocuments.spliceScopes(doc)
+    assertEquals(scopes(0).keySet, Set("ep"))
+  }
+
+  test(
+    "spliceScopes: a splice inside a fragment is out of scope when only one operation declares the variable"
+  ) {
+    val doc    = parseDoc(
+      "query A($ep: Episode!) { hero { ...f } } query B { hero { ...f } } " +
+        "fragment f on Character { clue_splice_0: __typename }"
+    )
+    val scopes = GraphQLDocuments.spliceScopes(doc)
+    assertEquals(scopes(0).keySet, Set.empty[String])
   }
 }
