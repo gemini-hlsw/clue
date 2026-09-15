@@ -14,6 +14,10 @@ import io.circe.Decoder
  * member (parenthesized var-defs, operation-header syntax). The member is not declared here: absent
  * means the subquery references no variables. It is read by name — syntactically by the generator,
  * and at compile time by the `gql` interpolator, which checks it against every splice site.
+ *
+ * A subquery is self-contained: it is validated standalone against its root type, so it cannot
+ * spread fragments defined by the document that splices it (nor define fragments itself). The
+ * `gql` unused-fragment warning relies on this: it only looks at the splicing document's own text.
  */
 abstract class GraphQLSubquery[S] extends GraphQLTextSyntax {
   type Data

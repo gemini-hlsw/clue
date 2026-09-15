@@ -210,13 +210,10 @@ trait QueryGen extends Generator {
     val fragMap  = fragments.map(f => f.name -> f).toMap
 
     for {
-      // `reportUnused = false`: grackle's unused detection is unreliable — its `collectValueRefs`
-      // overwrites instead of accumulating variable refs (`loop(values, Set(nme))`), so when one
-      // value holds several variables (e.g. an input object with multiple `$var` fields) all but the
-      // last are falsely reported as unused. Note that re-enabling it would also need an exemption
-      // for subqueries: a subquery legitimately declares variables that only a subquery it splices
-      // uses, and a splice is rendered as `__typename` here (see [[InterpolatedGql.render]]).
-      // TODO Re-enable unused detection when grackle releases the bug fix for `collectValueRefs`.
+      // `reportUnused = false`: unused variables/fragments are reported by the `gql` macro at compile
+      // time instead (see `GraphQLInterpolator`). Grackle can't do it here for documents that splice
+      // subqueries: a splice is rendered as `__typename` (see [[InterpolatedGql.render]]), so the
+      // variables the host declares for its spliced children would be falsely reported.
       _ <- Result.fromProblems(
              compiler.validateVariablesAndFragments(operations, fragments, reportUnused = false)
            )

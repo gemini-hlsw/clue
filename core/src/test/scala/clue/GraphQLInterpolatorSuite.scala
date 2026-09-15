@@ -97,3 +97,25 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
     assertEquals(doc.value, "query ($ep: Episode!) { friends { hero(episode: $ep) { name } } }")
   }
 }
+
+// The unused-declaration checks are warnings, which `compileErrors` can't observe, so the text
+// scanning behind them is unit-tested in `GraphQLTextSuite`. These only pin the positive cases
+// through the macro: with fatal warnings on (CI), a false positive here fails the build.
+class GraphQLInterpolatorUnusedSuite extends munit.FunSuite {
+
+  test("a variable used only by a spliced subquery is not reported") {
+    val doc = gql"query ($$ep: Episode!) $InterpolatorTestSub"
+    assertEquals(doc.value, "query ($ep: Episode!) { hero(episode: $ep) { name } }")
+  }
+
+  test("a variable used in the text is not reported") {
+    val doc = gql"query ($$id: ID!) { character(id: $$id) { name } }"
+    assertEquals(doc.value, "query ($id: ID!) { character(id: $id) { name } }")
+  }
+
+  test("a spread fragment is not reported, and an inline fragment is not a spread") {
+    val doc =
+      gql"query { hero { ...fields ... on Droid { primaryFunction } } } fragment fields on Character { id }"
+    assert(doc.value.contains("fragment fields"))
+  }
+}
