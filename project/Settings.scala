@@ -12,7 +12,6 @@ object Settings {
     val fs2                    = "3.14.0"
     val grackle                = "0.30.0"
     val http4s                 = "0.23.37"
-    val http4sDom              = "0.2.7"
     val http4sJDKClient        = "0.10.0"
     val jawn                   = "1.3.2"
     val kittens                = "3.5.0"
@@ -89,12 +88,6 @@ object Settings {
     val Http4sClient = Def.setting(
       Seq(
         "org.http4s" %%% "http4s-client" % http4s
-      )
-    )
-
-    val Http4sDom = Def.setting(
-      Seq(
-        "org.http4s" %%% "http4s-dom" % http4sDom
       )
     )
 
