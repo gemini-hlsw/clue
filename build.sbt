@@ -1,12 +1,18 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
+lazy val scala3 = "3.8.4"
+
 ThisBuild / tlBaseVersion     := "0.59"
 Global / onChangedBuildSource := ReloadOnSourceChanges
+
+// sbt 2.0.8 runs on Scala 3.8.4, and `sbt-clue` has to match it.
+ThisBuild / scalaVersion       := scala3
+ThisBuild / crossScalaVersions := List(scala3)
 
 // The CI matrix covers Scala 3 only, which builds `sbt-clue` for sbt 2.x. Run the scripted tests
 // of the sbt 1.x cross-build (Scala 2.12) in a separate step.
 ThisBuild / githubWorkflowBuild += WorkflowStep.Sbt(
-  List("++ 2.12.20", "sbtPlugin/test"),
+  List("++ 2.12.20; sbtPlugin/scripted"),
   name = Some("Test the sbt plugin against sbt 1.x"),
   cond = Some("matrix.project == 'rootJVM'")
 )
@@ -50,9 +56,6 @@ lazy val root = tlCrossRootProject
     genOutput,
     genTests,
     sbtPlugin
-  )
-  .settings(
-    name := "clue"
   )
 
 lazy val model =
@@ -199,6 +202,8 @@ lazy val genTests =
     .enablePlugins(ScalafixTestkitPlugin, NoPublishPlugin)
     .disablePlugins(ScalafixPlugin)
     .settings(
+      // The rule is built for Scala 2.13 (scalafix runs on 2.13) but the testkit suite is Scala 3.
+      allowMismatchScala                     := true,
       libraryDependencies ~= (_.filterNot(_.name == "scalafix-testkit")),
       libraryDependencies ++= Settings.Libraries.ScalaFixTestkit.value
         .map(_.cross(CrossVersion.constant(V.scala213))),
@@ -217,12 +222,12 @@ lazy val sbtPlugin =
     .settings(
       moduleName                           := "sbt-clue",
       scalaVersion                         := "2.12.20",
-      crossScalaVersions                   := List("2.12.20", "3.8.4"),
+      crossScalaVersions                   := List("2.12.20", scala3),
       scalacOptions                        := Nil,
       (pluginCrossBuild / sbtVersion)      := {
         scalaBinaryVersion.value match {
           case "2.12" => "1.13.0"
-          case _      => "2.0.7"
+          case _      => "2.0.8"
         }
       },
       addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"     % V.scalafixVersion),
@@ -251,8 +256,6 @@ lazy val sbtPlugin =
         "coreModule"  -> (core.jvm / moduleName).value
       ),
       buildInfoOptions += BuildInfoOption.PackagePrivate,
-      Test / test                          :=
-        scripted.toTask("").value,
       scripted                             := scripted
         .dependsOn(
           genRules / publishLocal,
