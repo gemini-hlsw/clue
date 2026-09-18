@@ -66,6 +66,24 @@ trait QueryGen extends Generator {
         tpe
     }
 
+  // A spliced subquery is rendered as this placeholder selection, the index identifying which
+  // `subqueries(i)` it stands for. `__typename` keeps it a legal selection on any object, interface
+  // or union, so the host document still typechecks against the schema. The placeholder is internal
+  // to this generator: at runtime `gql` splices the subquery's own text, so it never reaches a
+  // server. The prefix is deliberately unlikely to collide with a real alias, and an alias that
+  // doesn't match it exactly is treated as an ordinary field rather than a broken splice.
+  private def splicePlaceholder(i: Int): String = s"{ clue_splice_$i: __typename }"
+  private val SpliceAlias                       = """clue_splice_(\d+)""".r
+
+  // Matches a placeholder selection, yielding the splice index it stands for.
+  private object Splice {
+    def unapply(q: Query): Option[Int] =
+      q match {
+        case Query.UntypedSelect(TypeSelect, Some(SpliceAlias(i)), _, _, _) => Some(i.toInt)
+        case _                                                              => None
+      }
+  }
+
   case class InterpolatedGql(parts: List[GqlPart]) {
     def render: String = parts
       .traverse {
@@ -75,7 +93,7 @@ trait QueryGen extends Generator {
           // the index (so codegen can map it back to `subqueries(i)`), while `__typename` is a
           // valid selection on any object/interface/union, so the host document also typechecks
           // against the schema. The spliced subquery itself is validated at its definition site.
-          State.inspect[Int, String](i => s"{ subquery$i: __typename }") <* State.modify(_ + 1)
+          State.inspect[Int, String](splicePlaceholder) <* State.modify(_ + 1)
       }
       .runA(0)
       .value
@@ -230,9 +248,9 @@ trait QueryGen extends Generator {
                _        <- Result.fromProblems(
                              validateTypenameSelections(schema, fragMap, rootType, op.query)
                            )
-               // A spliced subquery (rendered as `{ subqueryN: __typename }`, see
-               // InterpolatedGql.render) is only recognized by `resolveData` as the whole
-               // selection set of a field; anywhere else it silently fails to splice.
+               // A spliced subquery (rendered as a placeholder selection, see `splicePlaceholder`)
+               // is only recognized by `resolveData` as the whole selection set of a field;
+               // anywhere else it silently fails to splice.
                _        <- Result.fromProblems(validateSubqueryPlacement(fragMap, op.query))
                _        <- phases
                              .foldLeftM(op.query)((acc, phase) =>
@@ -494,11 +512,11 @@ trait QueryGen extends Generator {
     check(selectionsOf(query), rootType.some)
   }
 
-  // A subquery is spliced by rendering it as `{ subqueryN: __typename }` (see
-  // `InterpolatedGql.render`); `resolveData` only recognizes it in that shape when it is the
-  // *whole* selection set of a field (`UntypedSelect(_, _, _, _, UntypedSelect(_, Some(alias), ...))`
-  // with `alias` starting with "subquery"). Anywhere else — inside a fragment (inline or spread),
-  // or alongside sibling selections in a `Group` — it silently fails to splice, so report it.
+  // A subquery is spliced by rendering it as a placeholder selection (see `splicePlaceholder`);
+  // `resolveData` only recognizes it in that shape when it is the *whole* selection set of a field
+  // (`UntypedSelect(_, _, _, _, UntypedSelect(_, Some(alias), ...))` with `alias` matching
+  // `SpliceAlias`). Anywhere else — inside a fragment (inline or spread), or alongside sibling
+  // selections in a `Group` — it silently fails to splice, so report it.
   private val subqueryPlacementMessage: String =
     "A subquery can only be spliced as the whole selection set of a field (`field $Subquery`), " +
       "not inside a fragment or next to other selections. Splice it on a field of the " +
@@ -508,11 +526,7 @@ trait QueryGen extends Generator {
     fragments: Map[String, UntypedFragment],
     query:     Query
   ): List[Problem] = {
-    def isSubqueryMarker(q: Query): Boolean =
-      q match {
-        case Query.UntypedSelect(TypeSelect, Some(alias), _, _, _) => alias.startsWith("subquery")
-        case _                                                     => false
-      }
+    def isSubqueryMarker(q: Query): Boolean = Splice.unapply(q).isDefined
 
     // `wholeChild` is true exactly when `q` is the entire (unwrapped) selection set of a field;
     // that's the only legal position for a subquery marker.
@@ -769,13 +783,7 @@ trait QueryGen extends Generator {
       currentType:    Option[GType]
     ): ClassAccumulator =
       currentAlgebra match {
-        case UntypedSelect(
-              name,
-              alias,
-              _,
-              directives,
-              UntypedSelect(TypeSelect, Some(subAlias), _, _, _)
-            ) if subAlias.startsWith("subquery") =>
+        case UntypedSelect(name, alias, _, directives, Splice(i)) =>
           val isConditional: Boolean = hasConditionalDirective(directives)
 
           val param = MetaTypes
@@ -785,8 +793,6 @@ trait QueryGen extends Generator {
               // Unreachable: validateParsed already verified this field exists on the schema.
               throw new Exception(s"Could not resolve type for validated field [$name]")
             ) { nextType =>
-              val i = subAlias.substring("subquery".length).toInt
-
               val subquery: Term.Ref = subqueries(i) match {
                 case Term.Block((q: Term.Ref) :: Nil) => q
                 case q: Term.Ref                      => q
@@ -804,7 +810,7 @@ trait QueryGen extends Generator {
             }
 
           ClassAccumulator(parAccum = List(param))
-        case UntypedSelect(name, alias, _, directives, child) =>
+        case UntypedSelect(name, alias, _, directives, child)     =>
           val paramName: String = alias.getOrElse(name)
 
           // A field with an @include or @skip directive may be absent from the response, so it
@@ -849,15 +855,15 @@ trait QueryGen extends Generator {
                 )
               )
             }
-        case UntypedInlineFragment(_, _, _)                   =>
+        case UntypedInlineFragment(_, _, _)                       =>
           // grackle's parser collapses a selection set with a single inline fragment to a bare
           // node instead of wrapping it in a `Group`, so route it through the same
           // flatten-and-classify logic as the `Group` case below (it may itself be a variant).
           go(Group(List(currentAlgebra)), currentType)
-        case UntypedFragmentSpread(_, _)                      =>
+        case UntypedFragmentSpread(_, _)                          =>
           // Same reasoning as the bare-inline-fragment case above.
           go(Group(List(currentAlgebra)), currentType)
-        case Group(selections)                                =>
+        case Group(selections)                                    =>
           // Normalize named-fragment spreads to inline fragments and unwrap same-type fragments
           // (grouping only, e.g. for `@include`) into a flat, ordered list of base-level selects
           // and variant inline fragments (fragments on a proper subtype of `currentType`). See
@@ -1010,8 +1016,8 @@ trait QueryGen extends Generator {
                 ).some
               )
           }
-        case Empty                                            => ClassAccumulator()
-        case _                                                =>
+        case Empty                                                => ClassAccumulator()
+        case _                                                    =>
           throw new Exception(
             s"Unhandled Algebra: [$currentAlgebra] - Current Type: [$currentType]"
           )
