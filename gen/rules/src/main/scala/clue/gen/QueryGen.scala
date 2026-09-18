@@ -464,12 +464,16 @@ trait QueryGen extends Generator {
       }.distinct
 
       // Whether each base-level `__typename` select is conditional: directly guarded by
-      // `@skip`/`@include`, or unwrapped from a same-type fragment/spread that was.
+      // `@skip`/`@include`, or unwrapped from a same-type fragment/spread that was. A spliced
+      // subquery's placeholder is an aliased `__typename` too (see [[splicePlaceholder]]), but it
+      // stands for the subquery's own selection and says nothing about this type, so it must not
+      // pass as the discriminator.
       val typenames: List[Boolean] = flat.collect {
-        case FlatSelection(None,
-                           Query.UntypedSelect(TypeSelect, _, _, directives, _),
-                           conditional
-            ) =>
+        case FlatSelection(
+              None,
+              sel @ Query.UntypedSelect(TypeSelect, _, _, directives, _),
+              conditional
+            ) if Splice.unapply(sel).isEmpty =>
           conditional || hasConditionalDirective(directives)
       }
 
@@ -1134,7 +1138,10 @@ trait QueryGen extends Generator {
               val (discriminatorKey, discriminatorIsAliased): (String, Boolean) =
                 flatSelections
                   .collectFirst {
-                    case FlatSelection(None, UntypedSelect(TypeSelect, alias, _, _, _), _) =>
+                    // A splice placeholder is an aliased `__typename` but not a discriminator, the
+                    // same exclusion `validateTypenameSelections` makes.
+                    case FlatSelection(None, sel @ UntypedSelect(TypeSelect, alias, _, _, _), _)
+                        if Splice.unapply(sel).isEmpty =>
                       (alias.getOrElse(TypeSelect), alias.isDefined)
                   }
                   .getOrElse(
