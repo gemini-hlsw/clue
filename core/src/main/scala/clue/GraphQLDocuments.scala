@@ -188,4 +188,143 @@ private[clue] object GraphQLDocuments {
       case (Ast.Type.List(_), _) | (_, Ast.Type.List(_)) => false
       case (d, r)                                        => d == r
     }
+
+  // Every variable `v` references, recursing into list/object values (a variable can appear nested
+  // inside either, e.g. `filter: { ids: [$a, $b] }`).
+  private def variablesIn(v: Ast.Value): Set[String] =
+    v match {
+      case Ast.Value.Variable(name)      => Set(name.value)
+      case Ast.Value.ListValue(values)   => values.flatMap(variablesIn).toSet
+      case Ast.Value.ObjectValue(fields) => fields.flatMap { case (_, fv) => variablesIn(fv) }.toSet
+      case _                             => Set.empty
+    }
+
+  private def variablesInArgs(args: List[(Ast.Name, Ast.Value)]): Set[String] =
+    args.flatMap { case (_, v) => variablesIn(v) }.toSet
+
+  private def variablesInDirectives(directives: List[Ast.Directive]): Set[String] =
+    directives.flatMap(d => variablesInArgs(d.arguments)).toSet
+
+  // What a definition's own selection set (not descending into a spread fragment's own body)
+  // references: the variables mentioned in any field/directive argument, and the names of every
+  // fragment spread anywhere inside it (however deeply nested), which is what a transitive-usage
+  // walk needs to follow.
+  private def selectionRefs(selections: List[Ast.Selection]): (Set[String], Set[String]) =
+    selections.foldLeft((Set.empty[String], Set.empty[String])) { case ((vars, frags), sel) =>
+      sel match {
+        case f: Ast.Selection.Field          =>
+          val (childVars, childFrags) = selectionRefs(f.selectionSet)
+          (vars ++ variablesInArgs(f.arguments) ++ variablesInDirectives(f.directives) ++ childVars,
+           frags ++ childFrags
+          )
+        case i: Ast.Selection.InlineFragment =>
+          val (childVars, childFrags) = selectionRefs(i.selectionSet)
+          (vars ++ variablesInDirectives(i.directives) ++ childVars, frags ++ childFrags)
+        case s: Ast.Selection.FragmentSpread =>
+          (vars ++ variablesInDirectives(s.directives), frags + s.name.value)
+      }
+    }
+
+  // What a definition (operation or fragment) references directly: its own variables/fragment
+  // spreads (`selectionRefs`), the variables in its own directives (an operation's `query (...)
+  // @dir(...)` or a fragment definition's `fragment f on T @dir(...)`), plus the splice indices
+  // found in its own selection set.
+  private case class DefinitionRefs(
+    variables: Set[String],
+    fragments: Set[String],
+    splices:   Set[Int]
+  )
+
+  private def definitionRefs(
+    directives: List[Ast.Directive],
+    selections: List[Ast.Selection]
+  ): DefinitionRefs = {
+    val (vars, frags) = selectionRefs(selections)
+    DefinitionRefs(vars ++ variablesInDirectives(directives),
+                   frags,
+                   spliceIndices(selections).toSet
+    )
+  }
+
+  /**
+   * Variables an operation declares but never uses, per GraphQL's "All Variables Used". A variable
+   * counts as used when the operation references it, when a fragment the operation transitively
+   * spreads references it, or when a subquery spliced inside either requires it
+   * (`spliceRequirements`, keyed by splice index as embedded by `placeholderDocument`). Returns
+   * (operation label, variable name) pairs, the label matching `spliceSites`' wording (`operation
+   * [Name]` / `operation`), in document order.
+   */
+  def unusedVariables(
+    doc:                Ast.Document,
+    spliceRequirements: Map[Int, Set[String]]
+  ): List[(String, String)] = {
+    val fragmentRefs: Map[String, DefinitionRefs] =
+      doc.collect { case fd: Ast.FragmentDefinition =>
+        fd.name.value -> definitionRefs(fd.directives, fd.selectionSet)
+      }.toMap
+
+    // The variables `refs` and everything it transitively spreads (guarded against cycles) counts
+    // as using, including what any splice inside requires.
+    def usedBy(refs: DefinitionRefs, visited: Set[String]): Set[String] = {
+      val direct =
+        refs.variables ++ refs.splices.flatMap(spliceRequirements.getOrElse(_, Set.empty))
+      refs.fragments.foldLeft(direct) { (acc, name) =>
+        if (visited(name)) acc
+        else
+          fragmentRefs.get(name) match {
+            case Some(fr) => acc ++ usedBy(fr, visited + name)
+            case None     => acc
+          }
+      }
+    }
+
+    doc
+      .collect { case op: Ast.OperationDefinition.Operation => op }
+      .flatMap { op =>
+        val used  = usedBy(definitionRefs(op.directives, op.selectionSet), Set.empty)
+        val label = op.name.fold("operation")(n => s"operation [${n.value}]")
+        op.variables.map(_.name.value).filterNot(used).map(label -> _)
+      }
+      .distinct
+  }
+
+  /**
+   * Every variable `doc` references: directly, through any fragment it defines, or through a
+   * subquery it splices. A subquery declares its variables in `type VariableDefs` rather than in
+   * the document, so subtracting this from the declared set finds the unused ones. Fragment
+   * reachability is not considered here (a reference from an unspread fragment still counts), which
+   * can only under-report.
+   */
+  def referencedVariables(
+    doc:                Ast.Document,
+    spliceRequirements: Map[Int, Set[String]]
+  ): Set[String] = {
+    val refs: List[DefinitionRefs] = doc.collect {
+      case op: Ast.OperationDefinition.Operation      => definitionRefs(op.directives, op.selectionSet)
+      case qs: Ast.OperationDefinition.QueryShorthand => definitionRefs(Nil, qs.selectionSet)
+      case fd: Ast.FragmentDefinition                 => definitionRefs(fd.directives, fd.selectionSet)
+    }
+    refs.foldLeft(Set.empty[String]) { (acc, r) =>
+      acc ++ r.variables ++ r.splices.flatMap(spliceRequirements.getOrElse(_, Set.empty))
+    }
+  }
+
+  /**
+   * Fragments defined in `doc` but never spread anywhere in it ("Fragments Must Be Used").
+   *
+   * Known false negative (unchanged from before the rebase): this is "defined minus spread", with
+   * no reachability step from an operation. A closed cycle of fragments that spread each other but
+   * that nothing else spreads (e.g. `fragment a { ...b } fragment b { ...a }`, neither reachable
+   * from any operation) is therefore not reported. Deliberately not implemented.
+   */
+  def unusedFragments(doc: Ast.Document): List[String] = {
+    val defined: List[String] = doc.collect { case fd: Ast.FragmentDefinition => fd.name.value }
+    val spread: Set[String]   = doc.flatMap {
+      case op: Ast.OperationDefinition.Operation      => selectionRefs(op.selectionSet)._2
+      case qs: Ast.OperationDefinition.QueryShorthand => selectionRefs(qs.selectionSet)._2
+      case fd: Ast.FragmentDefinition                 => selectionRefs(fd.selectionSet)._2
+      case _                                          => Set.empty[String]
+    }.toSet
+    defined.filterNot(spread)
+  }
 }
