@@ -1,6 +1,4 @@
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.Def
-import sbt.librarymanagement._
+import sbt.*
 
 object Settings {
 
@@ -30,152 +28,152 @@ object Settings {
 
     val Cats = Def.setting(
       Seq(
-        "org.typelevel" %%% "cats-core" % cats
+        "org.typelevel" %% "cats-core" % cats
       )
     )
 
     val CatsEffect = Def.setting(
       Seq(
-        "org.typelevel" %%% "cats-effect" % catsEffect
+        "org.typelevel" %% "cats-effect" % catsEffect
       )
     )
 
     val CatsTestkit = Def.setting(
       Seq(
-        "org.typelevel" %%% "cats-testkit" % cats % "test"
+        "org.typelevel" %% "cats-testkit" % cats % "test"
       )
     )
 
     val Circe = Def.setting(
       Seq(
-        "io.circe" %%% "circe-core",
-        "io.circe" %%% "circe-generic",
-        "io.circe" %%% "circe-parser",
-        "io.circe" %%% "circe-testing"
+        "io.circe" %% "circe-core",
+        "io.circe" %% "circe-generic",
+        "io.circe" %% "circe-parser",
+        "io.circe" %% "circe-testing"
       ).map(_ % circe)
     )
 
     val DisciplineMUnit = Def.setting(
       Seq[ModuleID](
-        "org.typelevel" %%% "discipline-munit" % disciplineMUnit % "test"
+        "org.typelevel" %% "discipline-munit" % disciplineMUnit % "test"
       )
     )
 
     val Fs2 = Def.setting(
       Seq(
-        "co.fs2" %%% "fs2-core" % fs2
+        "co.fs2" %% "fs2-core" % fs2
       )
     )
 
     val Grackle = Def.setting(
       Seq(
-        "org.typelevel" %%% "grackle-core" % grackle
+        "org.typelevel" %% "grackle-core" % grackle
       )
     )
 
     val Http4sCirce = Def.setting(
       Seq(
-        "org.http4s" %%% "http4s-circe" % http4s
+        "org.http4s" %% "http4s-circe" % http4s
       )
     )
 
     val Http4sCore = Def.setting(
       Seq(
-        "org.http4s" %%% "http4s-core" % http4s
+        "org.http4s" %% "http4s-core" % http4s
       )
     )
 
     val Http4sClient = Def.setting(
       Seq(
-        "org.http4s" %%% "http4s-client" % http4s
+        "org.http4s" %% "http4s-client" % http4s
       )
     )
 
     val Http4sJDKClient = Def.setting(
       Seq(
-        "org.http4s" %%% "http4s-jdk-http-client" % http4sJDKClient
+        "org.http4s" %% "http4s-jdk-http-client" % http4sJDKClient
       )
     )
 
     val Jawn = Def.setting(
       Seq(
-        "org.typelevel" %%% "jawn-ast" % jawn
+        "org.typelevel" %% "jawn-ast" % jawn
       )
     )
 
     val Kittens = Def.setting(
       Seq(
-        "org.typelevel" %%% "kittens" % kittens
+        "org.typelevel" %% "kittens" % kittens
       )
     )
 
     val Log4Cats = Def.setting(
       Seq(
-        "org.typelevel" %%% "log4cats-core"    % log4Cats,
-        "org.typelevel" %%% "log4cats-testing" % log4Cats % "test"
+        "org.typelevel" %% "log4cats-core"    % log4Cats,
+        "org.typelevel" %% "log4cats-testing" % log4Cats % "test"
       )
     )
 
     val Monocle = Def.setting(
       Seq(
-        "dev.optics" %%% "monocle-core"  % monocle,
-        "dev.optics" %%% "monocle-macro" % monocle
+        "dev.optics" %% "monocle-core"  % monocle,
+        "dev.optics" %% "monocle-macro" % monocle
       )
     )
 
     val MonocleLaw = Def.setting(
       Seq(
-        "dev.optics" %%% "monocle-law" % monocle
+        "dev.optics" %% "monocle-law" % monocle
       )
     )
 
     val MUnit = Def.setting(
       Seq[ModuleID](
-        "org.scalameta" %%% "munit" % munit % "test"
+        "org.scalameta" %% "munit" % munit % "test"
       )
     )
 
     val MUnitCatsEffect = Def.setting(
       Seq[ModuleID](
-        "org.typelevel" %%% "munit-cats-effect" % munitCatsEffect % "test"
+        "org.typelevel" %% "munit-cats-effect" % munitCatsEffect % "test"
       )
     )
 
     val Otel4s = Def.setting(
       Seq(
-        "org.typelevel" %%% "otel4s-core"                 % otel4s,
-        "org.typelevel" %%% "otel4s-semconv"              % otel4s,
-        "org.typelevel" %%% "otel4s-semconv-experimental" % otel4s
+        "org.typelevel" %% "otel4s-core"                 % otel4s,
+        "org.typelevel" %% "otel4s-semconv"              % otel4s,
+        "org.typelevel" %% "otel4s-semconv-experimental" % otel4s
       )
     )
 
     val Otel4sTestkit = Def.setting(
       Seq(
-        "org.typelevel" %%% "otel4s-sdk-testkit" % otel4s % "test"
+        "org.typelevel" %% "otel4s-sdk-testkit" % otel4s % "test"
       )
     )
 
     val Http4sOtel4sMiddleware = Def.setting(
       Seq(
-        "org.http4s" %%% "http4s-otel4s-middleware-trace-client" % http4sOtel4sMiddleware
+        "org.http4s" %% "http4s-otel4s-middleware-trace-client" % http4sOtel4sMiddleware
       )
     )
 
     val ScalaFix = Def.setting(
       Seq(
-        "ch.epfl.scala" %%% "scalafix-core" % scalaFix
+        "ch.epfl.scala" %% "scalafix-core" % scalaFix
       )
     )
 
     val ScalaFixTestkit = Def.setting(
       Seq(
-        "ch.epfl.scala" %%% "scalafix-testkit" % scalaFix % "test"
+        "ch.epfl.scala" %% "scalafix-testkit" % scalaFix % "test"
       ).map(_.cross(CrossVersion.full))
     )
 
     val ScalaJsDom = Def.setting(
       Seq(
-        "org.scala-js" %%% "scalajs-dom" % scalaJsDom
+        "org.scala-js" %% "scalajs-dom" % scalaJsDom
       )
     )
 
