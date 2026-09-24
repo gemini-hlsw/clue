@@ -161,4 +161,119 @@ class GraphQLDocumentsSuite extends munit.FunSuite {
     val scopes = GraphQLDocuments.spliceScopes(doc)
     assertEquals(scopes(0).keySet, Set.empty[String])
   }
+
+  // unusedVariables
+
+  test("unusedVariables: a declared, unreferenced variable is reported; a referenced one is not") {
+    val doc = parseDoc("query ($used: ID!, $unused: ID!) { character(id: $used) { name } }")
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map.empty), List("operation" -> "unused"))
+  }
+
+  test("unusedVariables: a variable referenced only inside a directive argument counts as used") {
+    val doc = parseDoc("query ($x: Boolean!) { hero { name @include(if: $x) } }")
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map.empty), Nil)
+  }
+
+  test(
+    "unusedVariables: a variable referenced only inside a nested list/object argument value counts as used"
+  ) {
+    val doc = parseDoc("query ($id: ID!) { humans(filter: {ids: [$id]}) { name } }")
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map.empty), Nil)
+  }
+
+  test(
+    "unusedVariables: a variable referenced only inside a spread fragment counts as used, including one level of fragment-to-fragment spreading"
+  ) {
+    val doc = parseDoc(
+      "query ($ep: Episode!) { hero { ...f1 } } " +
+        "fragment f1 on Character { ...f2 } " +
+        "fragment f2 on Character { friends(episode: $ep) { name } }"
+    )
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map.empty), Nil)
+  }
+
+  test(
+    "unusedVariables: with two operations, a variable declared by A and used only by B is reported against A"
+  ) {
+    val doc = parseDoc(
+      "query A($id: ID!) { hero } query B($id: ID!) { character(id: $id) { name } }"
+    )
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map.empty), List("operation [A]" -> "id"))
+  }
+
+  test("unusedVariables: a variable required by a spliced subquery counts as used") {
+    val doc = parseDoc("query ($ep: Episode!) { hero { clue_splice_0: __typename } }")
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map(0 -> Set("ep"))), Nil)
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map.empty), List("operation" -> "ep"))
+  }
+
+  test(
+    "unusedVariables: a variable referenced only in an operation-level directive counts as used"
+  ) {
+    val doc = parseDoc("query ($cond: Boolean!) @live(if: $cond) { hero { name } }")
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map.empty), Nil)
+  }
+
+  test(
+    "unusedVariables: a variable referenced only in a fragment-definition directive counts as used"
+  ) {
+    val doc = parseDoc(
+      "query ($cond: Boolean!) { hero { ...f } } fragment f on Character @include(if: $cond) { name }"
+    )
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map.empty), Nil)
+  }
+
+  test("unusedVariables: a duplicate variable declaration yields one warning, not two") {
+    val doc = parseDoc("query ($a: ID!, $a: ID!) { hero }")
+    assertEquals(GraphQLDocuments.unusedVariables(doc, Map.empty), List("operation" -> "a"))
+  }
+
+  // referencedVariables
+
+  test("referencedVariables: picks up a reference from the selection set") {
+    val doc = parseDoc("{ character(id: $id) { name } }")
+    assertEquals(GraphQLDocuments.referencedVariables(doc, Map.empty), Set("id"))
+  }
+
+  test("referencedVariables: picks up a reference from a fragment definition") {
+    val doc = parseDoc(
+      "{ hero { ...f } } fragment f on Character { friends(episode: $ep) { name } }"
+    )
+    assertEquals(GraphQLDocuments.referencedVariables(doc, Map.empty), Set("ep"))
+  }
+
+  test("referencedVariables: picks up a reference from a directive") {
+    val doc = parseDoc("{ hero { name @include(if: $x) } }")
+    assertEquals(GraphQLDocuments.referencedVariables(doc, Map.empty), Set("x"))
+  }
+
+  test("referencedVariables: picks up a reference from spliceRequirements") {
+    val doc = parseDoc("{ hero { clue_splice_0: __typename } }")
+    assertEquals(GraphQLDocuments.referencedVariables(doc, Map(0 -> Set("ep"))), Set("ep"))
+    assertEquals(GraphQLDocuments.referencedVariables(doc, Map.empty), Set.empty[String])
+  }
+
+  // unusedFragments
+
+  test("unusedFragments: reports a fragment never spread") {
+    val doc = parseDoc("query { hero { name } } fragment f on Character { name }")
+    assertEquals(GraphQLDocuments.unusedFragments(doc), List("f"))
+  }
+
+  test("unusedFragments: does not report a fragment spread from an operation") {
+    val doc = parseDoc("query { hero { ...f } } fragment f on Character { name }")
+    assertEquals(GraphQLDocuments.unusedFragments(doc), Nil)
+  }
+
+  test("unusedFragments: does not report a fragment spread from another fragment") {
+    val doc = parseDoc(
+      "query { hero { ...f1 } } fragment f1 on Character { ...f2 } fragment f2 on Character { name }"
+    )
+    assertEquals(GraphQLDocuments.unusedFragments(doc), Nil)
+  }
+
+  test("unusedFragments: an inline fragment is not a spread") {
+    val doc = parseDoc("query { hero { ... on Droid { name } } } fragment f on Character { name }")
+    assertEquals(GraphQLDocuments.unusedFragments(doc), List("f"))
+  }
 }

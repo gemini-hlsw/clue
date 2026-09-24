@@ -108,11 +108,13 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
   }
 
   test("a fragment before the operation still sees the declared variables") {
+    // `f` is spread, so the document is complete GraphQL: a fragment that is never spread is a
+    // warning of its own, which would fail this build under fatal warnings.
     val doc =
-      gql"fragment f on Character { name } query ($$ep: Episode!) { hero $InterpolatorTestSub }"
+      gql"fragment f on Character { name } query ($$ep: Episode!, $$id: ID!) { character(id: $$id) { ...f } hero $InterpolatorTestSub }"
     assertEquals(
       doc.value,
-      "fragment f on Character { name } query ($ep: Episode!) { hero { hero(episode: $ep) { name } } }"
+      "fragment f on Character { name } query ($ep: Episode!, $id: ID!) { character(id: $id) { ...f } hero { hero(episode: $ep) { name } } }"
     )
   }
 
@@ -182,5 +184,46 @@ class GraphQLInterpolatorSuite extends munit.FunSuite {
   test("a deeply nested input value (six levels) compiles") {
     val doc = gql"query { f(l: {a:{b:{c:{d:{e:{f:1}}}}}}) }"
     assertEquals(doc.value, "query { f(l: {a:{b:{c:{d:{e:{f:1}}}}}}) }")
+  }
+}
+
+// The unused-declaration checks are warnings, which `compileErrors` can't observe, so the AST walk
+// behind them is unit-tested in `GraphQLDocumentsSuite`. These only pin the positive cases through
+// the macro: with fatal warnings on (CI), a false positive here fails the build.
+class GraphQLInterpolatorUnusedSuite extends munit.FunSuite {
+
+  test("a variable used only by a spliced subquery is not reported") {
+    val doc = gql"query ($$ep: Episode!) $InterpolatorTestSub"
+    assertEquals(doc.value, "query ($ep: Episode!) { hero(episode: $ep) { name } }")
+  }
+
+  test("a variable used in the text is not reported") {
+    val doc = gql"query ($$id: ID!) { character(id: $$id) { name } }"
+    assertEquals(doc.value, "query ($id: ID!) { character(id: $id) { name } }")
+  }
+
+  test("a spread fragment is not reported, and an inline fragment is not a spread") {
+    val doc =
+      gql"query { hero { ...fields ... on Droid { primaryFunction } } } fragment fields on Character { id }"
+    assert(doc.value.contains("fragment fields"))
+  }
+
+  test("a variable used only in an operation-level directive is not reported") {
+    val doc = gql"query ($$cond: Boolean!) @live(if: $$cond) { hero { name } }"
+    assertEquals(doc.value, "query ($cond: Boolean!) @live(if: $cond) { hero { name } }")
+  }
+
+  test("a variable used only in a fragment-definition directive is not reported") {
+    val doc =
+      gql"query ($$cond: Boolean!) { hero { ...f } } fragment f on Character @include(if: $$cond) { name }"
+    assertEquals(
+      doc.value,
+      "query ($cond: Boolean!) { hero { ...f } } fragment f on Character @include(if: $cond) { name }"
+    )
+  }
+
+  test("splicing a @GraphQLStub in an operation that declares a variable is not reported") {
+    val doc = gql"query ($$cond: Boolean!) { hero $InterpolatorTestStub }"
+    assertEquals(doc.value, s"query ($$cond: Boolean!) { hero $InterpolatorTestStub }")
   }
 }
