@@ -61,7 +61,12 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt +update
+        run: |
+          for attempt in 1 2 3; do
+            sbt +update +scalaCompilerBridgeBinaryJar && exit 0
+            [ "$attempt" = 3 ] || sleep 30
+          done
+          exit 1
 
       - name: Check that workflows are up to date
         run: sbt githubWorkflowCheck
@@ -143,7 +148,12 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt +update
+        run: |
+          for attempt in 1 2 3; do
+            sbt +update +scalaCompilerBridgeBinaryJar && exit 0
+            [ "$attempt" = 3 ] || sleep 30
+          done
+          exit 1
 
       - name: Download target directories (3, rootJS)
         uses: actions/download-artifact@v6
