@@ -20,7 +20,7 @@ object Settings {
     val munit                  = "1.3.6"
     val munitCatsEffect        = "2.2.1"
     val otel4s                 = "1.2.0"
-    val http4sOtel4sMiddleware = "0.19.0"
+    val http4sOtel4sMiddleware = "0.20.0"
     val scalaFix               = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJsDom             = "2.8.1"
   }
