@@ -7,7 +7,7 @@ import grackle.GraphQLParser
 import grackle.QueryParser
 
 package object gen {
-  private val config = GraphQLParser.defaultConfig.copy(maxInputValueDepth = 16)
+  private[gen] val config = GraphQLParser.defaultConfig.copy(maxInputValueDepth = 16)
 
   val GQLParser: QueryParser = QueryParser(GraphQLParser(config))
 }
