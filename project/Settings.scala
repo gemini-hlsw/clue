@@ -10,7 +10,7 @@ object Settings {
     val circe                  = "0.14.17"
     val disciplineMUnit        = "2.0.0"
     val fs2                    = "3.14.0"
-    val grackle                = "0.30.0"
+    val grackle                = "0.31.0"
     val http4s                 = "0.23.38"
     val http4sJDKClient        = "0.10.0"
     val jawn                   = "1.3.2"

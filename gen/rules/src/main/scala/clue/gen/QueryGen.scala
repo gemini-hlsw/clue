@@ -79,8 +79,8 @@ trait QueryGen extends Generator {
   private object Splice {
     def unapply(q: Query): Option[Int] =
       q match {
-        case Query.UntypedSelect(TypeSelect, Some(SpliceAlias(i)), _, _, _) => Some(i.toInt)
-        case _                                                              => None
+        case Query.UntypedSelect(TypeSelect, Some(SpliceAlias(i)), _, _, _, _) => Some(i.toInt)
+        case _                                                                 => None
       }
   }
 
@@ -180,7 +180,7 @@ trait QueryGen extends Generator {
     schema: Schema,
     vars:   List[Query.UntypedVarDef]
   ): List[InputValue] =
-    new QueryCompiler(GQLParser, schema, List.empty).compileVarDefs(vars).toOption.get
+    new QueryCompiler(GQLParser, schema, List.empty, config).compileVarDefs(vars).toOption.get
 
   // A `SelectElaborator` that performs grackle's standard schema typechecking and, additionally,
   // emits a warning whenever a selected field is `@deprecated`. This is how deprecation surfaces
@@ -217,7 +217,7 @@ trait QueryGen extends Generator {
     operations: List[UntypedOperation],
     fragments:  List[UntypedFragment]
   ): Result[Unit] = {
-    val compiler = new QueryCompiler(GQLParser, schema, List.empty)
+    val compiler = new QueryCompiler(GQLParser, schema, List.empty, config)
     val phases   =
       QueryCompiler.IntrospectionElaborator(QueryCompiler.IntrospectionLevel.Full).toList ++
         List(
@@ -333,7 +333,7 @@ trait QueryGen extends Generator {
 
     def go(q: Query, currentType: Option[GType]): Query.Vars =
       q match {
-        case Query.UntypedSelect(name, _, args, directives, child) =>
+        case Query.UntypedSelect(name, _, args, directives, child, _) =>
           val fieldArgs: List[InputValue] =
             currentType.flatMap(_.fieldInfo(name)).map(_.args).getOrElse(Nil)
           val argVars: Query.Vars         =
@@ -342,18 +342,18 @@ trait QueryGen extends Generator {
             }
           val next: Option[GType]         = currentType.flatMap(_.field(name)).flatMap(_.underlyingObject)
           argVars ++ fromDirectives(directives) ++ go(child, next)
-        case Query.UntypedInlineFragment(tpnme, directives, child) =>
+        case Query.UntypedInlineFragment(tpnme, directives, child)    =>
           fromDirectives(directives) ++ go(child,
                                            tpnme.flatMap(schema.definition).orElse(currentType)
           )
-        case Query.UntypedFragmentSpread(name, directives)         =>
+        case Query.UntypedFragmentSpread(name, directives)            =>
           fromDirectives(directives) ++
             fragMap
               .get(name)
               .fold(Map.empty[String, (GType, Value)])(f => go(f.child, schema.definition(f.tpnme)))
-        case Query.Group(queries)                                  =>
+        case Query.Group(queries)                                     =>
           queries.foldLeft(Map.empty[String, (GType, Value)])((acc, c) => acc ++ go(c, currentType))
-        case _                                                     =>
+        case _                                                        =>
           Map.empty
       }
 
@@ -452,7 +452,11 @@ trait QueryGen extends Generator {
     rootType:  GType,
     query:     Query
   ): List[Problem] = {
-    def check(selections: List[Query], currentType: Option[GType]): List[Problem] = {
+    def check(
+      selections:  List[Query],
+      currentType: Option[GType],
+      location:    Option[(Int, Int)]
+    ): List[Problem] = {
       val flat: List[FlatSelection] =
         flattenSelections(schema, fragments, selections, currentType)
 
@@ -468,7 +472,7 @@ trait QueryGen extends Generator {
       val typenames: List[Boolean] = flat.collect {
         case FlatSelection(
               None,
-              sel @ Query.UntypedSelect(TypeSelect, _, _, directives, _),
+              sel @ Query.UntypedSelect(TypeSelect, _, _, directives, _, _),
               conditional
             ) if Splice.unapply(sel).isEmpty =>
           conditional || hasConditionalDirective(directives)
@@ -483,7 +487,8 @@ trait QueryGen extends Generator {
             Problem(
               s"Selection on [$ctName] has fragments on subtypes [${variantTypeNames
                   .mkString(", ")}] but does not select `__typename`. Add `__typename` next to " +
-                "them so the response can be decoded to the right subtype."
+                "them so the response can be decoded to the right subtype.",
+              locations = location.toList
             )
           )
         } else if (typenames.forall(identity)) {
@@ -492,7 +497,8 @@ trait QueryGen extends Generator {
               s"Selection on [$ctName] has fragments on subtypes [${variantTypeNames
                   .mkString(", ")}] but its `__typename` is selected with `@skip`/`@include` " +
                 "(directly or via an enclosing fragment). The discriminator must be selected " +
-                "unconditionally so every response can be decoded to the right subtype."
+                "unconditionally so every response can be decoded to the right subtype.",
+              locations = location.toList
             )
           )
         } else List.empty
@@ -529,7 +535,8 @@ trait QueryGen extends Generator {
                   s"concrete type(s) [${shared.toList.sorted
                       .mkString(", ")}]: a response of that type can only decode to one of " +
                   "them, so the other's fields would be lost. Merge them into a single " +
-                  "fragment (e.g. on the concrete type)."
+                  "fragment (e.g. on the concrete type).",
+                locations = location.toList
               )
             )
           }
@@ -538,23 +545,23 @@ trait QueryGen extends Generator {
       val here: List[Problem] = typenameProblems ++ overlapProblems
 
       val nested: List[Problem] = flat.flatMap {
-        case FlatSelection(None, Query.UntypedSelect(name, _, _, _, child), _) =>
+        case FlatSelection(None, Query.UntypedSelect(name, _, _, _, child, loc), _) =>
           val next =
             MetaTypes
               .get(name)
               .orElse(currentType.flatMap(_.field(name)))
               .flatMap(_.underlyingObject)
-          check(selectionsOf(child), next)
-        case FlatSelection(Some(t), child, _)                                  =>
-          check(selectionsOf(child), schema.definition(t))
-        case _                                                                 =>
+          check(selectionsOf(child), next, loc)
+        case FlatSelection(Some(t), child, _)                                       =>
+          check(selectionsOf(child), schema.definition(t), location)
+        case _                                                                      =>
           List.empty
       }
 
       here ++ nested
     }
 
-    check(selectionsOf(query), rootType.some)
+    check(selectionsOf(query), rootType.some, none)
   }
 
   // A subquery is spliced by rendering it as a placeholder selection (see `splicePlaceholder`);
@@ -573,22 +580,30 @@ trait QueryGen extends Generator {
   ): List[Problem] = {
     def isSubqueryMarker(q: Query): Boolean = Splice.unapply(q).isDefined
 
+    def locationOf(q: Query): List[(Int, Int)] =
+      q match {
+        case Query.UntypedSelect(_, _, _, _, _, loc) => loc.toList
+        case Query.Select(_, _, _, loc)              => loc.toList
+        case _                                       => List.empty
+      }
+
     // `wholeChild` is true exactly when `q` is the entire (unwrapped) selection set of a field;
     // that's the only legal position for a subquery marker.
     def check(q: Query, wholeChild: Boolean): List[Problem] =
       if (isSubqueryMarker(q))
-        if (wholeChild) List.empty else List(Problem(subqueryPlacementMessage))
+        if (wholeChild) List.empty
+        else List(Problem(subqueryPlacementMessage, locations = locationOf(q)))
       else
         q match {
-          case Query.UntypedSelect(_, _, _, _, child)   =>
+          case Query.UntypedSelect(_, _, _, _, child, _) =>
             check(child, wholeChild = true)
-          case Query.UntypedInlineFragment(_, _, child) =>
+          case Query.UntypedInlineFragment(_, _, child)  =>
             check(child, wholeChild = false)
-          case Query.UntypedFragmentSpread(name, _)     =>
+          case Query.UntypedFragmentSpread(name, _)      =>
             fragments.get(name).fold(List.empty[Problem])(f => check(f.child, wholeChild = false))
-          case Query.Group(items)                       =>
+          case Query.Group(items)                        =>
             items.flatMap(check(_, wholeChild = false))
-          case _                                        =>
+          case _                                         =>
             List.empty
         }
 
@@ -998,7 +1013,7 @@ trait QueryGen extends Generator {
       currentType:    Option[GType]
     ): ClassAccumulator =
       currentAlgebra match {
-        case UntypedSelect(name, alias, _, directives, Splice(i)) =>
+        case UntypedSelect(name, alias, _, directives, Splice(i), _) =>
           val isConditional: Boolean = hasConditionalDirective(directives)
 
           val param = MetaTypes
@@ -1025,7 +1040,7 @@ trait QueryGen extends Generator {
             }
 
           ClassAccumulator(parAccum = List(param))
-        case UntypedSelect(name, alias, _, directives, child)     =>
+        case UntypedSelect(name, alias, _, directives, child, _)     =>
           val paramName: String = alias.getOrElse(name)
 
           // A field with an @include or @skip directive may be absent from the response, so it
@@ -1070,15 +1085,15 @@ trait QueryGen extends Generator {
                 )
               )
             }
-        case UntypedInlineFragment(_, _, _)                       =>
+        case UntypedInlineFragment(_, _, _)                          =>
           // grackle's parser collapses a selection set with a single inline fragment to a bare
           // node instead of wrapping it in a `Group`, so route it through the same
           // flatten-and-classify logic as the `Group` case below (it may itself be a variant).
           go(Group(List(currentAlgebra)), currentType)
-        case UntypedFragmentSpread(_, _)                          =>
+        case UntypedFragmentSpread(_, _)                             =>
           // Same reasoning as the bare-inline-fragment case above.
           go(Group(List(currentAlgebra)), currentType)
-        case Group(selections)                                    =>
+        case Group(selections)                                       =>
           // Normalize named-fragment spreads to inline fragments and unwrap same-type fragments
           // (grouping only, e.g. for `@include`) into a flat, ordered list of base-level selects
           // and variant inline fragments (fragments on a proper subtype of `currentType`). See
@@ -1137,7 +1152,7 @@ trait QueryGen extends Generator {
                   .collectFirst {
                     // A splice placeholder is an aliased `__typename` but not a discriminator, the
                     // same exclusion `validateTypenameSelections` makes.
-                    case FlatSelection(None, sel @ UntypedSelect(TypeSelect, alias, _, _, _), _)
+                    case FlatSelection(None, sel @ UntypedSelect(TypeSelect, alias, _, _, _, _), _)
                         if Splice.unapply(sel).isEmpty =>
                       (alias.getOrElse(TypeSelect), alias.isDefined)
                   }
@@ -1230,8 +1245,8 @@ trait QueryGen extends Generator {
                 ).some
               )
           }
-        case Empty                                                => ClassAccumulator()
-        case _                                                    =>
+        case Empty                                                   => ClassAccumulator()
+        case _                                                       =>
           throw new Exception(
             s"Unhandled Algebra: [$currentAlgebra] - Current Type: [$currentType]"
           )

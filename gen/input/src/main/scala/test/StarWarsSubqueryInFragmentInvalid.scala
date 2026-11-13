@@ -17,6 +17,9 @@ import clue.annotation.GraphQL
 @GraphQL
 trait StarWarsSubqueryInFragmentInvalid extends GraphQLOperation[StarWars] {
   override val document =
-    gql"query ($$ep: Episode!) { hero(episode: $$ep) { __typename name ... on Human $StarWarsHumanSubquery } }" // assert: GraphQLGen
+    gql"query ($$ep: Episode!) { hero(episode: $$ep) { __typename name ... on Human $StarWarsHumanSubquery } }" /* assert: GraphQLGen
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A subquery can only be spliced as the whole selection set of a field (`field $Subquery`), not inside a fragment or next to other selections. Splice it on a field of the subquery's type, or move the fragment into the subquery. (at 1:77)
+*/
 }
 // format: on

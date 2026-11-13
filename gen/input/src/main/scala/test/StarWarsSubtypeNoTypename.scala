@@ -16,6 +16,9 @@ import clue.annotation.GraphQL
 @GraphQL
 trait StarWarsSubtypeNoTypename extends GraphQLOperation[StarWars] {
   override val document =
-    gql"query ($$ep: Episode!) { hero(episode: $$ep) { name ... on Human { homePlanet } } }" // assert: GraphQLGen
+    gql"query ($$ep: Episode!) { hero(episode: $$ep) { name ... on Human { homePlanet } } }" /* assert: GraphQLGen
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Selection on [Character] has fragments on subtypes [Human] but does not select `__typename`. Add `__typename` next to them so the response can be decoded to the right subtype. (at 1:25)
+*/
 }
 // format: on
