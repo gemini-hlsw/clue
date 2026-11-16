@@ -83,6 +83,26 @@ object CluePlugin extends AutoPlugin {
       }.value)
     }
 
+  // What makes the generator rewrite a source: one of its annotations, or a `gql:` comment.
+  private val GeneratorTrigger =
+    """@(clue\.annotation\.)?GraphQL(Schema|Stub)?\b|//\s*gql:""".r
+
+  // scalafix only writes the sources the generator changed, so the others would never be compiled.
+  // They are copied as they are, which lets `clueSourceDirectory` also hold plain definitions (such
+  // as hand-written subqueries, or the classes the operations decode to).
+  private def copyUnprocessedSources(from: File, to: File): Unit =
+    (from ** "*.scala").get().foreach { source =>
+      IO.relativizeFile(from, source).foreach { relative =>
+        val target: File         = new File(to, relative.getPath)
+        val contents: String     = IO.read(source)
+        // A source the generator rewrites is never copied over its generated counterpart, even
+        // when scalafix skipped it this time. Without a counterpart, the generator left it alone.
+        val unprocessed: Boolean = GeneratorTrigger.findFirstIn(contents).isEmpty
+        if (!target.exists || (unprocessed && IO.read(target) != contents))
+          IO.write(target, contents)
+      }
+    }
+
   override def derivedProjects(proj: ProjectDefinition[?]): Seq[Project] = Seq(
     Project(
       proj.id + "-clue",
@@ -107,9 +127,11 @@ object CluePlugin extends AutoPlugin {
           val outTo   = root.relativize(to.toPath).normalize
           Def.task {
             streams.value.log.info(s"Generating Clue code from $outFrom to $outTo")
+            // A failed generation fails the task here, so nothing is copied then.
             val _ = (Compile / scalafix)
               .toTask(s" GraphQLGen --out-from=$outFrom --out-to=$outTo")
               .value
+            copyUnprocessedSources(from, to)
             (to ** "*.scala").get()
           }
         }.taskValue,
