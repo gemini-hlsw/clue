@@ -3,6 +3,7 @@
 
 package clue
 
+import clue.annotation.GraphQLStub
 import io.circe.Json
 
 // A subquery declaring a required variable, used to exercise the `gql` caller-check.
@@ -38,7 +39,7 @@ object InterpolatorTestSubList extends GraphQLSubquery.Typed[Unit, Json] {
 // A pre-generation `@GraphQLStub` placeholder (no `GraphQLSubquery` supertype), as the generator
 // leaves it before the scalafix rule replaces it with a real subquery. Exercises that the macro
 // tolerates splicing it.
-@clue.annotation.GraphQLStub
+@GraphQLStub
 object InterpolatorTestStub
 
 class GraphQLInterpolatorSuite extends munit.FunSuite {

@@ -132,9 +132,10 @@ abstract class FriendFields extends GraphQLSubquery.Typed[StarWars, Json] {
 A subquery's `subquery` is a `GraphQLDocument` too, so it is built with `gql` for the same reason a
 `document` is (see [Subquery variables](#subquery-variables)).
 
-Hand-written subqueries may declare **multiple** types (the selection is validated against each:
-`@GraphQLType("Human", "Droid")`). A subquery processed by the generator (`@GraphQL`) must declare
-**exactly one** type. `@GraphQLType` is only valid on a subquery, not on a `GraphQLOperation`.
+A subquery may declare **multiple** types (the selection is validated against each:
+`@GraphQLType("Human", "Droid")`). For a subquery processed by the generator (`@GraphQL`), the
+selected fields must also have the same types in every declared type, since a single `Data` is
+generated from them. `@GraphQLType` is only valid on a subquery, not on a `GraphQLOperation`.
 
 #### Interfaces and unions
 

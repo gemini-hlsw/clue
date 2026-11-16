@@ -10,13 +10,17 @@ package test
 
 import clue.GraphQLSubquery
 import clue.annotation.GraphQL
+import clue.annotation.GraphQLStub
 import clue.annotation.GraphQLType
 
-// A subquery processed by the generator (`@GraphQL`) must declare exactly one `@GraphQLType`, since
-// generation targets a single type. Multiple types here is an error (and nothing is generated).
-@GraphQL // assert: GraphQLGen
+// A subquery processed by the generator (`@GraphQL`) declaring multiple root types. `id` and `name`
+// have the same types on `Human` and `Droid`, so a single `Data` is generated for both.
+@GraphQL
 @GraphQLType("Human", "Droid")
 abstract class StarWarsSubqueryMultiTypeGenerated extends GraphQLSubquery[StarWars] {
   override val subquery = gql"{ id name }"
 }
+
+@GraphQLStub
+object StarWarsSubqueryMultiTypeGenerated
 // format: on
