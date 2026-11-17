@@ -10,6 +10,7 @@ package test
 
 import clue.GraphQLSubquery
 import clue.annotation.GraphQL
+import clue.annotation.GraphQLStub
 import clue.annotation.GraphQLType
 
 // A generated subquery that references `$ep` without declaring it: the generator infers the variable
@@ -20,6 +21,6 @@ abstract class StarWarsSubqueryInferVariable extends GraphQLSubquery[StarWars] {
   override val subquery = gql"{ hero(episode: $$ep) { name } }"
 }
 
-@clue.annotation.GraphQLStub
+@GraphQLStub
 object StarWarsSubqueryInferVariable
 // format: on

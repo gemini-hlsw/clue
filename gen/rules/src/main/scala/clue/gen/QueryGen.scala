@@ -660,25 +660,47 @@ trait QueryGen extends Generator {
       .getOrElse("")
 
   /**
-   * The variables to validate a subquery against: the declared `type VariableDefs`, or — when the
-   * generator processes the subquery (`@GraphQL`), which also emits the declaration for it — the
-   * set inferred from usage. A hand-written subquery must declare them itself, so `infer` is false
-   * there and an undeclared variable is reported.
+   * Validate a subquery the generator processes (`@GraphQL`) against each of `rootTypeNames`,
+   * yielding the variables it requires: the declared `type VariableDefs` (`explicitVariableDefs`)
+   * or, when there is none, the set inferred from usage, which the generator then emits as the
+   * declaration. A single declaration is emitted, so the variables inferred against each root type
+   * must be the same.
    */
-  protected def subqueryVariableDefs(
-    schema:        Schema,
-    rootTypeNames: List[String],
-    stats:         List[Stat],
-    subquery:      String,
-    infer:         Boolean
-  ): String =
-    extractVariableDefs(stats).getOrElse {
-      rootTypeNames match {
-        // Inference needs a single unambiguous root type, which is what `@GraphQL` requires anyway.
-        case rootTypeName :: Nil if infer =>
-          inferSubqueryVariableDefs(schema, rootTypeName, subquery)
-        case _                            => ""
-      }
+  protected def resolveSubqueryVariableDefs(
+    schema:               Schema,
+    rootTypeNames:        List[String],
+    explicitVariableDefs: Option[String],
+    subquery:             String
+  ): Result[String] =
+    explicitVariableDefs match {
+      case Some(variableDefs) =>
+        validateSubqueryTypes(schema, rootTypeNames, variableDefs, subquery).map(_ => variableDefs)
+      case None               =>
+        val inferred: List[(String, String)] =
+          rootTypeNames.map(name => name -> inferSubqueryVariableDefs(schema, name, subquery))
+        // Each type is validated with its own inferred variables first, so a selection that is
+        // invalid for one of them is reported as such rather than as a disagreement.
+        inferred
+          .parTraverse_ { case (name, variableDefs) =>
+            validateSubquery(schema, name, variableDefs, subquery)
+          }
+          .flatMap { _ =>
+            inferred.map(_._2).distinct match {
+              case Nil                 => Result.success("")
+              case variableDefs :: Nil => Result.success(variableDefs)
+              case _                   =>
+                val perType: String =
+                  inferred
+                    .map { case (name, variableDefs) =>
+                      s"$name: ${if (variableDefs.isEmpty) "()" else variableDefs}"
+                    }
+                    .mkString(", ")
+                Result.failure(
+                  s"The variables inferred for the subquery differ between its root types " +
+                    s"[$perType]. Declare them explicitly with `type VariableDefs`."
+                )
+            }
+          }
     }
 
   // Emit `type VariableDefs = "(...)"` into a generated subquery object when its variables were

@@ -10,6 +10,7 @@ package test
 
 import clue.GraphQLSubquery
 import clue.annotation.GraphQL
+import clue.annotation.GraphQLStub
 import clue.annotation.GraphQLType
 
 @GraphQL
@@ -23,6 +24,6 @@ abstract class StarWarsSubquery extends GraphQLSubquery[StarWars] {
       """
 }
 
-@clue.annotation.GraphQLStub
+@GraphQLStub
 object StarWarsSubquery
 // format: on

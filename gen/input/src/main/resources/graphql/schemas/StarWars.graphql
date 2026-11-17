@@ -42,3 +42,9 @@ type Droid implements Character {
   functions: [String!]
   primaryFunction: String @deprecated(reason: "Use 'functions' instead")
 }
+
+type Starship {
+  id: String!
+  name: String!
+  hero(episode: Episode): Character
+}

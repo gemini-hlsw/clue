@@ -35,6 +35,31 @@ class GraphQLGen(val config: GraphQLGenConfig)
     newLineIndent + lines.replaceAll("\\n", newLineIndent)
   }
 
+  // A generated subquery with several root types emits a single object, so the definitions
+  // generated from each of them (one entry per root type) must be the same. Reports the first
+  // difference found, if any.
+  private def generatedMismatch(bodies: List[(String, List[Stat])]): Option[String] = {
+    def lines(body: List[Stat]): List[String] =
+      body.flatMap(_.syntax.linesIterator.map(_.trim).toList)
+
+    bodies match {
+      case (firstType, firstBody) :: rest =>
+        val firstLines: List[String] = lines(firstBody)
+        rest.collectFirst {
+          case (otherType, otherBody) if lines(otherBody) != firstLines =>
+            val (first, other): (String, String) =
+              firstLines
+                .zipAll(lines(otherBody), "", "")
+                .find { case (a, b) => a != b }
+                .getOrElse(("", ""))
+            s"The subquery generates different definitions for its root types [$firstType] " +
+              s"(`$first`) and [$otherType] (`$other`). The fields it selects must have the same " +
+              "types in every root type."
+        }
+      case Nil                            => none
+    }
+  }
+
   override def fix(implicit doc: SemanticDocument): Patch = {
     val importPatch: List[IO[Patch]] =
       doc.tokens.collect {
@@ -72,17 +97,22 @@ class GraphQLGen(val config: GraphQLGenConfig)
                extractSubquery(stats),
                extractRootTypes(mods)
               ) match {
-                case (Some(schemaType), Some(subquery), rootTypeName :: Nil)
-                    if extractVariableDefs(stats).isEmpty =>
+                case (Some(schemaType), Some(subquery), rootTypes)
+                    if rootTypes.nonEmpty && extractVariableDefs(stats).isEmpty =>
                   config
                     .getSchema(schemaType.value)
                     .map(
-                      _.toOption.fold(stats)(schema =>
-                        addVariableDefsTypeAlias(
-                          none,
-                          inferSubqueryVariableDefs(schema, rootTypeName, subquery.render)
-                        )(stats)
-                      )
+                      _.toOption
+                        .flatMap(schema =>
+                          resolveSubqueryVariableDefs(schema,
+                                                      rootTypes,
+                                                      none,
+                                                      subquery.render
+                          ).toOption
+                        )
+                        .fold(stats)(variableDefs =>
+                          addVariableDefsTypeAlias(none, variableDefs)(stats)
+                        )
                     )
                 case _ => IO.pure(stats)
               }
@@ -94,7 +124,10 @@ class GraphQLGen(val config: GraphQLGenConfig)
                 _,
                 _
               ) =>
-            IO.pure(Patch.replaceTree(obj, ""))
+            // The placeholder goes away, and with it the import of its annotation, if any.
+            IO.pure(
+              Patch.replaceTree(obj, "") + Patch.removeGlobalImport(GraphQLStubAnnotation.symbol)
+            )
           case obj @ Defn.Trait.Initial(
                 mods @ GraphQLSchemaAnnotation(_),
                 templateName,
@@ -236,29 +269,21 @@ class GraphQLGen(val config: GraphQLGenConfig)
             val objName = templateName.value
 
             (extractSubquerySchemaType(inits), extractRootTypes(mods)) match {
-              case (None, _)                                    =>
+              case (None, _)                     =>
                 IO.pure(
                   errorDiagnostic(
                     "Invalid annotation target: must be a class extending GraphQLSubquery[Schema].",
                     obj.pos
                   )
                 )
-              case (Some(_), Nil)                               =>
+              case (Some(_), Nil)                =>
                 IO.pure(
                   errorDiagnostic(
                     "A GraphQLSubquery must declare its root type with a `@GraphQLType(\"...\")` annotation.",
                     obj.pos
                   )
                 )
-              case (Some(_), rootTypes) if rootTypes.sizeIs > 1 =>
-                IO.pure(
-                  errorDiagnostic(
-                    "A subquery processed by the generator (@GraphQL) must declare exactly one " +
-                      "@GraphQLType; multiple types are only supported on hand-written subqueries.",
-                    obj.pos
-                  )
-                )
-              case (Some(schemaType), rootTypeName :: _)        =>
+              case (Some(schemaType), rootTypes) =>
                 extractSubquery(stats) match {
                   case None           =>
                     IO.pure(
@@ -270,26 +295,26 @@ class GraphQLGen(val config: GraphQLGenConfig)
                   case Some(subquery) =>
                     withSchema(schemaType.value, obj.pos) { schema =>
                       val explicitVariableDefs: Option[String] = extractVariableDefs(stats)
-                      // For @GraphQL subqueries, infer the referenced variables from usage when the
-                      // author didn't declare them; the inferred set is emitted as
-                      // `type VariableDefs`.
-                      val variableDefs: String                 =
-                        explicitVariableDefs.getOrElse(
-                          inferSubqueryVariableDefs(schema, rootTypeName, subquery.render)
+                      // Validate the subquery against each of its root types first, reporting all
+                      // problems as diagnostics (errors at the subquery, warnings at the
+                      // definition). For @GraphQL subqueries, the referenced variables are inferred
+                      // from usage when the author didn't declare them; the inferred set is emitted
+                      // as `type VariableDefs`.
+                      val validation: Result[String]           =
+                        resolveSubqueryVariableDefs(
+                          schema,
+                          rootTypes,
+                          explicitVariableDefs,
+                          subquery.render
                         )
-                      // Validate the subquery against its root type first, reporting all problems
-                      // as diagnostics (errors at the subquery, warnings at the definition).
-                      val validation: Result[Unit]             =
-                        validateSubquery(schema, rootTypeName, variableDefs, subquery.render)
                       val diagnostics: Patch                   =
                         lintResult(
-                          validation,
+                          validation.map(_ => ()),
                           gqlValuePos("subquery", stats).getOrElse(obj.pos),
                           obj.pos
                         )
 
-                      if (!validation.hasValue) diagnostics
-                      else {
+                      validation.toOption.fold(diagnostics) { variableDefs =>
                         // Validation passed, so parsing and variable-type resolution below succeed.
                         val (operations, fragments) =
                           GQLParser
@@ -299,39 +324,49 @@ class GraphQLGen(val config: GraphQLGenConfig)
                         // TODO Support multi-operation queries?
                         val operation               = operations.head
 
-                        // Modifications to add the missing definitions.
-                        val modObjDefs = scala.Function.chain(
-                          List(
-                            addVariableDefsTypeAlias(explicitVariableDefs, variableDefs),
-                            addImports(schemaType.value),
-                            addData(
-                              schema,
-                              operation,
-                              config,
-                              subquery.subqueries,
-                              fragments,
-                              schema.types.find(_.name == rootTypeName)
-                            ),
-                            addDataDecoder,
-                            addConvenienceMethod(schemaType, operation, objName, config)
+                        // Modifications to add the missing definitions, resolving the selected
+                        // fields against `rootTypeName`.
+                        def modObjDefs(rootTypeName: String): List[Stat] => List[Stat] =
+                          scala.Function.chain(
+                            List(
+                              addVariableDefsTypeAlias(explicitVariableDefs, variableDefs),
+                              addImports(schemaType.value),
+                              addData(
+                                schema,
+                                operation,
+                                config,
+                                subquery.subqueries,
+                                fragments,
+                                schema.types.find(_.name == rootTypeName)
+                              ),
+                              addDataDecoder,
+                              addConvenienceMethod(schemaType, operation, objName, config)
+                            )
                           )
-                        )
+
+                        // A single object is emitted, so every root type must generate the same one.
+                        val bodies: List[(String, List[Stat])] =
+                          rootTypes.map(rootTypeName =>
+                            rootTypeName -> modObjDefs(rootTypeName)(stats)
+                          )
 
                         val newMods = GraphQLAnnotation.removeFrom(mods).filterNot {
                           case Mod.Abstract() => true
                           case _              => false
                         }
 
-                        // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
-                        diagnostics + Patch.replaceTree(
-                          obj,
-                          indented(obj)(
-                            q"..$newMods object ${Term
-                                .Name(
-                                  objName
-                                )} ${buildTemplate(early, inits, (self.some, modObjDefs(stats)))}".toString
-                          )
-                        ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
+                        generatedMismatch(bodies).fold(
+                          // Congratulations! You got a full-fledged GraphQLOperation (hopefully).
+                          diagnostics + Patch.replaceTree(
+                            obj,
+                            indented(obj)(
+                              q"..$newMods object ${Term
+                                  .Name(
+                                    objName
+                                  )} ${buildTemplate(early, inits, (self.some, bodies.head._2))}".toString
+                            )
+                          ) + Patch.removeGlobalImport(GraphQLAnnotation.symbol)
+                        )(mismatch => diagnostics + errorDiagnostic(mismatch, obj.pos))
                       }
                     }
                 }

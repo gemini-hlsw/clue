@@ -7,8 +7,9 @@ import scala.annotation.StaticAnnotation
 
 /**
  * Declares the GraphQL root type(s) a `GraphQLSubquery`'s selection set applies to, so it can be
- * validated against the schema. Multiple types are allowed for hand-written subqueries (the
- * selection is validated against each); a subquery processed by the generator (`@GraphQL`) must
- * declare exactly one. Not valid on a `GraphQLOperation`.
+ * validated against the schema. When multiple types are declared, the selection is validated
+ * against each. For a subquery processed by the generator (`@GraphQL`), the selected fields must
+ * also have the same types in every declared type, since a single `Data` is generated. Not valid on
+ * a `GraphQLOperation`.
  */
 class GraphQLType(types: String*) extends StaticAnnotation

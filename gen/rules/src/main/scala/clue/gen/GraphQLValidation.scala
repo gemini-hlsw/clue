@@ -105,10 +105,10 @@ trait GraphQLValidation extends QueryGen {
   // definition is neither. `defnPos` anchors structural/schema/warning diagnostics.
   //
   // `generating` is true when this definition is processed by the code generator (it carries a
-  // `@GraphQL` annotation): in that case a subquery must declare exactly one `@GraphQLType`, since
-  // generation (whether it synthesizes `Data` or copies a `.Typed`) targets a single type. When
-  // false (hand-written, validation only), multiple types are allowed and the selection is validated
-  // against each.
+  // `@GraphQL` annotation): in that case the variables a subquery doesn't declare are inferred from
+  // usage (the generator emits the declaration). When false (hand-written, validation only), the
+  // subquery must declare them itself, so an undeclared variable is reported. Either way a subquery
+  // may declare multiple `@GraphQLType`s, and the selection is validated against each.
   protected def validateGraphQLDefn(
     mods:       List[Mod],
     inits:      List[Init],
@@ -149,28 +149,24 @@ trait GraphQLValidation extends QueryGen {
                   defnPos
                 )
               )
-            else if (generating && rootTypes.sizeIs > 1)
-              IO.pure(
-                errorDiagnostic(
-                  "A subquery processed by the generator (@GraphQL) must declare exactly one " +
-                    "@GraphQLType; multiple types are only supported on hand-written subqueries.",
-                  defnPos
-                )
-              )
             else
               withSchema(schemaType.value, defnPos) { schema =>
+                val explicitVariableDefs: Option[String] = extractVariableDefs(stats)
                 lintResult(
-                  validateSubqueryTypes(
-                    schema,
-                    rootTypes,
-                    subqueryVariableDefs(schema,
-                                         rootTypes,
-                                         stats,
-                                         subquery.render,
-                                         infer = generating
+                  if (generating)
+                    resolveSubqueryVariableDefs(
+                      schema,
+                      rootTypes,
+                      explicitVariableDefs,
+                      subquery.render
+                    ).map(_ => ())
+                  else
+                    validateSubqueryTypes(
+                      schema,
+                      rootTypes,
+                      explicitVariableDefs.orEmpty,
+                      subquery.render
                     ),
-                    subquery.render
-                  ),
                   gqlValuePos("subquery", stats).getOrElse(defnPos),
                   defnPos
                 )
