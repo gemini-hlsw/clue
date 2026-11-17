@@ -16,6 +16,8 @@
 
 2. **Directory Structure**:
    - GraphQL queries should be placed in `<project>/src/clue/scala/[package]/`
+   - Other sources placed there (hand-written subqueries, the classes operations decode to) are
+     compiled too: the ones the generator doesn't process are copied as they are.
 
 3. **Schema Reference Configuration**:
    - Create or update `.scalafix.conf` to reference GraphQL schemas:

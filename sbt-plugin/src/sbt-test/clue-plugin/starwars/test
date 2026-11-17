@@ -2,3 +2,19 @@
 > app/clean
 $ absent app-clue/target/scala-2.13 target/**/app-clue/classes
 > app/compile
+
+# An edit of a plain source is copied, even when the source mentions the generator's annotations.
+$ copy-file changes/CharacterId.scala app/src/clue/scala/CharacterId.scala
+$ copy-file changes/AppEdited.scala app/src/main/scala/App.scala
+> app/compile
+
+# A source that is no longer generated replaces what had been generated from it.
+$ copy-file changes/HeroQuery.scala app/src/clue/scala/HeroQuery.scala
+$ copy-file changes/AppPlain.scala app/src/main/scala/App.scala
+> app/compile
+
+# A removed source is no longer compiled.
+$ delete app/src/clue/scala/HeroQuery.scala
+-> app/compile
+$ copy-file changes/AppEdited.scala app/src/main/scala/App.scala
+> app/compile
