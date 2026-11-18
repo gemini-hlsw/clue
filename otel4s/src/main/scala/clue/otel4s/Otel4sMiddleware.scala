@@ -29,6 +29,7 @@ import org.typelevel.otel4s.semconv.attributes.HttpAttributes
 import org.typelevel.otel4s.semconv.experimental.attributes.GraphqlExperimentalAttributes
 import org.typelevel.otel4s.trace.Span
 import org.typelevel.otel4s.trace.SpanBuilder
+import org.typelevel.otel4s.trace.SpanFinalizer
 import org.typelevel.otel4s.trace.SpanKind
 import org.typelevel.otel4s.trace.StatusCode
 import org.typelevel.otel4s.trace.Tracer
@@ -41,6 +42,16 @@ object Otel4sMiddleware:
 
   private def emptyAttrs[F[_]: Applicative]
     : (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]] = (_, _) => List.empty.pure
+
+  private[otel4s] def errorMessage(e: Throwable): String =
+    Option(e.getMessage).getOrElse(e.toString)
+
+  // Cancelling is how a subscription normally ends, so only real failures mark the span as errored.
+  private[otel4s] val subscriptionFinalization: SpanFinalizer.Strategy =
+    case Resource.ExitCase.Errored(e) =>
+      SpanFinalizer.recordException(e) |+| SpanFinalizer.setStatus(StatusCode.Error,
+                                                                   errorMessage(e)
+      )
 
   // Supplied only here: the streaming clients extend `Otel4sFetchClient` but speak WebSocket, and
   // must not describe their requests as HTTP.
@@ -151,10 +162,12 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
     operation:     String,
     document:      GraphQLQuery,
     operationName: Option[String],
-    descriptor:    Option[String]
+    descriptor:    Option[String],
+    finalization:  SpanFinalizer.Strategy = SpanFinalizer.Strategy.reportAbnormal
   ) = spanMod(
     T.spanBuilder(Otel4sMiddleware.spanName(operation, document, descriptor))
       .withSpanKind(SpanKind.Client)
+      .withFinalizationStrategy(finalization)
       .addAttributes(Otel4sMiddleware.commonAttributes(document, operationName, descriptor)*)
   )
 
@@ -221,7 +234,13 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
     descriptor:    Option[String]
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     for
-      res          <- traceSpan("subscribe", document, operationName, descriptor).build.resource
+      res          <- traceSpan(
+                        "subscribe",
+                        document,
+                        operationName,
+                        descriptor,
+                        Otel4sMiddleware.subscriptionFinalization
+                      ).build.resource
       span          = res.span
       _            <- Resource.eval:
                         additionalAttributesF(document, variables).flatMap: attrs =>
@@ -246,7 +265,7 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
       span.addAttribute(Attribute("clue.exitCase", exitCase.toOutcome.toString)) *>
         (exitCase match
           case Resource.ExitCase.Errored(e) =>
-            span.setStatus(StatusCode.Error, Option(e.getMessage).getOrElse(e.toString))
+            span.setStatus(StatusCode.Error, Otel4sMiddleware.errorMessage(e))
           case _                            => Applicative[F].unit)
 
 class Otel4sPersistentStreamingClient[F[_]: Tracer: Concurrent, S, CP, CE](
