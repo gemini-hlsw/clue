@@ -20,6 +20,7 @@ object Settings {
     val munit                  = "1.3.6"
     val munitCatsEffect        = "2.2.1"
     val otel4s                 = "1.2.0"
+    val otel4sSdk              = "0.19.5"
     val http4sOtel4sMiddleware = "0.20.0"
     val scalaFix               = scalafix.sbt.BuildInfo.scalafixVersion
     val scalaJsDom             = "2.8.1"
@@ -151,7 +152,7 @@ object Settings {
 
     val Otel4sTestkit = Def.setting(
       Seq(
-        "org.typelevel" %%% "otel4s-sdk-testkit" % otel4s % "test"
+        "org.typelevel" %%% "otel4s-sdk-trace-testkit" % otel4sSdk % "test"
       )
     )
 
