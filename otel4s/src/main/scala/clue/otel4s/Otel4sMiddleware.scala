@@ -6,6 +6,7 @@ package clue.otel4s
 import cats.Applicative
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
+import cats.effect.Ref
 import cats.effect.Resource
 import cats.syntax.all.*
 import clue.BuildInfo
@@ -46,12 +47,15 @@ object Otel4sMiddleware:
   private[otel4s] def errorMessage(e: Throwable): String =
     Option(e.getMessage).getOrElse(e.toString)
 
-  // Cancelling is how a subscription normally ends, so only real failures mark the span as errored.
-  private[otel4s] val subscriptionFinalization: SpanFinalizer.Strategy =
-    case Resource.ExitCase.Errored(e) =>
-      SpanFinalizer.recordException(e) |+| SpanFinalizer.setStatus(StatusCode.Error,
-                                                                   errorMessage(e)
-      )
+  private[otel4s] def exitCaseAttribute(exitCase: Resource.ExitCase): Attribute[String] =
+    val name = exitCase match
+      case Resource.ExitCase.Succeeded  => "Succeeded"
+      case Resource.ExitCase.Errored(_) => "Errored"
+      case Resource.ExitCase.Canceled   => "Canceled"
+    Attribute("clue.exitCase", name)
+
+  private[otel4s] def recordError[F[_]: Applicative](span: Span[F], e: Throwable): F[Unit] =
+    span.recordException(e) *> span.setStatus(StatusCode.Error, errorMessage(e))
 
   // Supplied only here: the streaming clients extend `Otel4sFetchClient` but speak WebSocket, and
   // must not describe their requests as HTTP.
@@ -239,9 +243,19 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
                         document,
                         operationName,
                         descriptor,
-                        Otel4sMiddleware.subscriptionFinalization
+                        SpanFinalizer.Strategy.empty
                       ).build.resource
       span          = res.span
+      streamError  <- Resource.eval(Ref.of[F, Option[Throwable]](None))
+      // Cancelling is how a subscription normally ends, so only real failures mark the span as
+      // errored. A stream error the consumer rethrows was already recorded by the stream.
+      _            <- Resource.onFinalizeCase:
+                        case Resource.ExitCase.Errored(e)          =>
+                          streamError.get.flatMap: recorded =>
+                            Otel4sMiddleware.recordError(span, e).unlessA(recorded.exists(_ eq e))
+                        case exitCase @ Resource.ExitCase.Canceled =>
+                          span.addAttribute(Otel4sMiddleware.exitCaseAttribute(exitCase))
+                        case Resource.ExitCase.Succeeded           => Applicative[F].unit
       _            <- Resource.eval:
                         additionalAttributesF(document, variables).flatMap: attrs =>
                           span.addAttributes(attrs*)
@@ -262,10 +276,10 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
                         descriptor
                       )
     yield stream.onFinalizeCase: exitCase =>
-      span.addAttribute(Attribute("clue.exitCase", exitCase.toOutcome.toString)) *>
+      span.addAttribute(Otel4sMiddleware.exitCaseAttribute(exitCase)) *>
         (exitCase match
           case Resource.ExitCase.Errored(e) =>
-            span.setStatus(StatusCode.Error, Otel4sMiddleware.errorMessage(e))
+            streamError.set(Some(e)) *> Otel4sMiddleware.recordError(span, e)
           case _                            => Applicative[F].unit)
 
 class Otel4sPersistentStreamingClient[F[_]: Tracer: Concurrent, S, CP, CE](

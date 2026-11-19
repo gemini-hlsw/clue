@@ -15,6 +15,7 @@ import io.circe.Json
 import io.circe.JsonObject
 import munit.CatsEffectSuite
 import org.typelevel.otel4s.sdk.testkit.trace.TracesTestkit
+import org.typelevel.otel4s.sdk.trace.data.SpanData
 import org.typelevel.otel4s.sdk.trace.data.StatusData
 import org.typelevel.otel4s.trace.Tracer
 
@@ -24,7 +25,9 @@ class Otel4sSubscribeSpanSpec extends CatsEffectSuite:
 
   private val doc = GraphQLQuery("subscription Edits { edits { id } }")
 
-  private val stubStream: StreamingClient[IO, Unit] =
+  private val boom = new RuntimeException("boom")
+
+  private def stubStream(events: Stream[IO, Nothing]): StreamingClient[IO, Unit] =
     new StreamingClient[IO, Unit]:
       protected[clue] def requestInternal[D: Decoder](
         document:      GraphQLQuery,
@@ -42,9 +45,12 @@ class Otel4sSubscribeSpanSpec extends CatsEffectSuite:
         extensions:    Option[JsonObject],
         descriptor:    Option[String]
       ): Resource[IO, Stream[IO, GraphQLResponse[D]]] =
-        Resource.pure(Stream.never[IO])
+        Resource.pure(events)
 
-  private def subscribeStatus(run: Subscription => IO[Unit]): IO[StatusData] =
+  private def subscribeSpan(
+    events: Stream[IO, Nothing],
+    run:    Subscription => IO[Unit]
+  ): IO[SpanData] =
     TracesTestkit
       .inMemory[IO]()
       .use: testkit =>
@@ -52,15 +58,21 @@ class Otel4sSubscribeSpanSpec extends CatsEffectSuite:
           tracer <- testkit.tracerProvider.get("test")
           client  =
             given Tracer[IO] = tracer
-            Otel4sStreamingClient[IO, Unit](stubStream, identity, (_, _) => IO.pure(Nil))
+            Otel4sStreamingClient[IO, Unit](stubStream(events), identity, (_, _) => IO.pure(Nil))
           _      <- run(client.subscribeInternal[Json](doc, None, None, None, None))
           spans  <- testkit.finishedSpans
-        yield spans.map(_.status)
+        yield spans
       .map:
-        case List(status) => status
-        case other        => fail(s"expected one span, got [$other]")
+        case List(span) => span
+        case other      => fail(s"expected one span, got [$other]")
 
-  test("a cancelled subscription leaves the span status unset"):
+  private def exitCase(span: SpanData): Option[String] =
+    span.attributes.elements.get[String]("clue.exitCase").map(_.value)
+
+  private def exceptionEvents(span: SpanData): Int =
+    span.events.elements.count(_.name == "exception")
+
+  test("a subscription cancelled before the stream is pulled is recorded but not an error"):
     val cancel: Subscription => IO[Unit] = sub =>
       Deferred[IO, Unit].flatMap: started =>
         sub
@@ -68,11 +80,31 @@ class Otel4sSubscribeSpanSpec extends CatsEffectSuite:
           .start
           .flatMap: fiber =>
             started.get >> fiber.cancel
-    assertIO(subscribeStatus(cancel), StatusData.Unset)
+    subscribeSpan(Stream.never[IO], cancel).map: span =>
+      assertEquals(span.status, StatusData.Unset)
+      assertEquals(exitCase(span), Some("Canceled"))
 
-  test("a failed subscription marks the span as an error with the failure message"):
-    val boom: Subscription => IO[Unit] =
-      _.use(_ => IO.raiseError(new RuntimeException("boom"))).voidError
-    assertIO(subscribeStatus(boom), StatusData.Error(Some("boom")))
+  test("a subscription whose stream ends normally records a plain Succeeded exit case"):
+    subscribeSpan(Stream.empty, _.use(_.compile.drain)).map: span =>
+      assertEquals(span.status, StatusData.Unset)
+      assertEquals(exitCase(span), Some("Succeeded"))
+
+  test("a consumer failure marks the span as an error with the failure message"):
+    subscribeSpan(Stream.never[IO], _.use(_ => IO.raiseError(boom)).voidError).map: span =>
+      assertEquals(span.status, StatusData.Error(Some("boom")))
+      assertEquals(exceptionEvents(span), 1)
+
+  test("a stream failure marks the span as an error with the failure message"):
+    subscribeSpan(Stream.raiseError[IO](boom), _.use(_.compile.drain).voidError).map: span =>
+      assertEquals(span.status, StatusData.Error(Some("boom")))
+      assertEquals(exitCase(span), Some("Errored"))
+      assertEquals(exceptionEvents(span), 1)
+
+  test("a stream failure the consumer recovers from still records the exception"):
+    val recover: Subscription => IO[Unit] =
+      _.use(_.handleErrorWith(_ => Stream.empty).compile.drain)
+    subscribeSpan(Stream.raiseError[IO](boom), recover).map: span =>
+      assertEquals(span.status, StatusData.Error(Some("boom")))
+      assertEquals(exceptionEvents(span), 1)
 
 end Otel4sSubscribeSpanSpec
