@@ -6,6 +6,7 @@ package clue.otel4s
 import cats.Applicative
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
+import cats.effect.Ref
 import cats.effect.Resource
 import cats.syntax.all.*
 import clue.BuildInfo
@@ -29,6 +30,7 @@ import org.typelevel.otel4s.semconv.attributes.HttpAttributes
 import org.typelevel.otel4s.semconv.experimental.attributes.GraphqlExperimentalAttributes
 import org.typelevel.otel4s.trace.Span
 import org.typelevel.otel4s.trace.SpanBuilder
+import org.typelevel.otel4s.trace.SpanFinalizer
 import org.typelevel.otel4s.trace.SpanKind
 import org.typelevel.otel4s.trace.StatusCode
 import org.typelevel.otel4s.trace.Tracer
@@ -41,6 +43,19 @@ object Otel4sMiddleware:
 
   private def emptyAttrs[F[_]: Applicative]
     : (GraphQLQuery, Option[JsonObject]) => F[List[Attribute[?]]] = (_, _) => List.empty.pure
+
+  private[otel4s] def errorMessage(e: Throwable): String =
+    Option(e.getMessage).getOrElse(e.toString)
+
+  private[otel4s] def exitCaseAttribute(exitCase: Resource.ExitCase): Attribute[String] =
+    val name = exitCase match
+      case Resource.ExitCase.Succeeded  => "Succeeded"
+      case Resource.ExitCase.Errored(_) => "Errored"
+      case Resource.ExitCase.Canceled   => "Canceled"
+    Attribute("clue.exitCase", name)
+
+  private[otel4s] def recordError[F[_]: Applicative](span: Span[F], e: Throwable): F[Unit] =
+    span.recordException(e) *> span.setStatus(StatusCode.Error, errorMessage(e))
 
   // Supplied only here: the streaming clients extend `Otel4sFetchClient` but speak WebSocket, and
   // must not describe their requests as HTTP.
@@ -151,10 +166,12 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
     operation:     String,
     document:      GraphQLQuery,
     operationName: Option[String],
-    descriptor:    Option[String]
+    descriptor:    Option[String],
+    finalization:  SpanFinalizer.Strategy = SpanFinalizer.Strategy.reportAbnormal
   ) = spanMod(
     T.spanBuilder(Otel4sMiddleware.spanName(operation, document, descriptor))
       .withSpanKind(SpanKind.Client)
+      .withFinalizationStrategy(finalization)
       .addAttributes(Otel4sMiddleware.commonAttributes(document, operationName, descriptor)*)
   )
 
@@ -221,8 +238,24 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
     descriptor:    Option[String]
   ): Resource[F, fs2.Stream[F, GraphQLResponse[D]]] =
     for
-      res          <- traceSpan("subscribe", document, operationName, descriptor).build.resource
+      res          <- traceSpan(
+                        "subscribe",
+                        document,
+                        operationName,
+                        descriptor,
+                        SpanFinalizer.Strategy.empty
+                      ).build.resource
       span          = res.span
+      streamError  <- Resource.eval(Ref.of[F, Option[Throwable]](None))
+      // Cancelling is how a subscription normally ends, so only real failures mark the span as
+      // errored. A stream error the consumer rethrows was already recorded by the stream.
+      _            <- Resource.onFinalizeCase:
+                        case Resource.ExitCase.Errored(e)          =>
+                          streamError.get.flatMap: recorded =>
+                            Otel4sMiddleware.recordError(span, e).unlessA(recorded.exists(_ eq e))
+                        case exitCase @ Resource.ExitCase.Canceled =>
+                          span.addAttribute(Otel4sMiddleware.exitCaseAttribute(exitCase))
+                        case Resource.ExitCase.Succeeded           => Applicative[F].unit
       _            <- Resource.eval:
                         additionalAttributesF(document, variables).flatMap: attrs =>
                           span.addAttributes(attrs*)
@@ -243,10 +276,10 @@ class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
                         descriptor
                       )
     yield stream.onFinalizeCase: exitCase =>
-      span.addAttribute(Attribute("clue.exitCase", exitCase.toOutcome.toString)) *>
+      span.addAttribute(Otel4sMiddleware.exitCaseAttribute(exitCase)) *>
         (exitCase match
           case Resource.ExitCase.Errored(e) =>
-            span.setStatus(StatusCode.Error, Option(e.getMessage).getOrElse(e.toString))
+            streamError.set(Some(e)) *> Otel4sMiddleware.recordError(span, e)
           case _                            => Applicative[F].unit)
 
 class Otel4sPersistentStreamingClient[F[_]: Tracer: Concurrent, S, CP, CE](

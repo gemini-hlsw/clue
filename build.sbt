@@ -1,6 +1,6 @@
 lazy val V = _root_.scalafix.sbt.BuildInfo
 
-ThisBuild / tlBaseVersion     := "0.62"
+ThisBuild / tlBaseVersion     := "0.63"
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 // The CI matrix covers Scala 3 only, which builds `sbt-clue` for sbt 2.x. Run the scripted tests
@@ -147,7 +147,9 @@ lazy val otel4s =
       moduleName := "clue-otel4s",
       libraryDependencies ++=
         Settings.Libraries.Otel4s.value ++
-          Settings.Libraries.MUnit.value
+          Settings.Libraries.MUnit.value ++
+          Settings.Libraries.MUnitCatsEffect.value ++
+          Settings.Libraries.Otel4sTestkit.value
     )
     .dependsOn(core)
 
