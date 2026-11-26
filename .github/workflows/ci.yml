@@ -199,6 +199,53 @@ jobs:
           SONATYPE_CREDENTIAL_HOST: ${{ secrets.SONATYPE_CREDENTIAL_HOST }}
         run: sbt tlCiRelease
 
+  dependency-submission:
+    name: Submit Dependencies
+    if: github.event.repository.fork == false && github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        java: [temurin@25]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout current branch (full)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Setup Java (temurin@25)
+        id: setup-java-temurin-25
+        if: matrix.java == 'temurin@25'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: sbt
+          cache-dependency-path: |
+            **/*.sbt
+            **/project/build.properties
+            **/project/**.scala
+            **/project/**.sbt
+            .github/workflows/ci.yml
+
+      - name: sbt update
+        if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
+        run: |
+          for attempt in 1 2 3; do
+            sbt +update +scalaCompilerBridgeBinaryJar && exit 0
+            [ "$attempt" = 3 ] || sleep 30
+          done
+          exit 1
+
+      - name: Submit Dependencies
+        uses: scalacenter/sbt-dependency-submission@v2
+        with:
+          modules-ignore: gentests_3 geninput_3 clue_3 genoutput_3 clue_3 clue_3 clue-http4s-jdk-client-demo_3
+          configs-ignore: test scala-tool scala-doc-tool test-internal
+
   validate-steward:
     name: Validate Steward Config
     strategy:
