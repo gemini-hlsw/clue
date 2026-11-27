@@ -6,6 +6,7 @@ package clue.otel4s
 import cats.Applicative
 import cats.effect.Concurrent
 import cats.effect.MonadCancelThrow
+import cats.effect.Outcome
 import cats.effect.Ref
 import cats.effect.Resource
 import cats.syntax.all.*
@@ -191,38 +192,49 @@ class Otel4sFetchClient[F[_]: {MonadCancelThrow, Tracer as T}, P: TraceHeaderInj
     descriptor:    Option[String]
   ): F[GraphQLResponse[D]] =
     MonadCancelThrow[F].uncancelable: poll =>
-      traceSpan("request", document, operationName, descriptor)
+      traceSpan("request", document, operationName, descriptor, SpanFinalizer.Strategy.empty)
         .addAttributes(transportAttributes*)
         .build
         .use: span =>
-          for
-            additional   <- additionalAttributesF(document, variables)
-            _            <- span.addAttributes(additional*)
-            traceHeaders <- T.propagate(Map.empty)
-            mergedExt     = mergeOtelExtension(extensions, traceHeaders)
-            // Measure the payload after trace headers are merged in
-            _            <- span.addAttribute(
-                              Attribute(
-                                "clue.request.body.size",
-                                Otel4sMiddleware.requestBodySize(document, operationName, variables, mergedExt)
-                              )
-                            )
-            modWithTrace  =
-              modParams.andThen(p => TraceHeaderInjector[P].addHeaders(p, traceHeaders))
-            result       <-
-              poll(
-                wrapped
-                  .requestInternal[D](
-                    document,
-                    operationName,
-                    variables,
-                    mergedExt,
-                    modWithTrace,
-                    descriptor
+          // A superseded request is cancelled on purpose, so only real failures mark the span as
+          // errored.
+          val finalizeSpan: Outcome[F, Throwable, GraphQLResponse[D]] => F[Unit] =
+            case Outcome.Errored(e)   => Otel4sMiddleware.recordError(span, e)
+            case Outcome.Canceled()   =>
+              span.addAttribute(Otel4sMiddleware.exitCaseAttribute(Resource.ExitCase.Canceled))
+            case Outcome.Succeeded(_) => Applicative[F].unit
+
+          val traced: F[GraphQLResponse[D]] =
+            for
+              additional   <- additionalAttributesF(document, variables)
+              _            <- span.addAttributes(additional*)
+              traceHeaders <- T.propagate(Map.empty)
+              mergedExt     = mergeOtelExtension(extensions, traceHeaders)
+              // Measure the payload after trace headers are merged in
+              _            <-
+                span.addAttribute(
+                  Attribute(
+                    "clue.request.body.size",
+                    Otel4sMiddleware.requestBodySize(document, operationName, variables, mergedExt)
                   )
-              )
-            _            <- Otel4sMiddleware.responseAttributes(span, result)
-          yield result
+                )
+              modWithTrace  =
+                modParams.andThen(p => TraceHeaderInjector[P].addHeaders(p, traceHeaders))
+              result       <-
+                poll(
+                  wrapped
+                    .requestInternal[D](
+                      document,
+                      operationName,
+                      variables,
+                      mergedExt,
+                      modWithTrace,
+                      descriptor
+                    )
+                )
+              _            <- Otel4sMiddleware.responseAttributes(span, result)
+            yield result
+          MonadCancelThrow[F].guaranteeCase(traced)(finalizeSpan)
 
 class Otel4sStreamingClient[F[_]: {Concurrent, Tracer as T}, S](
   wrapped:               StreamingClient[F, S],
